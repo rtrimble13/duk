@@ -116,3 +116,114 @@ class TestTreasuryCLI:
         assert result.exit_code == 0
         assert "TurningBull Data Utility Knife" in result.output
         assert "tr" in result.output
+
+    @patch("duk.commands.tr.TreasuryRateDownloader._make_request")
+    def test_tr_interpolation_basic(self, mock_request):
+        """Test tr command with basic interpolation."""
+        # Use more complete sample data for interpolation
+        complete_sample_data = [
+            {
+                "record_date": "2023-12-01",
+                "1_mo": "5.50",
+                "3_mo": "5.35",
+                "6_mo": "5.15",
+                "1_yr": "4.95",
+                "2_yr": "4.85",
+                "5_yr": "4.65",
+                "10_yr": "4.45",
+                "30_yr": "4.25",
+            }
+        ]
+        
+        mock_request.side_effect = [
+            {"data": [{"record_date": "2023-12-01"}]},  # get_latest_date
+            {"data": complete_sample_data},  # download_data
+        ]
+
+        result = self.runner.invoke(main, ["tr", "--interpolate"])
+
+        assert result.exit_code == 0
+        assert "calendar_date" in result.output
+        assert "date_decimal_years" in result.output
+        assert "maturity_years" in result.output
+        assert "interpolated_rate" in result.output
+        assert "2023-12-01" in result.output
+
+    @patch("duk.commands.tr.TreasuryRateDownloader._make_request")
+    def test_tr_interpolation_quarterly(self, mock_request):
+        """Test tr command with quarterly interpolation."""
+        complete_sample_data = [
+            {
+                "record_date": "2023-12-01",
+                "1_mo": "5.50",
+                "3_mo": "5.35",
+                "6_mo": "5.15",
+                "1_yr": "4.95",
+                "2_yr": "4.85",
+                "5_yr": "4.65",
+                "10_yr": "4.45",
+                "30_yr": "4.25",
+            }
+        ]
+        
+        mock_request.side_effect = [
+            {"data": [{"record_date": "2023-12-01"}]},
+            {"data": complete_sample_data},
+        ]
+
+        result = self.runner.invoke(main, ["tr", "--interpolate", "--interpolate-interval", "quarter"])
+
+        assert result.exit_code == 0
+        assert "calendar_date" in result.output
+        assert "interpolated_rate" in result.output
+
+    @patch("duk.commands.tr.TreasuryRateDownloader._make_request")
+    def test_tr_interpolation_file_output(self, mock_request):
+        """Test tr command with interpolation and file output."""
+        complete_sample_data = [
+            {
+                "record_date": "2023-12-01",
+                "1_mo": "5.50",
+                "3_mo": "5.35",
+                "6_mo": "5.15",
+                "1_yr": "4.95",
+                "2_yr": "4.85",
+                "5_yr": "4.65",
+                "10_yr": "4.45",
+                "30_yr": "4.25",
+            }
+        ]
+        
+        mock_request.side_effect = [
+            {"data": [{"record_date": "2023-12-01"}]},
+            {"data": complete_sample_data},
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.runner.invoke(main, ["tr", "--interpolate", "--output", "--directory", tmpdir])
+
+            assert result.exit_code == 0
+            assert "Data saved to" in result.output
+            assert "treasury_par_yields_interpolated_semiannual_20231201.csv" in result.output
+
+    @patch("duk.commands.tr.TreasuryRateDownloader._make_request")
+    def test_tr_interpolation_insufficient_data(self, mock_request):
+        """Test tr command with interpolation when there's insufficient data."""
+        # Only provide 2 data points - insufficient for cubic spline
+        insufficient_data = [
+            {
+                "record_date": "2023-12-01",
+                "1_yr": "4.95",
+                "10_yr": "4.45",
+            }
+        ]
+        
+        mock_request.side_effect = [
+            {"data": [{"record_date": "2023-12-01"}]},
+            {"data": insufficient_data},
+        ]
+
+        result = self.runner.invoke(main, ["tr", "--interpolate"])
+
+        assert result.exit_code == 1
+        assert "Interpolation failed" in result.output or "Not enough valid data points" in result.output

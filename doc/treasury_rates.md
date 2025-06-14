@@ -16,6 +16,52 @@ duk tr
 duk -v tr
 ```
 
+## Cubic Spline Interpolation
+
+The `tr` command supports cubic spline interpolation of the yield curve data to provide rates at regular intervals along the maturity spectrum.
+
+### Basic Interpolation
+```bash
+# Perform semiannual interpolation (default)
+duk tr --interpolate
+duk tr -i
+
+# Specify different interpolation intervals
+duk tr --interpolate --interpolate-interval quarter
+duk tr --interpolate --interpolate-interval month
+duk tr --interpolate --interpolate-interval day
+```
+
+### Interpolation Output Format
+
+When interpolation is enabled, the output format changes to:
+- `calendar_date`: Date in YYYY-MM-DD format
+- `date_decimal_years`: Date expressed as decimal years (reference: year 2000)
+- `maturity_years`: Maturity in decimal years
+- `interpolated_rate`: Interpolated interest rate
+
+### Interpolation Intervals
+
+- **semiannual** (default): 0.5-year intervals (e.g., 0.5, 1.0, 1.5, 2.0...)
+- **quarter**: 0.25-year intervals (e.g., 0.25, 0.5, 0.75, 1.0...)
+- **month**: Monthly intervals (e.g., 0.083, 0.167, 0.25...)
+- **day**: Mixed intervals from daily (short-term) to yearly (long-term)
+
+### Interpolation Examples
+```bash
+# Latest data with default semiannual interpolation
+duk tr --interpolate
+
+# Historical data with quarterly interpolation
+duk tr --date 2023-12-01 --interpolate --interpolate-interval quarter
+
+# Save interpolated data to file
+duk tr --days 5 --interpolate --output
+
+# Multiple dates with monthly interpolation in JSON format
+duk tr --start-date 2023-11-01 --end-date 2023-11-30 --interpolate --interpolate-interval month --format json --output
+```
+
 ## Date Options
 
 ### Specific Date
