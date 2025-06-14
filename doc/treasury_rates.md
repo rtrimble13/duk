@@ -1,0 +1,191 @@
+# Treasury Rate Downloader (`duk tr`)
+
+The `duk tr` subprogram downloads U.S. Treasury par yield curve rates from the Treasury.gov API.
+
+## Overview
+
+This command retrieves daily Treasury par yield curve rates, which represent the interest rates on Treasury securities of various maturities. The data includes rates for maturities from 1 month to 30 years.
+
+## Basic Usage
+
+```bash
+# Download the most recent available data to stdout (CSV format)
+duk tr
+
+# Download with verbose logging
+duk -v tr
+```
+
+## Date Options
+
+### Specific Date
+```bash
+# Download data for a specific date
+duk tr --date 2023-12-01
+duk tr -d 2023-12-01
+```
+
+### Date Range
+```bash
+# Download data for a date range
+duk tr --start-date 2023-11-01 --end-date 2023-11-30
+duk tr -s 2023-11-01 -e 2023-11-30
+```
+
+### Number of Days
+```bash
+# Download last 5 days of data
+duk tr --days 5
+duk tr -n 5
+
+# Download 10 days starting from a specific date
+duk tr --start-date 2023-12-01 --days 10
+```
+
+## Output Options
+
+### Output to File
+```bash
+# Output to file with default naming (treasury_par_yields_YYYYMMDD.csv)
+duk tr --output
+duk tr -o
+
+# Output to file with custom filename
+duk tr --filename my_treasury_data
+duk tr -f my_treasury_data
+
+# Specify output directory
+duk tr --output --directory /path/to/output
+duk tr -o -D /path/to/output
+```
+
+### Output Formats
+
+#### CSV Format (Default)
+```bash
+# CSV output to stdout
+duk tr
+
+# CSV output to file
+duk tr --output --format csv
+```
+
+#### JSON Format
+```bash
+# JSON output to stdout
+duk tr --format json
+
+# JSON output to file
+duk tr --output --format json
+```
+
+## Data Structure
+
+The treasury data includes the following fields:
+
+- `record_date`: The date of the yield curve data (YYYY-MM-DD)
+- `1_mo`, `2_mo`, `3_mo`, `4_mo`, `6_mo`: Short-term rates (months)
+- `1_yr`, `2_yr`, `3_yr`, `5_yr`, `7_yr`: Medium-term rates (years)
+- `10_yr`, `20_yr`, `30_yr`: Long-term rates (years)
+
+Rate values are expressed as percentages (e.g., 4.25 represents 4.25%).
+
+## Examples
+
+### Basic Usage Examples
+```bash
+# Get latest data
+duk tr
+
+# Get data for last trading week (5 days)
+duk tr --days 5
+
+# Get specific date
+duk tr --date 2023-12-01
+```
+
+### File Output Examples
+```bash
+# Save last 30 days to default file
+duk tr --days 30 --output
+
+# Save to custom filename in JSON format
+duk tr --days 10 --filename rates_december --format json --output
+
+# Save to specific directory
+duk tr --output --directory ./data/treasury
+```
+
+### Advanced Examples
+```bash
+# Download Q4 2023 data to CSV file
+duk tr --start-date 2023-10-01 --end-date 2023-12-31 --output
+
+# Get year-end data for multiple years (would require multiple commands)
+duk tr --date 2022-12-30 --filename rates_2022 --output
+duk tr --date 2023-12-29 --filename rates_2023 --output
+```
+
+## Integration with Data Analysis
+
+The output format is designed to be easily loaded into pandas DataFrames:
+
+### Python Integration
+```python
+import pandas as pd
+
+# Load CSV output
+df = pd.read_csv('treasury_par_yields_20231201.csv')
+
+# Convert date column to datetime
+df['record_date'] = pd.to_datetime(df['record_date'])
+
+# Set date as index for time series analysis
+df.set_index('record_date', inplace=True)
+```
+
+### JSON Integration
+```python
+import json
+import pandas as pd
+
+# Load JSON output
+with open('treasury_par_yields_20231201.json', 'r') as f:
+    data = json.load(f)
+
+df = pd.DataFrame(data)
+df['record_date'] = pd.to_datetime(df['record_date'])
+```
+
+## Error Handling
+
+The command provides clear error messages for common issues:
+
+- **Network connectivity issues**: "Failed to download treasury data"
+- **Invalid date formats**: Use YYYY-MM-DD format
+- **No data available**: "No data found for the specified criteria"
+- **Invalid date combinations**: Cannot specify --date with --start-date or --end-date
+
+## Logging
+
+When run with the `-v` flag, detailed logging information is written to `var/duk.log` and displayed on stderr, including:
+
+- API request details
+- Number of records downloaded
+- File save locations
+- Error details for troubleshooting
+
+## Data Source
+
+Data is retrieved from the U.S. Treasury's Fiscal Data API:
+- **API Endpoint**: `https://api.fiscaldata.treasury.gov/services/api/v1/accounting/od/daily_treasury_par_yield_curve_rates`
+- **Data Source**: U.S. Department of the Treasury, Bureau of the Fiscal Service
+- **Update Frequency**: Daily (business days)
+- **Historical Coverage**: Data available from 1990 to present
+
+## Notes
+
+- Treasury markets are closed on weekends and federal holidays, so no data is available for these dates
+- The most recent data may be delayed by 1-2 business days
+- All rates are expressed as annual percentages
+- The par yield curve represents the yields of the most recently auctioned Treasury securities
