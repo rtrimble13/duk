@@ -5,7 +5,7 @@ Treasury rate subprogram for downloading par treasury yield data.
 import json
 import logging
 import sys
-from datetime import timedelta, datetime
+from datetime import timedelta
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -239,18 +239,6 @@ def interpolate_yield_curve(df_row: pd.Series, interval: str) -> pd.DataFrame:
     # Create result DataFrame
     record_date = df_row["record_date"]
 
-    # Convert date to decimal years (using Jan 1, 2000 as reference)
-    reference_date = datetime(2000, 1, 1)
-    if isinstance(record_date, pd.Timestamp):
-        date_as_decimal = (
-            reference_date.year
-            + (record_date - pd.Timestamp(reference_date)).days / 365.25
-        )
-    else:
-        date_as_decimal = (
-            reference_date.year + (record_date - reference_date).days / 365.25
-        )
-
     result_data = []
     for maturity, rate in zip(target_maturities, interpolated_rates):
         result_data.append(
@@ -260,7 +248,6 @@ def interpolate_yield_curve(df_row: pd.Series, interval: str) -> pd.DataFrame:
                     if isinstance(record_date, pd.Timestamp)
                     else record_date.strftime("%Y-%m-%d")
                 ),
-                "date_decimal_years": date_as_decimal,
                 "maturity_years": maturity,
                 "interpolated_rate": rate,
             }

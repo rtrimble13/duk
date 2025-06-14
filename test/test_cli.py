@@ -144,7 +144,6 @@ class TestTreasuryCLI:
 
         assert result.exit_code == 0
         assert "calendar_date" in result.output
-        assert "date_decimal_years" in result.output
         assert "maturity_years" in result.output
         assert "interpolated_rate" in result.output
         assert "2023-12-01" in result.output

@@ -329,7 +329,6 @@ class TestInterpolationFunctions:
         assert isinstance(result, pd.DataFrame)
         assert list(result.columns) == [
             "calendar_date",
-            "date_decimal_years",
             "maturity_years",
             "interpolated_rate",
         ]
@@ -337,7 +336,6 @@ class TestInterpolationFunctions:
 
         # Check data types and values
         assert result["calendar_date"].iloc[0] == "2023-12-01"
-        assert isinstance(result["date_decimal_years"].iloc[0], (int, float))
         assert all(result["maturity_years"] >= 1 / 12)  # Should start from 1 month
         assert all(result["maturity_years"] <= 30.0)  # Should not exceed 30 years
 
