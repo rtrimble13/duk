@@ -9,11 +9,11 @@ import pandas as pd
 import numpy as np
 
 from duk.commands.tr import (
-    TreasuryRateDownloader, 
-    format_data_for_pandas, 
+    TreasuryRateDownloader,
+    format_data_for_pandas,
     maturity_to_years,
     get_interpolation_maturities,
-    interpolate_yield_curve
+    interpolate_yield_curve,
 )
 
 
@@ -280,12 +280,12 @@ class TestInterpolationFunctions:
 
     def test_maturity_to_years(self):
         """Test maturity string conversion to years."""
-        assert maturity_to_years("1_mo") == 1/12
+        assert maturity_to_years("1_mo") == 1 / 12
         assert maturity_to_years("6_mo") == 0.5
         assert maturity_to_years("1_yr") == 1.0
         assert maturity_to_years("10_yr") == 10.0
         assert maturity_to_years("30_yr") == 30.0
-        
+
         with pytest.raises(ValueError):
             maturity_to_years("invalid_format")
 
@@ -296,12 +296,12 @@ class TestInterpolationFunctions:
         assert len(semi_maturities) == 60  # 0.5 to 30.0 in 0.5 steps
         assert semi_maturities[0] == 0.5
         assert semi_maturities[-1] == 30.0
-        
+
         # Test quarterly
         quarterly_maturities = get_interpolation_maturities("quarter")
         assert quarterly_maturities[0] == 0.25
         assert quarterly_maturities[1] == 0.5
-        
+
         # Test invalid interval
         with pytest.raises(ValueError):
             get_interpolation_maturities("invalid")
@@ -321,21 +321,26 @@ class TestInterpolationFunctions:
             "30_yr": 4.25,
         }
         df_row = pd.Series(data)
-        
+
         # Test interpolation
         result = interpolate_yield_curve(df_row, "semiannual")
-        
+
         # Check result structure
         assert isinstance(result, pd.DataFrame)
-        assert list(result.columns) == ["calendar_date", "date_decimal_years", "maturity_years", "interpolated_rate"]
+        assert list(result.columns) == [
+            "calendar_date",
+            "date_decimal_years",
+            "maturity_years",
+            "interpolated_rate",
+        ]
         assert len(result) > 0
-        
+
         # Check data types and values
         assert result["calendar_date"].iloc[0] == "2023-12-01"
         assert isinstance(result["date_decimal_years"].iloc[0], (int, float))
-        assert all(result["maturity_years"] >= 1/12)  # Should start from 1 month
+        assert all(result["maturity_years"] >= 1 / 12)  # Should start from 1 month
         assert all(result["maturity_years"] <= 30.0)  # Should not exceed 30 years
-        
+
         # Check that interpolated rates are reasonable
         assert all(result["interpolated_rate"] > 0)
         assert all(result["interpolated_rate"] < 10)  # Reasonable rate range
@@ -349,7 +354,7 @@ class TestInterpolationFunctions:
             "10_yr": 4.45,
         }
         df_row = pd.Series(data)
-        
+
         with pytest.raises(ValueError, match="Not enough valid data points"):
             interpolate_yield_curve(df_row, "semiannual")
 
@@ -368,7 +373,7 @@ class TestInterpolationFunctions:
             "30_yr": 4.25,
         }
         df_row = pd.Series(data)
-        
+
         # Should still work with valid data points
         result = interpolate_yield_curve(df_row, "semiannual")
         assert len(result) > 0

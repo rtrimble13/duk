@@ -134,7 +134,7 @@ class TestTreasuryCLI:
                 "30_yr": "4.25",
             }
         ]
-        
+
         mock_request.side_effect = [
             {"data": [{"record_date": "2023-12-01"}]},  # get_latest_date
             {"data": complete_sample_data},  # download_data
@@ -165,13 +165,15 @@ class TestTreasuryCLI:
                 "30_yr": "4.25",
             }
         ]
-        
+
         mock_request.side_effect = [
             {"data": [{"record_date": "2023-12-01"}]},
             {"data": complete_sample_data},
         ]
 
-        result = self.runner.invoke(main, ["tr", "--interpolate", "--interpolate-interval", "quarter"])
+        result = self.runner.invoke(
+            main, ["tr", "--interpolate", "--interpolate-interval", "quarter"]
+        )
 
         assert result.exit_code == 0
         assert "calendar_date" in result.output
@@ -193,18 +195,23 @@ class TestTreasuryCLI:
                 "30_yr": "4.25",
             }
         ]
-        
+
         mock_request.side_effect = [
             {"data": [{"record_date": "2023-12-01"}]},
             {"data": complete_sample_data},
         ]
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            result = self.runner.invoke(main, ["tr", "--interpolate", "--output", "--directory", tmpdir])
+            result = self.runner.invoke(
+                main, ["tr", "--interpolate", "--output", "--directory", tmpdir]
+            )
 
             assert result.exit_code == 0
             assert "Data saved to" in result.output
-            assert "treasury_par_yields_interpolated_semiannual_20231201.csv" in result.output
+            assert (
+                "treasury_par_yields_interpolated_semiannual_20231201.csv"
+                in result.output
+            )
 
     @patch("duk.commands.tr.TreasuryRateDownloader._make_request")
     def test_tr_interpolation_insufficient_data(self, mock_request):
@@ -217,7 +224,7 @@ class TestTreasuryCLI:
                 "10_yr": "4.45",
             }
         ]
-        
+
         mock_request.side_effect = [
             {"data": [{"record_date": "2023-12-01"}]},
             {"data": insufficient_data},
@@ -226,4 +233,7 @@ class TestTreasuryCLI:
         result = self.runner.invoke(main, ["tr", "--interpolate"])
 
         assert result.exit_code == 1
-        assert "Interpolation failed" in result.output or "Not enough valid data points" in result.output
+        assert (
+            "Interpolation failed" in result.output
+            or "Not enough valid data points" in result.output
+        )

@@ -162,19 +162,24 @@ def maturity_to_years(maturity_str: str) -> float:
 def get_interpolation_maturities(interval: str) -> np.ndarray:
     """Get maturity points (in years) for interpolation based on interval."""
     if interval == "day":
-        # Daily from 1 day to 30 years (365 * 30 points would be too many, so we'll be reasonable)
-        return np.concatenate([
-            np.linspace(1/365, 1/12, 5),  # days to 1 month
-            np.linspace(1/12, 1, 12),     # monthly for first year
-            np.linspace(1, 5, 49),        # quarterly for 2-5 years
-            np.linspace(5, 30, 26)        # yearly for 5-30 years
-        ])
+        # Daily from 1 day to 30 years (365 * 30 points would be too many,
+        # so we'll be reasonable)
+        return np.concatenate(
+            [
+                np.linspace(1 / 365, 1 / 12, 5),  # days to 1 month
+                np.linspace(1 / 12, 1, 12),  # monthly for first year
+                np.linspace(1, 5, 49),  # quarterly for 2-5 years
+                np.linspace(5, 30, 26),  # yearly for 5-30 years
+            ]
+        )
     elif interval == "month":
         # Monthly intervals from 1 month to 30 years
-        return np.concatenate([
-            np.arange(1/12, 1, 1/12),     # monthly for first year
-            np.arange(1, 30.1, 1/12)      # monthly for all years
-        ])
+        return np.concatenate(
+            [
+                np.arange(1 / 12, 1, 1 / 12),  # monthly for first year
+                np.arange(1, 30.1, 1 / 12),  # monthly for all years
+            ]
+        )
     elif interval == "quarter":
         # Quarterly intervals from 3 months to 30 years
         return np.arange(0.25, 30.25, 0.25)
@@ -188,66 +193,79 @@ def get_interpolation_maturities(interval: str) -> np.ndarray:
 def interpolate_yield_curve(df_row: pd.Series, interval: str) -> pd.DataFrame:
     """
     Interpolate a single row's yield curve using cubic spline.
-    
+
     Args:
         df_row: Single row from treasury DataFrame containing rates
         interval: Interpolation interval ('day', 'month', 'quarter', 'semiannual')
-    
+
     Returns:
         DataFrame with interpolated rates
     """
     # Get rate columns and their corresponding maturities
-    rate_columns = [col for col in df_row.index if col.endswith("_yr") or col.endswith("_mo")]
-    
+    rate_columns = [
+        col for col in df_row.index if col.endswith("_yr") or col.endswith("_mo")
+    ]
+
     # Filter out columns with NaN values for interpolation
     valid_columns = [col for col in rate_columns if not pd.isna(df_row[col])]
-    
+
     if len(valid_columns) < 3:
         # Need at least 3 points for cubic spline
         raise ValueError("Not enough valid data points for cubic spline interpolation")
-    
+
     # Convert maturity strings to years and get corresponding rates
     maturities = np.array([maturity_to_years(col) for col in valid_columns])
     rates = np.array([df_row[col] for col in valid_columns])
-    
+
     # Sort by maturity (should already be sorted, but ensure it)
     sort_idx = np.argsort(maturities)
     maturities = maturities[sort_idx]
     rates = rates[sort_idx]
-    
+
     # Get target interpolation points
     target_maturities = get_interpolation_maturities(interval)
-    
+
     # Filter target maturities to be within the available range
     min_maturity = maturities.min()
     max_maturity = maturities.max()
     target_maturities = target_maturities[
         (target_maturities >= min_maturity) & (target_maturities <= max_maturity)
     ]
-    
+
     # Perform cubic spline interpolation
     cs = interpolate.CubicSpline(maturities, rates)
     interpolated_rates = cs(target_maturities)
-    
+
     # Create result DataFrame
     record_date = df_row["record_date"]
-    
+
     # Convert date to decimal years (using Jan 1, 2000 as reference)
     reference_date = datetime(2000, 1, 1)
     if isinstance(record_date, pd.Timestamp):
-        date_as_decimal = reference_date.year + (record_date - pd.Timestamp(reference_date)).days / 365.25
+        date_as_decimal = (
+            reference_date.year
+            + (record_date - pd.Timestamp(reference_date)).days / 365.25
+        )
     else:
-        date_as_decimal = reference_date.year + (record_date - reference_date).days / 365.25
-    
+        date_as_decimal = (
+            reference_date.year + (record_date - reference_date).days / 365.25
+        )
+
     result_data = []
     for maturity, rate in zip(target_maturities, interpolated_rates):
-        result_data.append({
-            "calendar_date": record_date.strftime("%Y-%m-%d") if isinstance(record_date, pd.Timestamp) else record_date.strftime("%Y-%m-%d"),
-            "date_decimal_years": date_as_decimal,
-            "maturity_years": maturity,
-            "interpolated_rate": rate
-        })
-    
+        result_data.append(
+            {
+                "calendar_date": (
+                    record_date.strftime("%Y-%m-%d")
+                    if isinstance(record_date, pd.Timestamp)
+                    else record_date.strftime("%Y-%m-%d")
+                ),
+                "date_decimal_years": date_as_decimal,
+                "maturity_years": maturity,
+                "interpolated_rate": rate,
+            }
+        )
+
     return pd.DataFrame(result_data)
 
 
@@ -310,7 +328,17 @@ def save_data(data: pd.DataFrame, filename: str, format_type: str, directory: st
 )
 @click.pass_context
 def tr_command(
-    ctx, date, start_date, end_date, days, output, filename, output_format, directory, interpolate, interpolate_interval
+    ctx,
+    date,
+    start_date,
+    end_date,
+    days,
+    output,
+    filename,
+    output_format,
+    directory,
+    interpolate,
+    interpolate_interval,
 ):
     """Download treasury par yield curve rates.
 
@@ -355,22 +383,28 @@ def tr_command(
     # Perform interpolation if requested
     if interpolate:
         try:
-            logger.info(f"Performing cubic spline interpolation with {interpolate_interval} intervals")
+            logger.info(
+                f"Performing cubic spline interpolation with "
+                f"{interpolate_interval} intervals"
+            )
             interpolated_data = []
-            
+
             for _, row in df.iterrows():
                 interpolated_row = interpolate_yield_curve(row, interpolate_interval)
                 interpolated_data.append(interpolated_row)
-            
+
             # Combine all interpolated data
             df = pd.concat(interpolated_data, ignore_index=True)
-            
+
             # Update filename for interpolated data
             if output or filename:
                 if not filename:
                     last_date = df["calendar_date"].iloc[0].replace("-", "")
-                    filename = f"treasury_par_yields_interpolated_{interpolate_interval}_{last_date}.{output_format}"
-        
+                    filename = (
+                        f"treasury_par_yields_interpolated_"
+                        f"{interpolate_interval}_{last_date}.{output_format}"
+                    )
+
         except Exception as e:
             logger.error(f"Interpolation failed: {e}")
             click.echo(f"Error: Interpolation failed - {e}", err=True)
