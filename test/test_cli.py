@@ -236,3 +236,75 @@ class TestTreasuryCLI:
             "Interpolation failed" in result.output
             or "Not enough valid data points" in result.output
         )
+
+    @patch("duk.commands.tr.TreasuryRateDownloader._make_request")
+    def test_tr_bootstrap_spot_rates_basic(self, mock_request):
+        """Test tr command with bootstrap spot rates flag."""
+        mock_request.side_effect = [
+            {"data": [{"record_date": "2023-12-01"}]},
+            {"data": self.sample_data},
+        ]
+
+        result = self.runner.invoke(main, ["tr", "--bootstrap-spot-rates"])
+
+        assert result.exit_code == 0
+        assert "interpolated_rate" in result.output
+        assert "interpolated_spot_rate" in result.output
+        assert "calendar_date" in result.output
+
+    @patch("duk.commands.tr.TreasuryRateDownloader._make_request")
+    def test_tr_bootstrap_spot_rates_with_interval(self, mock_request):
+        """Test tr command with bootstrap spot rates and specific interval."""
+        mock_request.side_effect = [
+            {"data": [{"record_date": "2023-12-01"}]},
+            {"data": self.sample_data},
+        ]
+
+        result = self.runner.invoke(
+            main, ["tr", "--bootstrap-spot-rates", "--interpolate-interval", "quarter"]
+        )
+
+        assert result.exit_code == 0
+        assert "interpolated_rate" in result.output
+        assert "interpolated_spot_rate" in result.output
+
+    @patch("duk.commands.tr.TreasuryRateDownloader._make_request")
+    def test_tr_bootstrap_spot_rates_file_output(self, mock_request):
+        """Test tr command with bootstrap spot rates and file output."""
+        mock_request.side_effect = [
+            {"data": [{"record_date": "2023-12-01"}]},
+            {"data": self.sample_data},
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.runner.invoke(
+                main, ["tr", "--bootstrap-spot-rates", "--output", "--directory", tmpdir]
+            )
+
+            assert result.exit_code == 0
+            assert "Data saved to" in result.output
+            assert "bootstrap" in result.output
+            assert "treasury_par_yields_interpolated_bootstrap_semiannual_20231201.csv" in result.output
+
+    @patch("duk.commands.tr.TreasuryRateDownloader._make_request")
+    def test_tr_bootstrap_spot_rates_json_output(self, mock_request):
+        """Test tr command with bootstrap spot rates and JSON format."""
+        mock_request.side_effect = [
+            {"data": [{"record_date": "2023-12-01"}]},
+            {"data": self.sample_data},
+        ]
+
+        result = self.runner.invoke(main, ["tr", "--bootstrap-spot-rates", "--format", "json"])
+
+        assert result.exit_code == 0
+        # Parse JSON to verify structure
+        output_lines = result.output.strip().split('\n')
+        json_output = '\n'.join(output_lines)
+        data = json.loads(json_output)
+        
+        assert isinstance(data, list)
+        assert len(data) > 0
+        assert "calendar_date" in data[0]
+        assert "interpolated_rate" in data[0] 
+        assert "interpolated_spot_rate" in data[0]
+        assert "maturity_years" in data[0]
