@@ -5,6 +5,7 @@ This directory contains documentation for the duk CLI tool and its subprograms.
 ## Available Documentation
 
 - [Treasury Rates (`duk tr`)](treasury_rates.md) - Download U.S. Treasury par yield curve rates
+- [Packaging Guide](packaging.md) - Build and distribute the duk package
 
 ## Quick Start
 
