@@ -27,6 +27,7 @@ dev = [
     "pytest-cov>=2.0",
     "black>=21.0",
     "flake8>=3.8",
+    "build>=0.7.0",
 ]
 
 [project.scripts]

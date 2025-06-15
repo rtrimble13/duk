@@ -1,4 +1,4 @@
-.PHONY: install test clean lint format help
+.PHONY: install test clean lint format build publish help
 
 # Default target
 help:
@@ -8,6 +8,9 @@ help:
 	@echo "  clean      - Clean build artifacts"
 	@echo "  lint       - Run linting checks"
 	@echo "  format     - Format code with black"
+	@echo "  build      - Build distribution packages"
+	@echo "  build-standalone - Build packages using fallback method"
+	@echo "  publish    - Publish to PyPI (requires credentials)"
 
 install:
 	pip install -e .[dev]
@@ -28,3 +31,12 @@ lint:
 
 format:
 	black src/ test/
+
+build:
+	python -m build
+
+build-standalone:
+	python scripts/build.py
+
+publish:
+	python -m twine upload dist/*
