@@ -6,6 +6,12 @@ The `duk tr` subprogram downloads U.S. Treasury par yield curve rates from the T
 
 This command retrieves daily Treasury par yield curve rates, which represent the interest rates on Treasury securities of various maturities. The data includes rates for maturities from 1 month to 30 years.
 
+Key features:
+- Download par yield curve data for specific dates or date ranges
+- Cubic spline interpolation for smooth yield curves at regular intervals
+- Bootstrap spot rate calculation from par rates (zero-coupon rates)
+- Multiple output formats (CSV, JSON) and flexible file naming
+
 ## Basic Usage
 
 ```bash
@@ -14,6 +20,12 @@ duk tr
 
 # Download with verbose logging
 duk -v tr
+
+# Download with interpolation
+duk tr --interpolate
+
+# Download with bootstrap spot rates (includes interpolation)
+duk tr --bootstrap-spot-rates
 ```
 
 ## Cubic Spline Interpolation
@@ -61,6 +73,61 @@ duk tr --days 5 --interpolate --output
 # Multiple dates with monthly interpolation in JSON format
 duk tr --start-date 2023-11-01 --end-date 2023-11-30 --interpolate --interpolate-interval month --format json --output
 ```
+
+## Bootstrap Spot Rates
+
+The `tr` command can calculate bootstrap spot rates (zero-coupon rates) from the par yield curve data. This feature automatically enables interpolation and provides both par rates and spot rates in the output.
+
+### Basic Bootstrap Usage
+```bash
+# Calculate spot rates with default semiannual interpolation
+duk tr --bootstrap-spot-rates
+
+# Calculate spot rates with quarterly interpolation
+duk tr --bootstrap-spot-rates --interpolate-interval quarter
+
+# Calculate spot rates for specific date
+duk tr --date 2023-12-01 --bootstrap-spot-rates
+```
+
+### Bootstrap Output Format
+
+When bootstrap spot rates are enabled, the output format includes:
+- `calendar_date`: Date in YYYY-MM-DD format
+- `maturity_years`: Maturity in decimal years
+- `interpolated_rate`: Interpolated par rate (original par yield curve)
+- `interpolated_spot_rate`: Bootstrap-calculated spot rate (zero-coupon rate)
+
+### Bootstrap Algorithm
+
+The bootstrap method used follows these principles:
+- For maturities < 0.5 year: spot rate equals par rate (minimal coupon effect)
+- For longer maturities: iteratively solve for spot rates using previously calculated rates
+- **Assumes semiannual coupon payments** for bond pricing calculations (standard for Treasury bonds)
+- When interpolation interval is not semiannual, performs a two-step process:
+  1. Bootstrap calculation using semiannual coupon frequency
+  2. Interpolation from semiannual to the target interval
+
+### Bootstrap Examples
+```bash
+# Latest data with bootstrap spot rates
+duk tr --bootstrap-spot-rates
+
+# Historical data with bootstrap spot rates and quarterly intervals
+duk tr --date 2023-12-01 --bootstrap-spot-rates --interpolate-interval quarter
+
+# Save bootstrap data to file with custom naming
+duk tr --bootstrap-spot-rates --output --filename treasury_bootstrap_data
+
+# Multiple dates with bootstrap spot rates in JSON format
+duk tr --start-date 2023-11-01 --end-date 2023-11-30 --bootstrap-spot-rates --format json --output
+```
+
+### Bootstrap File Naming
+
+When saving bootstrap data to files, the naming convention automatically includes "bootstrap":
+- CSV: `treasury_par_yields_interpolated_bootstrap_semiannual_YYYYMMDD.csv`
+- JSON: `treasury_par_yields_interpolated_bootstrap_semiannual_YYYYMMDD.json`
 
 ## Date Options
 
@@ -170,6 +237,12 @@ duk tr --start-date 2023-10-01 --end-date 2023-12-31 --output
 # Get year-end data for multiple years (would require multiple commands)
 duk tr --date 2022-12-30 --filename rates_2022 --output
 duk tr --date 2023-12-29 --filename rates_2023 --output
+
+# Bootstrap spot rates with quarterly interpolation and file output
+duk tr --bootstrap-spot-rates --interpolate-interval quarter --output
+
+# Bootstrap spot rates for historical analysis
+duk tr --start-date 2023-01-01 --end-date 2023-12-31 --bootstrap-spot-rates --format json --output
 ```
 
 ## Integration with Data Analysis
@@ -201,6 +274,33 @@ with open('treasury_par_yields_20231201.json', 'r') as f:
 
 df = pd.DataFrame(data)
 df['record_date'] = pd.to_datetime(df['record_date'])
+```
+
+### Bootstrap Data Integration
+```python
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Load bootstrap spot rates data
+df = pd.read_csv('treasury_par_yields_interpolated_bootstrap_semiannual_20231201.csv')
+
+# Convert date column to datetime
+df['calendar_date'] = pd.to_datetime(df['calendar_date'])
+
+# Compare par rates vs spot rates
+plt.figure(figsize=(10, 6))
+plt.plot(df['maturity_years'], df['interpolated_rate'], label='Par Rates', marker='o')
+plt.plot(df['maturity_years'], df['interpolated_spot_rate'], label='Spot Rates', marker='s')
+plt.xlabel('Maturity (Years)')
+plt.ylabel('Interest Rate (%)')
+plt.title('Par Rates vs Bootstrap Spot Rates')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Calculate rate differences
+df['rate_difference'] = df['interpolated_spot_rate'] - df['interpolated_rate']
+print("Maximum difference between spot and par rates:", df['rate_difference'].abs().max())
 ```
 
 ## Error Handling

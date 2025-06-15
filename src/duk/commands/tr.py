@@ -190,16 +190,117 @@ def get_interpolation_maturities(interval: str) -> np.ndarray:
         raise ValueError(f"Unknown interpolation interval: {interval}")
 
 
-def interpolate_yield_curve(df_row: pd.Series, interval: str) -> pd.DataFrame:
+def bootstrap_spot_rates(maturities: np.ndarray, par_rates: np.ndarray) -> np.ndarray:
+    """
+    Calculate bootstrap spot rates from par yield curve using the bootstrap method.
+
+    This implementation uses a simplified bootstrap approach where:
+    - For very short maturities (< 0.5 year), the spot rate equals the par rate
+    - For longer maturities, we use an iterative approach to solve for the spot rate
+    - Assumes semiannual coupon payments (standard for treasury bonds)
+
+    Args:
+        maturities: Array of maturities in years
+        par_rates: Array of par rates (as percentages, e.g., 4.25 for 4.25%)
+
+    Returns:
+        Array of spot rates (as percentages)
+    """
+    if len(maturities) != len(par_rates):
+        raise ValueError("Maturities and par rates must have the same length")
+
+    if len(maturities) == 0:
+        return np.array([])
+
+    # Sort by maturity
+    sort_idx = np.argsort(maturities)
+    sorted_maturities = maturities[sort_idx]
+    sorted_par_rates = par_rates[sort_idx]
+
+    spot_rates = np.zeros_like(sorted_par_rates)
+
+    # For bonds with maturity < 0.5 year, spot rate approximately equals par rate
+    # This is because very short-term instruments are typically zero-coupon
+    # or have minimal coupon effects
+    for i in range(len(sorted_maturities)):
+        if sorted_maturities[i] < 0.5:
+            spot_rates[i] = sorted_par_rates[i]
+        else:
+            # For longer maturities, use bootstrap method with semiannual coupons
+            maturity = sorted_maturities[i]
+            par_rate = sorted_par_rates[i]
+
+            # Bootstrap method: assume semiannual coupon payments
+            # and use previously calculated spot rates for discounting
+
+            # Calculate present value of coupon payments
+            coupon_rate = par_rate / 100  # Convert to decimal
+            semiannual_coupon = (coupon_rate / 2) * 100  # Semiannual coupon payment per $100 face value
+
+            # Sum present value of all coupon payments except the last one
+            coupon_pv = 0.0
+            num_periods = int(maturity * 2)  # Number of semiannual periods
+
+            for period in range(1, num_periods):
+                period_years = period / 2.0  # Convert to years
+                # Find spot rate for this period through interpolation of existing rates
+                if i > 0 and period_years <= sorted_maturities[i - 1]:
+                    # Interpolate using existing spot rates
+                    spot_rate_for_period = np.interp(
+                        period_years, sorted_maturities[:i], spot_rates[:i]
+                    )
+                elif i > 0:
+                    # Use the last available spot rate
+                    spot_rate_for_period = spot_rates[i - 1]
+                else:
+                    # First bond, no previous rates available, use current par rate
+                    spot_rate_for_period = par_rate
+
+                # Convert annual spot rate to semiannual discount factor
+                semiannual_rate = spot_rate_for_period / 100 / 2
+                discount_factor = (1 + semiannual_rate) ** (-period)
+                coupon_pv += semiannual_coupon * discount_factor
+
+            # The final payment includes both coupon and principal
+            final_payment = semiannual_coupon + 100  # Last coupon + face value
+            remaining_pv = 100 - coupon_pv  # What remains to be discounted
+
+            # Solve for spot rate: remaining_pv = final_payment /
+            # (1 + semiannual_rate)^num_periods
+            if remaining_pv > 0 and final_payment > 0:
+                discount_factor_needed = final_payment / remaining_pv
+                if discount_factor_needed > 1:
+                    semiannual_rate = (discount_factor_needed ** (1 / num_periods)) - 1
+                    annual_spot_rate = semiannual_rate * 2 * 100  # Convert to annual percentage
+                    spot_rates[i] = annual_spot_rate
+                else:
+                    # Fallback to par rate if calculation doesn't make sense
+                    spot_rates[i] = par_rate
+            else:
+                # Fallback to par rate
+                spot_rates[i] = par_rate
+
+    # Return in original order
+    result = np.zeros_like(spot_rates)
+    result[sort_idx] = spot_rates
+    return result
+
+
+def interpolate_yield_curve(
+    df_row: pd.Series, interval: str, bootstrap_spot_rates_flag: bool = False
+) -> pd.DataFrame:
     """
     Interpolate a single row's yield curve using cubic spline.
 
     Args:
         df_row: Single row from treasury DataFrame containing rates
-        interval: Interpolation interval ('day', 'month', 'quarter', 'semiannual')
+        interval: Interpolation interval ('day', 'month', 'quarter',
+                  'semiannual')
+        bootstrap_spot_rates_flag: If True, also calculate and interpolate
+                                   bootstrap spot rates
 
     Returns:
-        DataFrame with interpolated rates
+        DataFrame with interpolated rates and optionally spot rates
     """
     # Get rate columns and their corresponding maturities
     rate_columns = [
@@ -232,26 +333,65 @@ def interpolate_yield_curve(df_row: pd.Series, interval: str) -> pd.DataFrame:
         (target_maturities >= min_maturity) & (target_maturities <= max_maturity)
     ]
 
-    # Perform cubic spline interpolation
+    # Perform cubic spline interpolation for par rates
     cs = interpolate.CubicSpline(maturities, rates)
     interpolated_rates = cs(target_maturities)
+
+    # Calculate bootstrap spot rates if requested
+    spot_rates_interpolated = None
+    if bootstrap_spot_rates_flag:
+        try:
+            # Calculate bootstrap spot rates from original data (assumes semiannual coupons)
+            spot_rates = bootstrap_spot_rates(maturities, rates)
+
+            # If the target interval is semiannual, interpolate directly to target
+            if interval == "semiannual":
+                cs_spot = interpolate.CubicSpline(maturities, spot_rates)
+                spot_rates_interpolated = cs_spot(target_maturities)
+            else:
+                # For non-semiannual intervals, first interpolate to semiannual,
+                # then interpolate from semiannual to target interval
+                
+                # Get semiannual maturities within the available range
+                semiannual_maturities = get_interpolation_maturities("semiannual")
+                semiannual_maturities = semiannual_maturities[
+                    (semiannual_maturities >= min_maturity) & 
+                    (semiannual_maturities <= max_maturity)
+                ]
+                
+                # Interpolate spot rates to semiannual intervals first
+                cs_spot = interpolate.CubicSpline(maturities, spot_rates)
+                semiannual_spot_rates = cs_spot(semiannual_maturities)
+                
+                # Then interpolate from semiannual to target interval
+                cs_spot_final = interpolate.CubicSpline(semiannual_maturities, semiannual_spot_rates)
+                spot_rates_interpolated = cs_spot_final(target_maturities)
+                
+        except Exception as e:
+            logger.warning(f"Failed to calculate bootstrap spot rates: {e}")
+            # Continue without spot rates if calculation fails
+            spot_rates_interpolated = None
 
     # Create result DataFrame
     record_date = df_row["record_date"]
 
     result_data = []
-    for maturity, rate in zip(target_maturities, interpolated_rates):
-        result_data.append(
-            {
-                "calendar_date": (
-                    record_date.strftime("%Y-%m-%d")
-                    if isinstance(record_date, pd.Timestamp)
-                    else record_date.strftime("%Y-%m-%d")
-                ),
-                "maturity_years": maturity,
-                "interpolated_rate": rate,
-            }
-        )
+    for i, (maturity, rate) in enumerate(zip(target_maturities, interpolated_rates)):
+        row_data = {
+            "calendar_date": (
+                record_date.strftime("%Y-%m-%d")
+                if isinstance(record_date, pd.Timestamp)
+                else record_date.strftime("%Y-%m-%d")
+            ),
+            "maturity_years": maturity,
+            "interpolated_rate": rate,
+        }
+
+        # Add spot rate if available
+        if spot_rates_interpolated is not None:
+            row_data["interpolated_spot_rate"] = spot_rates_interpolated[i]
+
+        result_data.append(row_data)
 
     return pd.DataFrame(result_data)
 
@@ -313,6 +453,11 @@ def save_data(data: pd.DataFrame, filename: str, format_type: str, directory: st
     default="semiannual",
     help="Interpolation interval (default: semiannual)",
 )
+@click.option(
+    "--bootstrap-spot-rates",
+    is_flag=True,
+    help="Calculate bootstrap spot rates from par rates (implies --interpolate)",
+)
 @click.pass_context
 def tr_command(
     ctx,
@@ -326,6 +471,7 @@ def tr_command(
     directory,
     interpolate,
     interpolate_interval,
+    bootstrap_spot_rates,
 ):
     """Download treasury par yield curve rates.
 
@@ -337,8 +483,12 @@ def tr_command(
       duk tr --days 5                  # Last 5 days to stdout
       duk tr --days 30 --output        # Last 30 days to file
       duk tr --start-date 2023-01-01 --end-date 2023-01-31 --output
-      duk tr --interpolate             # Latest data with semiannual interpolation
-      duk tr --interpolate --interpolate-interval monthly  # Monthly interpolation
+      duk tr --interpolate             # Latest data with semiannual
+                                       # interpolation
+      duk tr --interpolate --interpolate-interval monthly  # Monthly
+                                                            # interpolation
+      duk tr --bootstrap-spot-rates    # Latest data with spot rates
+                                       # (implies interpolation)
     """
     downloader = TreasuryRateDownloader()
 
@@ -367,6 +517,13 @@ def tr_command(
         click.echo("No data found for the specified criteria", err=True)
         sys.exit(1)
 
+    # Enable interpolation if bootstrap spot rates is requested
+    if bootstrap_spot_rates:
+        interpolate = True
+        logger.info(
+            "Bootstrap spot rates enabled - automatically enabling interpolation"
+        )
+
     # Perform interpolation if requested
     if interpolate:
         try:
@@ -377,7 +534,9 @@ def tr_command(
             interpolated_data = []
 
             for _, row in df.iterrows():
-                interpolated_row = interpolate_yield_curve(row, interpolate_interval)
+                interpolated_row = interpolate_yield_curve(
+                    row, interpolate_interval, bootstrap_spot_rates
+                )
                 interpolated_data.append(interpolated_row)
 
             # Combine all interpolated data
@@ -387,9 +546,12 @@ def tr_command(
             if output or filename:
                 if not filename:
                     last_date = df["calendar_date"].iloc[0].replace("-", "")
+                    base_name = "treasury_par_yields_interpolated"
+                    if bootstrap_spot_rates:
+                        base_name += "_bootstrap"
                     filename = (
-                        f"treasury_par_yields_interpolated_"
-                        f"{interpolate_interval}_{last_date}.{output_format}"
+                        f"{base_name}_{interpolate_interval}_{last_date}."
+                        f"{output_format}"
                     )
 
         except Exception as e:
