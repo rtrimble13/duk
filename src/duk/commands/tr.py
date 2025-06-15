@@ -195,8 +195,9 @@ def bootstrap_spot_rates(maturities: np.ndarray, par_rates: np.ndarray) -> np.nd
     Calculate bootstrap spot rates from par yield curve using the bootstrap method.
 
     This implementation uses a simplified bootstrap approach where:
-    - For very short maturities (< 1 year), the spot rate equals the par rate
+    - For very short maturities (< 0.5 year), the spot rate equals the par rate
     - For longer maturities, we use an iterative approach to solve for the spot rate
+    - Assumes semiannual coupon payments (standard for treasury bonds)
 
     Args:
         maturities: Array of maturities in years
@@ -218,53 +219,60 @@ def bootstrap_spot_rates(maturities: np.ndarray, par_rates: np.ndarray) -> np.nd
 
     spot_rates = np.zeros_like(sorted_par_rates)
 
-    # For bonds with maturity <= 1 year, spot rate approximately equals par rate
-    # This is because short-term instruments are typically zero-coupon
+    # For bonds with maturity < 0.5 year, spot rate approximately equals par rate
+    # This is because very short-term instruments are typically zero-coupon
     # or have minimal coupon effects
     for i in range(len(sorted_maturities)):
-        if sorted_maturities[i] <= 1.0:
+        if sorted_maturities[i] < 0.5:
             spot_rates[i] = sorted_par_rates[i]
         else:
-            # For longer maturities, use bootstrap method
+            # For longer maturities, use bootstrap method with semiannual coupons
             maturity = sorted_maturities[i]
             par_rate = sorted_par_rates[i]
 
-            # Simplified bootstrap: assume annual coupon payments
+            # Bootstrap method: assume semiannual coupon payments
             # and use previously calculated spot rates for discounting
 
             # Calculate present value of coupon payments
             coupon_rate = par_rate / 100  # Convert to decimal
-            annual_coupon = coupon_rate * 100  # Coupon payment per $100 face value
+            semiannual_coupon = (coupon_rate / 2) * 100  # Semiannual coupon payment per $100 face value
 
             # Sum present value of all coupon payments except the last one
             coupon_pv = 0.0
-            num_periods = int(maturity)
+            num_periods = int(maturity * 2)  # Number of semiannual periods
 
             for period in range(1, num_periods):
+                period_years = period / 2.0  # Convert to years
                 # Find spot rate for this period through interpolation of existing rates
-                if period <= sorted_maturities[i - 1]:
+                if i > 0 and period_years <= sorted_maturities[i - 1]:
                     # Interpolate using existing spot rates
                     spot_rate_for_period = np.interp(
-                        period, sorted_maturities[:i], spot_rates[:i]
+                        period_years, sorted_maturities[:i], spot_rates[:i]
                     )
-                else:
+                elif i > 0:
                     # Use the last available spot rate
                     spot_rate_for_period = spot_rates[i - 1]
+                else:
+                    # First bond, no previous rates available, use current par rate
+                    spot_rate_for_period = par_rate
 
-                discount_factor = (1 + spot_rate_for_period / 100) ** (-period)
-                coupon_pv += annual_coupon * discount_factor
+                # Convert annual spot rate to semiannual discount factor
+                semiannual_rate = spot_rate_for_period / 100 / 2
+                discount_factor = (1 + semiannual_rate) ** (-period)
+                coupon_pv += semiannual_coupon * discount_factor
 
             # The final payment includes both coupon and principal
-            final_payment = annual_coupon + 100  # Last coupon + face value
+            final_payment = semiannual_coupon + 100  # Last coupon + face value
             remaining_pv = 100 - coupon_pv  # What remains to be discounted
 
             # Solve for spot rate: remaining_pv = final_payment /
-            # (1 + spot_rate/100)^maturity
+            # (1 + semiannual_rate)^num_periods
             if remaining_pv > 0 and final_payment > 0:
                 discount_factor_needed = final_payment / remaining_pv
                 if discount_factor_needed > 1:
-                    spot_rate_decimal = (discount_factor_needed ** (1 / maturity)) - 1
-                    spot_rates[i] = spot_rate_decimal * 100
+                    semiannual_rate = (discount_factor_needed ** (1 / num_periods)) - 1
+                    annual_spot_rate = semiannual_rate * 2 * 100  # Convert to annual percentage
+                    spot_rates[i] = annual_spot_rate
                 else:
                     # Fallback to par rate if calculation doesn't make sense
                     spot_rates[i] = par_rate
@@ -333,12 +341,32 @@ def interpolate_yield_curve(
     spot_rates_interpolated = None
     if bootstrap_spot_rates_flag:
         try:
-            # Calculate bootstrap spot rates from original data
+            # Calculate bootstrap spot rates from original data (assumes semiannual coupons)
             spot_rates = bootstrap_spot_rates(maturities, rates)
 
-            # Interpolate the spot rates using cubic spline
-            cs_spot = interpolate.CubicSpline(maturities, spot_rates)
-            spot_rates_interpolated = cs_spot(target_maturities)
+            # If the target interval is semiannual, interpolate directly to target
+            if interval == "semiannual":
+                cs_spot = interpolate.CubicSpline(maturities, spot_rates)
+                spot_rates_interpolated = cs_spot(target_maturities)
+            else:
+                # For non-semiannual intervals, first interpolate to semiannual,
+                # then interpolate from semiannual to target interval
+                
+                # Get semiannual maturities within the available range
+                semiannual_maturities = get_interpolation_maturities("semiannual")
+                semiannual_maturities = semiannual_maturities[
+                    (semiannual_maturities >= min_maturity) & 
+                    (semiannual_maturities <= max_maturity)
+                ]
+                
+                # Interpolate spot rates to semiannual intervals first
+                cs_spot = interpolate.CubicSpline(maturities, spot_rates)
+                semiannual_spot_rates = cs_spot(semiannual_maturities)
+                
+                # Then interpolate from semiannual to target interval
+                cs_spot_final = interpolate.CubicSpline(semiannual_maturities, semiannual_spot_rates)
+                spot_rates_interpolated = cs_spot_final(target_maturities)
+                
         except Exception as e:
             logger.warning(f"Failed to calculate bootstrap spot rates: {e}")
             # Continue without spot rates if calculation fails

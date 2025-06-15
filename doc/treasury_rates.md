@@ -101,9 +101,12 @@ When bootstrap spot rates are enabled, the output format includes:
 ### Bootstrap Algorithm
 
 The bootstrap method used follows these principles:
-- For maturities ≤ 1 year: spot rate equals par rate (minimal coupon effect)
+- For maturities < 0.5 year: spot rate equals par rate (minimal coupon effect)
 - For longer maturities: iteratively solve for spot rates using previously calculated rates
-- Assumes annual coupon payments for bond pricing calculations
+- **Assumes semiannual coupon payments** for bond pricing calculations (standard for Treasury bonds)
+- When interpolation interval is not semiannual, performs a two-step process:
+  1. Bootstrap calculation using semiannual coupon frequency
+  2. Interpolation from semiannual to the target interval
 
 ### Bootstrap Examples
 ```bash

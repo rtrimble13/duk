@@ -250,7 +250,8 @@ class TestBootstrapSpotRates:
 
         # Basic checks
         assert len(spot_rates) == len(par_rates)
-        assert spot_rates[0] == par_rates[0]  # First spot rate equals first par rate
+        # First spot rate should be approximately equal to first par rate (within rounding)
+        assert abs(spot_rates[0] - par_rates[0]) < 1e-10
         assert all(spot_rates > 0)  # All spot rates should be positive
 
         # Spot rates should be close to par rates for realistic data
@@ -264,7 +265,7 @@ class TestBootstrapSpotRates:
         spot_rates = bootstrap_spot_rates(maturities, par_rates)
 
         assert len(spot_rates) == 1
-        assert spot_rates[0] == par_rates[0]
+        assert abs(spot_rates[0] - par_rates[0]) < 1e-10
 
     def test_bootstrap_spot_rates_empty_input(self):
         """Test bootstrap with empty input."""
@@ -358,6 +359,46 @@ class TestBootstrapSpotRates:
         assert isinstance(result, pd.DataFrame)
         assert "interpolated_rate" in result.columns
         assert len(result) > 0
+
+    def test_bootstrap_semiannual_coupons_with_different_intervals(self):
+        """Test that bootstrap correctly handles semiannual coupons for different interpolation intervals."""
+        # Create sample data with sufficient points for interpolation
+        data = {
+            "record_date": pd.Timestamp("2023-12-01"),
+            "6_mo": 4.00,
+            "1_yr": 4.20,
+            "2_yr": 4.50,
+            "5_yr": 5.00,
+            "10_yr": 5.25,
+        }
+        df_row = pd.Series(data)
+
+        # Test bootstrap with semiannual interval (direct calculation)
+        result_semiannual = interpolate_yield_curve(
+            df_row, "semiannual", bootstrap_spot_rates_flag=True
+        )
+
+        # Test bootstrap with quarterly interval (should use two-step process)
+        result_quarterly = interpolate_yield_curve(
+            df_row, "quarter", bootstrap_spot_rates_flag=True
+        )
+
+        # Both should have spot rates
+        assert "interpolated_spot_rate" in result_semiannual.columns
+        assert "interpolated_spot_rate" in result_quarterly.columns
+        
+        # Quarterly should have more data points than semiannual
+        assert len(result_quarterly) > len(result_semiannual)
+        
+        # Spot rates should be positive and close to par rates
+        assert all(result_semiannual["interpolated_spot_rate"] > 0)
+        assert all(result_quarterly["interpolated_spot_rate"] > 0)
+        
+        # Check that spot rates are reasonable (within 2% of par rates)
+        semi_diff = np.abs(result_semiannual["interpolated_rate"] - result_semiannual["interpolated_spot_rate"])
+        quarterly_diff = np.abs(result_quarterly["interpolated_rate"] - result_quarterly["interpolated_spot_rate"])
+        assert all(semi_diff < 2.0)
+        assert all(quarterly_diff < 2.0)
 
 
 class TestSaveData:
