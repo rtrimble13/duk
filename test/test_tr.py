@@ -245,14 +245,14 @@ class TestBootstrapSpotRates:
         # Simple test case with known par rates
         maturities = np.array([0.5, 1.0, 2.0, 5.0])
         par_rates = np.array([4.0, 4.2, 4.5, 5.0])
-        
+
         spot_rates = bootstrap_spot_rates(maturities, par_rates)
-        
+
         # Basic checks
         assert len(spot_rates) == len(par_rates)
         assert spot_rates[0] == par_rates[0]  # First spot rate equals first par rate
         assert all(spot_rates > 0)  # All spot rates should be positive
-        
+
         # Spot rates should be close to par rates for realistic data
         assert all(np.abs(spot_rates - par_rates) < 2.0)
 
@@ -260,9 +260,9 @@ class TestBootstrapSpotRates:
         """Test bootstrap with single maturity."""
         maturities = np.array([1.0])
         par_rates = np.array([4.5])
-        
+
         spot_rates = bootstrap_spot_rates(maturities, par_rates)
-        
+
         assert len(spot_rates) == 1
         assert spot_rates[0] == par_rates[0]
 
@@ -270,16 +270,16 @@ class TestBootstrapSpotRates:
         """Test bootstrap with empty input."""
         maturities = np.array([])
         par_rates = np.array([])
-        
+
         spot_rates = bootstrap_spot_rates(maturities, par_rates)
-        
+
         assert len(spot_rates) == 0
 
     def test_bootstrap_spot_rates_mismatched_lengths(self):
         """Test bootstrap with mismatched input lengths."""
         maturities = np.array([1.0, 2.0])
         par_rates = np.array([4.0])
-        
+
         with pytest.raises(ValueError, match="must have the same length"):
             bootstrap_spot_rates(maturities, par_rates)
 
@@ -288,9 +288,9 @@ class TestBootstrapSpotRates:
         # Input maturities out of order
         maturities = np.array([2.0, 0.5, 5.0, 1.0])
         par_rates = np.array([4.5, 4.0, 5.0, 4.2])
-        
+
         spot_rates = bootstrap_spot_rates(maturities, par_rates)
-        
+
         # Should return results in original order
         assert len(spot_rates) == len(par_rates)
         assert all(spot_rates > 0)
@@ -312,11 +312,18 @@ class TestBootstrapSpotRates:
         df_row = pd.Series(data)
 
         # Test interpolation with bootstrap enabled
-        result = interpolate_yield_curve(df_row, "semiannual", bootstrap_spot_rates_flag=True)
+        result = interpolate_yield_curve(
+            df_row, "semiannual", bootstrap_spot_rates_flag=True
+        )
 
         # Check result structure
         assert isinstance(result, pd.DataFrame)
-        expected_columns = ["calendar_date", "maturity_years", "interpolated_rate", "interpolated_spot_rate"]
+        expected_columns = [
+            "calendar_date",
+            "maturity_years",
+            "interpolated_rate",
+            "interpolated_spot_rate",
+        ]
         assert list(result.columns) == expected_columns
         assert len(result) > 0
 
@@ -326,7 +333,9 @@ class TestBootstrapSpotRates:
         assert all(pd.notna(result["interpolated_spot_rate"]))
 
         # Spot rates should be close to par rates
-        rate_diff = np.abs(result["interpolated_rate"] - result["interpolated_spot_rate"])
+        rate_diff = np.abs(
+            result["interpolated_rate"] - result["interpolated_spot_rate"]
+        )
         assert all(rate_diff < 2.0)  # Should be within reasonable range
 
     def test_interpolate_yield_curve_bootstrap_failure_fallback(self):
@@ -341,7 +350,9 @@ class TestBootstrapSpotRates:
         df_row = pd.Series(data)
 
         # Should not raise an exception even if bootstrap fails
-        result = interpolate_yield_curve(df_row, "semiannual", bootstrap_spot_rates_flag=True)
+        result = interpolate_yield_curve(
+            df_row, "semiannual", bootstrap_spot_rates_flag=True
+        )
 
         # Should still have interpolated rates
         assert isinstance(result, pd.DataFrame)
