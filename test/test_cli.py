@@ -88,7 +88,7 @@ class TestTreasuryCLI:
         assert "2023-12-01" in result.output
 
         # Verify correct API call was made
-        expected_params = {"sort": "record_date", "filter": "record_date:eq:2023-12-01"}
+        expected_params = {"from": "2023-12-01", "to": "2023-12-01"}
         mock_request.assert_called_once_with(expected_params)
 
     def test_tr_invalid_date_combination(self):

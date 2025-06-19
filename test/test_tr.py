@@ -29,35 +29,35 @@ class TestTreasuryRateDownloader:
         self.sample_data = [
             {
                 "record_date": "2023-12-01",
-                "1_mo": "5.50",
-                "2_mo": "5.40",
-                "3_mo": "5.35",
-                "4_mo": "5.25",
-                "6_mo": "5.15",
-                "1_yr": "4.95",
-                "2_yr": "4.85",
-                "3_yr": "4.75",
-                "5_yr": "4.65",
-                "7_yr": "4.55",
-                "10_yr": "4.45",
-                "20_yr": "4.35",
-                "30_yr": "4.25",
+                "month1": "5.50",
+                "month2": "5.40",
+                "month3": "5.35",
+                "month4": "5.25",
+                "month6": "5.15",
+                "year1": "4.95",
+                "year2": "4.85",
+                "year3": "4.75",
+                "year5": "4.65",
+                "year7": "4.55",
+                "year10": "4.45",
+                "year20": "4.35",
+                "year30": "4.25",
             },
             {
                 "record_date": "2023-11-30",
-                "1_mo": "5.52",
-                "2_mo": "5.42",
-                "3_mo": "5.37",
-                "4_mo": "5.27",
-                "6_mo": "5.17",
-                "1_yr": "4.97",
-                "2_yr": "4.87",
-                "3_yr": "4.77",
-                "5_yr": "4.67",
-                "7_yr": "4.57",
-                "10_yr": "4.47",
-                "20_yr": "4.37",
-                "30_yr": "4.27",
+                "month1": "5.52",
+                "month2": "5.42",
+                "month3": "5.37",
+                "month4": "5.27",
+                "month6": "5.17",
+                "year1": "4.97",
+                "year2": "4.87",
+                "year3": "4.77",
+                "year5": "4.67",
+                "year7": "4.57",
+                "year10": "4.47",
+                "year20": "4.37",
+                "year30": "4.27",
             },
         ]
 
@@ -70,9 +70,8 @@ class TestTreasuryRateDownloader:
         assert result == "2023-12-01"
 
         # Verify correct API call
-        mock_request.assert_called_once_with(
-            {"sort": "-record_date", "page[size]": "1"}
-        )
+        # Should request only one record via FMP API
+        mock_request.assert_called_once_with({"limit": 1})
 
     @patch("duk.commands.tr.TreasuryRateDownloader._make_request")
     def test_get_latest_date_failure(self, mock_request):
@@ -104,8 +103,8 @@ class TestTreasuryRateDownloader:
         result = self.downloader.download_data(start_date="2023-12-01")
         assert result == self.sample_data[:1]
 
-        # Verify the filter parameter
-        expected_params = {"sort": "record_date", "filter": "record_date:eq:2023-12-01"}
+        # Verify the date range parameters for FMP API
+        expected_params = {"from": "2023-12-01", "to": "2023-12-01"}
         mock_request.assert_called_once_with(expected_params)
 
     @patch("duk.commands.tr.TreasuryRateDownloader._make_request")
@@ -118,11 +117,8 @@ class TestTreasuryRateDownloader:
         )
         assert result == self.sample_data
 
-        # Verify the filter parameter
-        expected_params = {
-            "sort": "record_date",
-            "filter": "record_date:gte:2023-11-30,record_date:lte:2023-12-01",
-        }
+        # Verify the date range parameters for FMP API
+        expected_params = {"from": "2023-11-30", "to": "2023-12-01"}
         mock_request.assert_called_once_with(expected_params)
 
     @patch("duk.commands.tr.TreasuryRateDownloader.get_latest_date")
@@ -135,11 +131,8 @@ class TestTreasuryRateDownloader:
         result = self.downloader.download_data(days=2)
         assert result == self.sample_data
 
-        # Verify the date range calculation
-        expected_params = {
-            "sort": "record_date",
-            "filter": "record_date:gte:2023-11-30,record_date:lte:2023-12-01",
-        }
+        # Verify the date range parameters for FMP API
+        expected_params = {"from": "2023-11-30", "to": "2023-12-01"}
         mock_request.assert_called_once_with(expected_params)
 
     @patch("requests.Session.get")
@@ -152,10 +145,13 @@ class TestTreasuryRateDownloader:
 
         result = self.downloader._make_request({"test": "param"})
         assert result == {"data": []}
-
-        mock_get.assert_called_once_with(
-            self.downloader.BASE_URL, params={"test": "param"}, timeout=30
-        )
+        # Verify that the API key is included in the request parameters
+        called_args, called_kwargs = mock_get.call_args
+        assert called_args[0] == self.downloader.BASE_URL
+        params = called_kwargs.get("params", {})
+        assert params.get("test") == "param"
+        assert "apikey" in params
+        assert called_kwargs.get("timeout") == 30
 
     @patch("requests.Session.get")
     def test_make_request_failure(self, mock_get):
@@ -180,10 +176,10 @@ class TestFormatDataForPandas:
         data = [
             {
                 "record_date": "2023-12-01",
-                "1_mo": "5.50",
-                "2_mo": "5.40",
-                "1_yr": "4.95",
-                "10_yr": "4.45",
+                "month1": "5.50",
+                "month2": "5.40",
+                "year1": "4.95",
+                "year10": "4.45",
             }
         ]
 
@@ -196,33 +192,33 @@ class TestFormatDataForPandas:
 
         # Check data types
         assert pd.api.types.is_datetime64_any_dtype(result["record_date"])
-        assert pd.api.types.is_numeric_dtype(result["1_mo"])
-        assert pd.api.types.is_numeric_dtype(result["10_yr"])
+        assert pd.api.types.is_numeric_dtype(result["month1"])
+        assert pd.api.types.is_numeric_dtype(result["year10"])
 
         # Check values
         assert result.iloc[0]["record_date"] == pd.Timestamp("2023-12-01")
-        assert result.iloc[0]["1_mo"] == 5.50
-        assert result.iloc[0]["10_yr"] == 4.45
+        assert result.iloc[0]["month1"] == 5.50
+        assert result.iloc[0]["year10"] == 4.45
 
     def test_format_data_with_nulls(self):
         """Test formatting data with null values."""
         data = [
             {
                 "record_date": "2023-12-01",
-                "1_mo": "5.50",
-                "2_mo": None,
-                "1_yr": "",
-                "10_yr": "4.45",
+                "month1": "5.50",
+                "month2": None,
+                "year1": "",
+                "year10": "4.45",
             }
         ]
 
         result = format_data_for_pandas(data)
 
         # Check that nulls are handled properly
-        assert result.iloc[0]["1_mo"] == 5.50
-        assert pd.isna(result.iloc[0]["2_mo"])
-        assert pd.isna(result.iloc[0]["1_yr"])
-        assert result.iloc[0]["10_yr"] == 4.45
+        assert result.iloc[0]["month1"] == 5.50
+        assert pd.isna(result.iloc[0]["month2"])
+        assert pd.isna(result.iloc[0]["year1"])
+        assert result.iloc[0]["year10"] == 4.45
 
 
 @pytest.fixture
@@ -230,9 +226,9 @@ def sample_dataframe():
     """Create a sample DataFrame for testing."""
     data = {
         "record_date": [pd.Timestamp("2023-12-01"), pd.Timestamp("2023-11-30")],
-        "1_mo": [5.50, 5.52],
-        "1_yr": [4.95, 4.97],
-        "10_yr": [4.45, 4.47],
+        "month1": [5.50, 5.52],
+        "year1": [4.95, 4.97],
+        "year10": [4.45, 4.47],
     }
     return pd.DataFrame(data)
 
@@ -301,14 +297,14 @@ class TestBootstrapSpotRates:
         # Create sample data
         data = {
             "record_date": pd.Timestamp("2023-12-01"),
-            "1_mo": 5.50,
-            "3_mo": 5.35,
-            "6_mo": 5.15,
-            "1_yr": 4.95,
-            "2_yr": 4.85,
-            "5_yr": 4.65,
-            "10_yr": 4.45,
-            "30_yr": 4.25,
+            "month1": 5.50,
+            "month3": 5.35,
+            "month6": 5.15,
+            "year1": 4.95,
+            "year2": 4.85,
+            "year5": 4.65,
+            "year10": 4.45,
+            "year30": 4.25,
         }
         df_row = pd.Series(data)
 
@@ -344,9 +340,9 @@ class TestBootstrapSpotRates:
         # Create data that might cause bootstrap issues (all same rate)
         data = {
             "record_date": pd.Timestamp("2023-12-01"),
-            "1_yr": 4.0,
-            "2_yr": 4.0,
-            "5_yr": 4.0,
+            "year1": 4.0,
+            "year2": 4.0,
+            "year5": 4.0,
         }
         df_row = pd.Series(data)
 
@@ -365,11 +361,11 @@ class TestBootstrapSpotRates:
         # Create sample data with sufficient points for interpolation
         data = {
             "record_date": pd.Timestamp("2023-12-01"),
-            "6_mo": 4.00,
-            "1_yr": 4.20,
-            "2_yr": 4.50,
-            "5_yr": 5.00,
-            "10_yr": 5.25,
+            "month6": 4.00,
+            "year1": 4.20,
+            "year2": 4.50,
+            "year5": 5.00,
+            "year10": 5.25,
         }
         df_row = pd.Series(data)
 
@@ -386,14 +382,14 @@ class TestBootstrapSpotRates:
         # Both should have spot rates
         assert "interpolated_spot_rate" in result_semiannual.columns
         assert "interpolated_spot_rate" in result_quarterly.columns
-        
+
         # Quarterly should have more data points than semiannual
         assert len(result_quarterly) > len(result_semiannual)
-        
+
         # Spot rates should be positive and close to par rates
         assert all(result_semiannual["interpolated_spot_rate"] > 0)
         assert all(result_quarterly["interpolated_spot_rate"] > 0)
-        
+
         # Check that spot rates are reasonable (within 2% of par rates)
         semi_diff = np.abs(result_semiannual["interpolated_rate"] - result_semiannual["interpolated_spot_rate"])
         quarterly_diff = np.abs(result_quarterly["interpolated_rate"] - result_quarterly["interpolated_spot_rate"])
@@ -418,7 +414,7 @@ class TestSaveData:
         # Check content
         saved_df = pd.read_csv(filepath)
         assert len(saved_df) == 2
-        assert list(saved_df.columns) == ["record_date", "1_mo", "1_yr", "10_yr"]
+        assert list(saved_df.columns) == ["record_date", "month1", "year1", "year10"]
 
     def test_save_json(self, tmp_path, sample_dataframe):
         """Test saving data as JSON."""
@@ -437,7 +433,7 @@ class TestSaveData:
 
         assert len(data) == 2
         assert data[0]["record_date"] == "2023-12-01"
-        assert data[0]["1_mo"] == 5.50
+        assert data[0]["month1"] == 5.50
 
 
 class TestInterpolationFunctions:
@@ -445,11 +441,11 @@ class TestInterpolationFunctions:
 
     def test_maturity_to_years(self):
         """Test maturity string conversion to years."""
-        assert maturity_to_years("1_mo") == 1 / 12
-        assert maturity_to_years("6_mo") == 0.5
-        assert maturity_to_years("1_yr") == 1.0
-        assert maturity_to_years("10_yr") == 10.0
-        assert maturity_to_years("30_yr") == 30.0
+        assert maturity_to_years("month1") == 1 / 12
+        assert maturity_to_years("month6") == 0.5
+        assert maturity_to_years("year1") == 1.0
+        assert maturity_to_years("year10") == 10.0
+        assert maturity_to_years("year30") == 30.0
 
         with pytest.raises(ValueError):
             maturity_to_years("invalid_format")
@@ -476,14 +472,14 @@ class TestInterpolationFunctions:
         # Create sample data
         data = {
             "record_date": pd.Timestamp("2023-12-01"),
-            "1_mo": 5.50,
-            "3_mo": 5.35,
-            "6_mo": 5.15,
-            "1_yr": 4.95,
-            "2_yr": 4.85,
-            "5_yr": 4.65,
-            "10_yr": 4.45,
-            "30_yr": 4.25,
+            "month1": 5.50,
+            "month3": 5.35,
+            "month6": 5.15,
+            "year1": 4.95,
+            "year2": 4.85,
+            "year5": 4.65,
+            "year10": 4.45,
+            "year30": 4.25,
         }
         df_row = pd.Series(data)
 
@@ -513,8 +509,8 @@ class TestInterpolationFunctions:
         # Create sample data with only 2 points (need at least 3 for cubic spline)
         data = {
             "record_date": pd.Timestamp("2023-12-01"),
-            "1_yr": 4.95,
-            "10_yr": 4.45,
+            "year1": 4.95,
+            "year10": 4.45,
         }
         df_row = pd.Series(data)
 
@@ -526,14 +522,14 @@ class TestInterpolationFunctions:
         # Create sample data with NaN values
         data = {
             "record_date": pd.Timestamp("2023-12-01"),
-            "1_mo": 5.50,
-            "3_mo": np.nan,  # This should be filtered out
-            "6_mo": 5.15,
-            "1_yr": 4.95,
-            "2_yr": np.nan,  # This should be filtered out
-            "5_yr": 4.65,
-            "10_yr": 4.45,
-            "30_yr": 4.25,
+            "month1": 5.50,
+            "month3": np.nan,  # This should be filtered out
+            "month6": 5.15,
+            "year1": 4.95,
+            "year2": np.nan,  # This should be filtered out
+            "year5": 4.65,
+            "year10": 4.45,
+            "year30": 4.25,
         }
         df_row = pd.Series(data)
 

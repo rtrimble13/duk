@@ -1,10 +1,12 @@
 # Treasury Rate Downloader (`duk tr`)
 
-The `duk tr` subprogram downloads U.S. Treasury par yield curve rates from the Treasury.gov API.
+The `duk tr` subprogram downloads U.S. Treasury par yield curve rates using the Financial Modeling Prep (FMP) API.
+
+Note: An FMP API key is required. Place your key in `etc/.fmp_api.key` before running this command.
 
 ## Overview
 
-This command retrieves daily Treasury par yield curve rates, which represent the interest rates on Treasury securities of various maturities. The data includes rates for maturities from 1 month to 30 years.
+This command retrieves daily Treasury par yield curve rates via the FMP API, which represent the interest rates on Treasury securities of various maturities. The data includes rates for maturities from 1 month to 30 years.
 
 Key features:
 - Download par yield curve data for specific dates or date ranges
@@ -197,9 +199,9 @@ duk tr --output --format json
 The treasury data includes the following fields:
 
 - `record_date`: The date of the yield curve data (YYYY-MM-DD)
-- `1_mo`, `2_mo`, `3_mo`, `4_mo`, `6_mo`: Short-term rates (months)
-- `1_yr`, `2_yr`, `3_yr`, `5_yr`, `7_yr`: Medium-term rates (years)
-- `10_yr`, `20_yr`, `30_yr`: Long-term rates (years)
+- `month1`, `month2`, `month3`, `month4`, `month6`: Short-term rates (months)
+- `year1`, `year2`, `year3`, `year5`, `year7`: Medium-term rates (years)
+- `year10`, `year20`, `year30`: Long-term rates (years)
 
 Rate values are expressed as percentages (e.g., 4.25 represents 4.25%).
 

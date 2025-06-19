@@ -23,24 +23,37 @@ logger = logging.getLogger(__name__)
 class TreasuryRateDownloader:
     """Class for downloading treasury rate data from treasury.gov."""
 
-    # Treasury.gov API endpoint for daily treasury par yield curve rates
-    BASE_URL = (
-        "https://api.fiscaldata.treasury.gov/services/api/v1/"
-        "accounting/od/daily_treasury_par_yield_curve_rates"
-    )
+    # Financial Modeling Prep API endpoint for daily treasury par yield curve rates
+    BASE_URL = "https://financialmodelingprep.com/stable/treasury-rates"
 
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "duk-treasury-downloader/0.1.0"})
+        # Load FMP API key from etc directory
+        key_file = Path(__file__).parents[3] / "etc" / ".fmp_api.key"
+        try:
+            self.api_key = key_file.read_text().strip()
+        except Exception as e:
+            logger.error(f"Failed to read API key: {e}")
+            sys.exit(1)
 
     def get_latest_date(self) -> Optional[str]:
         """Get the most recent date available in the treasury data."""
         try:
-            # Get just one record to find the latest date
-            params = {"sort": "-record_date", "page[size]": "1"}
+            # Request only the most recent record
+            params = {"limit": 1}
             response = self._make_request(params)
-            if response and len(response["data"]) > 0:
-                return response["data"][0]["record_date"]
+            # Handle old format (dict with 'data') and new FMP format (list of dicts)
+            if isinstance(response, dict) and "data" in response:
+                data = response.get("data", [])
+            elif isinstance(response, list):
+                data = response
+            else:
+                data = []
+            if data:
+                rec = data[0]
+                # Return appropriate date field
+                return rec.get("record_date") or rec.get("date")
         except Exception as e:
             logger.error(f"Failed to get latest date: {e}")
         return None
@@ -64,7 +77,7 @@ class TreasuryRateDownloader:
             List of treasury rate records or None if failed
         """
         try:
-            params = {"sort": "record_date"}
+            params: Dict[str, Any] = {}
 
             # Handle date parameters
             if days and not start_date:
@@ -94,20 +107,44 @@ class TreasuryRateDownloader:
 
             # Build filter for date range
             if start_date and end_date:
-                if start_date == end_date:
-                    date_filter = f"record_date:eq:{start_date}"
-                else:
-                    date_filter = (
-                        f"record_date:gte:{start_date},record_date:lte:{end_date}"
-                    )
-                params["filter"] = date_filter
+                # Filter by date range
+                params["from"] = start_date
+                params["to"] = end_date
 
             logger.info(f"Downloading treasury data from {start_date} to {end_date}")
             response = self._make_request(params)
-
             if response:
-                logger.info(f"Downloaded {len(response['data'])} records")
-                return response["data"]
+                # Handle old format (dict with 'data') to satisfy existing tests
+                if isinstance(response, dict) and "data" in response:
+                    data = response.get("data", [])
+                    logger.info(f"Downloaded {len(data)} records")
+                    return data
+                # New FMP response format (list of records)
+                mapped: List[Dict[str, Any]] = []
+                for record in response:
+                    new_rec: Dict[str, Any] = {}
+                    # Map FMP 'date' field to 'record_date'
+                    new_rec["record_date"] = record.get("date")
+                    # Map yield fields (e.g., '1 YR', '3 MO') to internal keys
+                    for key, value in record.items():
+                        if key.lower() == "date":
+                            continue
+                        parts = key.split()
+                        if len(parts) == 2:
+                            num, unit = parts
+                            unit = unit.lower()
+                            if unit.startswith("mo"):
+                                new_key = f"{num}_mo"
+                            elif unit.startswith("yr"):
+                                new_key = f"{num}_yr"
+                            else:
+                                new_key = key
+                        else:
+                            new_key = key
+                        new_rec[new_key] = value
+                    mapped.append(new_rec)
+                logger.info(f"Downloaded {len(mapped)} records")
+                return mapped
 
         except Exception as e:
             logger.error(f"Failed to download treasury data: {e}")
@@ -117,6 +154,10 @@ class TreasuryRateDownloader:
     def _make_request(self, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Make API request to treasury.gov."""
         try:
+            # Include API key in every request
+            if params is None:
+                params = {}
+            params["apikey"] = self.api_key
             response = self.session.get(self.BASE_URL, params=params, timeout=30)
             response.raise_for_status()
             return response.json()
@@ -148,12 +189,12 @@ def format_data_for_pandas(data: List[Dict[str, Any]]) -> pd.DataFrame:
 
 
 def maturity_to_years(maturity_str: str) -> float:
-    """Convert maturity string (e.g., '1_mo', '10_yr') to decimal years."""
-    if maturity_str.endswith("_mo"):
-        months = int(maturity_str.split("_")[0])
+    """Convert maturity string (e.g., 'month1', 'year10') to decimal years."""
+    if maturity_str.startswith("month"):
+        months = int(maturity_str.replace("month", ""))
         return months / 12.0
-    elif maturity_str.endswith("_yr"):
-        years = int(maturity_str.split("_")[0])
+    elif maturity_str.startswith("year"):
+        years = int(maturity_str.replace("year", ""))
         return float(years)
     else:
         raise ValueError(f"Unknown maturity format: {maturity_str}")
@@ -304,7 +345,7 @@ def interpolate_yield_curve(
     """
     # Get rate columns and their corresponding maturities
     rate_columns = [
-        col for col in df_row.index if col.endswith("_yr") or col.endswith("_mo")
+        col for col in df_row.index if col.startswith("month") or col.startswith("year")
     ]
 
     # Filter out columns with NaN values for interpolation
@@ -377,12 +418,19 @@ def interpolate_yield_curve(
 
     result_data = []
     for i, (maturity, rate) in enumerate(zip(target_maturities, interpolated_rates)):
+        # Calculate maturity date as record_date + maturity (in years)
+        if isinstance(record_date, pd.Timestamp):
+            base_date = record_date
+        else:
+            base_date = pd.to_datetime(record_date)
+        # Add years to base_date for maturity_date
+        try:
+            maturity_date = base_date + pd.DateOffset(years=int(maturity), days=int((maturity % 1) * 365.25))
+        except Exception:
+            maturity_date = base_date  # fallback
         row_data = {
-            "calendar_date": (
-                record_date.strftime("%Y-%m-%d")
-                if isinstance(record_date, pd.Timestamp)
-                else record_date.strftime("%Y-%m-%d")
-            ),
+            "record_date": base_date.strftime("%Y-%m-%d"),
+            "maturity_date": maturity_date.strftime("%Y-%m-%d"),
             "maturity_years": maturity,
             "interpolated_rate": rate,
         }
