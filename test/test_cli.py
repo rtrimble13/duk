@@ -231,11 +231,9 @@ class TestTreasuryCLI:
 
         result = self.runner.invoke(main, ["tr", "--interpolate"])
 
+        # Should exit with code 1 because no data could be interpolated
         assert result.exit_code == 1
-        assert (
-            "Interpolation failed" in result.output
-            or "Not enough valid data points" in result.output
-        )
+        assert "No data could be interpolated" in result.output
 
     @patch("duk.commands.tr.TreasuryRateDownloader._make_request")
     def test_tr_bootstrap_spot_rates_basic(self, mock_request):

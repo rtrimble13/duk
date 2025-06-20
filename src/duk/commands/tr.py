@@ -179,10 +179,19 @@ def format_data_for_pandas(data: List[Dict[str, Any]]) -> pd.DataFrame:
         df["record_date"] = pd.to_datetime(df["record_date"])
 
     # Convert rate columns to numeric, handling None values
+    # We'll normalize column names later only when needed for interpolation
     rate_columns = [
-        col for col in df.columns if col.endswith("_yr") or col.endswith("_mo")
+        col
+        for col in df.columns
+        if (
+            col.endswith("_yr")
+            or col.endswith("_mo")
+            or col.startswith("month")
+            or col.startswith("year")
+        )
     ]
     for col in rate_columns:
+        # Convert to numeric, handling empty strings and invalid values as NaN
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
     return df
@@ -276,7 +285,8 @@ def bootstrap_spot_rates(maturities: np.ndarray, par_rates: np.ndarray) -> np.nd
 
             # Calculate present value of coupon payments
             coupon_rate = par_rate / 100  # Convert to decimal
-            semiannual_coupon = (coupon_rate / 2) * 100  # Semiannual coupon payment per $100 face value
+            # Semiannual coupon payment per $100 face value
+            semiannual_coupon = (coupon_rate / 2) * 100
 
             # Sum present value of all coupon payments except the last one
             coupon_pv = 0.0
@@ -312,7 +322,8 @@ def bootstrap_spot_rates(maturities: np.ndarray, par_rates: np.ndarray) -> np.nd
                 discount_factor_needed = final_payment / remaining_pv
                 if discount_factor_needed > 1:
                     semiannual_rate = (discount_factor_needed ** (1 / num_periods)) - 1
-                    annual_spot_rate = semiannual_rate * 2 * 100  # Convert to annual percentage
+                    # Convert to annual percentage
+                    annual_spot_rate = semiannual_rate * 2 * 100
                     spot_rates[i] = annual_spot_rate
                 else:
                     # Fallback to par rate if calculation doesn't make sense
@@ -341,23 +352,65 @@ def interpolate_yield_curve(
                                    bootstrap spot rates
 
     Returns:
-        DataFrame with interpolated rates and optionally spot rates
+        DataFrame with interpolated rates and optionally spot rates.
+        If insufficient data points, returns DataFrame with NaN values.
     """
+    # Normalize column names for internal processing
+    # Convert 1_mo, 2_mo, etc. to month1, month2, etc.
+    # and 1_yr, 2_yr, etc. to year1, year2, etc.
+    normalized_row = df_row.copy()
+    for col in df_row.index:
+        if col.endswith("_mo"):
+            number = col.replace("_mo", "")
+            new_col = f"month{number}"
+            normalized_row[new_col] = normalized_row[col]
+        elif col.endswith("_yr"):
+            number = col.replace("_yr", "")
+            new_col = f"year{number}"
+            normalized_row[new_col] = normalized_row[col]
+
     # Get rate columns and their corresponding maturities
     rate_columns = [
-        col for col in df_row.index if col.startswith("month") or col.startswith("year")
+        col
+        for col in normalized_row.index
+        if col.startswith("month") or col.startswith("year")
     ]
 
     # Filter out columns with NaN values for interpolation
-    valid_columns = [col for col in rate_columns if not pd.isna(df_row[col])]
+    valid_columns = [col for col in rate_columns if not pd.isna(normalized_row[col])]
 
     if len(valid_columns) < 3:
-        # Need at least 3 points for cubic spline
-        raise ValueError("Not enough valid data points for cubic spline interpolation")
+        # Not enough data points for cubic spline interpolation
+        # Return a DataFrame with NaN values
+        logger.warning(
+            f"Insufficient data points ({len(valid_columns)}) for interpolation, "
+            "returning NaN values"
+        )
+
+        # Get record date for consistency
+        record_date = normalized_row["record_date"]
+        if isinstance(record_date, pd.Timestamp):
+            base_date = record_date
+        else:
+            base_date = pd.to_datetime(record_date)
+
+        # Create a single row with NaN values
+        result_data = [
+            {
+                "calendar_date": base_date.strftime("%Y-%m-%d"),
+                "maturity_years": np.nan,
+                "interpolated_rate": np.nan,
+            }
+        ]
+
+        if bootstrap_spot_rates_flag:
+            result_data[0]["interpolated_spot_rate"] = np.nan
+
+        return pd.DataFrame(result_data)
 
     # Convert maturity strings to years and get corresponding rates
     maturities = np.array([maturity_to_years(col) for col in valid_columns])
-    rates = np.array([df_row[col] for col in valid_columns])
+    rates = np.array([normalized_row[col] for col in valid_columns])
 
     # Sort by maturity (should already be sorted, but ensure it)
     sort_idx = np.argsort(maturities)
@@ -382,7 +435,8 @@ def interpolate_yield_curve(
     spot_rates_interpolated = None
     if bootstrap_spot_rates_flag:
         try:
-            # Calculate bootstrap spot rates from original data (assumes semiannual coupons)
+            # Calculate bootstrap spot rates from original data
+            # (assumes semiannual coupons)
             spot_rates = bootstrap_spot_rates(maturities, rates)
 
             # If the target interval is semiannual, interpolate directly to target
@@ -392,29 +446,30 @@ def interpolate_yield_curve(
             else:
                 # For non-semiannual intervals, first interpolate to semiannual,
                 # then interpolate from semiannual to target interval
-                
+
                 # Get semiannual maturities within the available range
                 semiannual_maturities = get_interpolation_maturities("semiannual")
                 semiannual_maturities = semiannual_maturities[
-                    (semiannual_maturities >= min_maturity) & 
-                    (semiannual_maturities <= max_maturity)
+                    (semiannual_maturities >= min_maturity)
+                    & (semiannual_maturities <= max_maturity)
                 ]
-                
+
                 # Interpolate spot rates to semiannual intervals first
                 cs_spot = interpolate.CubicSpline(maturities, spot_rates)
                 semiannual_spot_rates = cs_spot(semiannual_maturities)
-                
+
                 # Then interpolate from semiannual to target interval
-                cs_spot_final = interpolate.CubicSpline(semiannual_maturities, semiannual_spot_rates)
+                cs_spot_final = interpolate.CubicSpline(
+                    semiannual_maturities, semiannual_spot_rates
+                )
                 spot_rates_interpolated = cs_spot_final(target_maturities)
-                
         except Exception as e:
             logger.warning(f"Failed to calculate bootstrap spot rates: {e}")
             # Continue without spot rates if calculation fails
             spot_rates_interpolated = None
 
     # Create result DataFrame
-    record_date = df_row["record_date"]
+    record_date = normalized_row["record_date"]
 
     result_data = []
     for i, (maturity, rate) in enumerate(zip(target_maturities, interpolated_rates)):
@@ -423,14 +478,9 @@ def interpolate_yield_curve(
             base_date = record_date
         else:
             base_date = pd.to_datetime(record_date)
-        # Add years to base_date for maturity_date
-        try:
-            maturity_date = base_date + pd.DateOffset(years=int(maturity), days=int((maturity % 1) * 365.25))
-        except Exception:
-            maturity_date = base_date  # fallback
+
         row_data = {
-            "record_date": base_date.strftime("%Y-%m-%d"),
-            "maturity_date": maturity_date.strftime("%Y-%m-%d"),
+            "calendar_date": base_date.strftime("%Y-%m-%d"),
             "maturity_years": maturity,
             "interpolated_rate": rate,
         }
@@ -585,10 +635,21 @@ def tr_command(
                 interpolated_row = interpolate_yield_curve(
                     row, interpolate_interval, bootstrap_spot_rates
                 )
-                interpolated_data.append(interpolated_row)
+                # Skip rows that contain only NaN values (insufficient data)
+                if not interpolated_row["interpolated_rate"].isna().all():
+                    interpolated_data.append(interpolated_row)
+                else:
+                    logger.warning(
+                        f"Skipping row with date {row['record_date']} due to "
+                        "insufficient data for interpolation"
+                    )
 
             # Combine all interpolated data
-            df = pd.concat(interpolated_data, ignore_index=True)
+            if interpolated_data:
+                df = pd.concat(interpolated_data, ignore_index=True)
+            else:
+                click.echo("Warning: No data could be interpolated", err=True)
+                sys.exit(1)
 
             # Update filename for interpolated data
             if output or filename:
