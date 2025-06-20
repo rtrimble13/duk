@@ -178,21 +178,8 @@ def format_data_for_pandas(data: List[Dict[str, Any]]) -> pd.DataFrame:
     if "record_date" in df.columns:
         df["record_date"] = pd.to_datetime(df["record_date"])
 
-    # Normalize column names: convert 1_mo, 2_mo, etc. to month1, month2, etc.
-    # and 1_yr, 2_yr, etc. to year1, year2, etc.
-    columns_to_rename = {}
-    for col in df.columns:
-        if col.endswith("_mo"):
-            number = col.replace("_mo", "")
-            columns_to_rename[col] = f"month{number}"
-        elif col.endswith("_yr"):
-            number = col.replace("_yr", "")
-            columns_to_rename[col] = f"year{number}"
-
-    if columns_to_rename:
-        df = df.rename(columns=columns_to_rename)
-
     # Convert rate columns to numeric, handling None values
+    # We'll normalize column names later only when needed for interpolation
     rate_columns = [
         col
         for col in df.columns
@@ -368,13 +355,29 @@ def interpolate_yield_curve(
         DataFrame with interpolated rates and optionally spot rates.
         If insufficient data points, returns DataFrame with NaN values.
     """
+    # Normalize column names for internal processing
+    # Convert 1_mo, 2_mo, etc. to month1, month2, etc.
+    # and 1_yr, 2_yr, etc. to year1, year2, etc.
+    normalized_row = df_row.copy()
+    for col in df_row.index:
+        if col.endswith("_mo"):
+            number = col.replace("_mo", "")
+            new_col = f"month{number}"
+            normalized_row[new_col] = normalized_row[col]
+        elif col.endswith("_yr"):
+            number = col.replace("_yr", "")
+            new_col = f"year{number}"
+            normalized_row[new_col] = normalized_row[col]
+
     # Get rate columns and their corresponding maturities
     rate_columns = [
-        col for col in df_row.index if col.startswith("month") or col.startswith("year")
+        col
+        for col in normalized_row.index
+        if col.startswith("month") or col.startswith("year")
     ]
 
     # Filter out columns with NaN values for interpolation
-    valid_columns = [col for col in rate_columns if not pd.isna(df_row[col])]
+    valid_columns = [col for col in rate_columns if not pd.isna(normalized_row[col])]
 
     if len(valid_columns) < 3:
         # Not enough data points for cubic spline interpolation
@@ -385,7 +388,7 @@ def interpolate_yield_curve(
         )
 
         # Get record date for consistency
-        record_date = df_row["record_date"]
+        record_date = normalized_row["record_date"]
         if isinstance(record_date, pd.Timestamp):
             base_date = record_date
         else:
@@ -407,7 +410,7 @@ def interpolate_yield_curve(
 
     # Convert maturity strings to years and get corresponding rates
     maturities = np.array([maturity_to_years(col) for col in valid_columns])
-    rates = np.array([df_row[col] for col in valid_columns])
+    rates = np.array([normalized_row[col] for col in valid_columns])
 
     # Sort by maturity (should already be sorted, but ensure it)
     sort_idx = np.argsort(maturities)
@@ -466,7 +469,7 @@ def interpolate_yield_curve(
             spot_rates_interpolated = None
 
     # Create result DataFrame
-    record_date = df_row["record_date"]
+    record_date = normalized_row["record_date"]
 
     result_data = []
     for i, (maturity, rate) in enumerate(zip(target_maturities, interpolated_rates)):
