@@ -4,6 +4,7 @@ Treasury rate subprogram for downloading par treasury yield data.
 
 import json
 import logging
+import os
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -29,13 +30,15 @@ class TreasuryRateDownloader:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "duk-treasury-downloader/0.1.0"})
-        # Load FMP API key from etc directory
-        key_file = Path(__file__).parents[3] / "etc" / ".fmp_api.key"
-        try:
-            self.api_key = key_file.read_text().strip()
-        except Exception as e:
-            logger.error(f"Failed to read API key: {e}")
-            sys.exit(1)
+        # Load FMP API key from environment variable or etc directory
+        self.api_key = os.environ.get("FMP_API_KEY")
+        if not self.api_key:
+            key_file = Path(__file__).parents[3] / "etc" / ".fmp_api.key"
+            try:
+                self.api_key = key_file.read_text().strip()
+            except Exception as e:
+                logger.error(f"Failed to read API key: {e}")
+                sys.exit(1)
 
     def get_latest_date(self) -> Optional[str]:
         """Get the most recent date available in the treasury data."""
