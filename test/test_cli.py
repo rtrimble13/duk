@@ -321,3 +321,28 @@ class TestTreasuryCLI:
         assert "interpolated_rate" in data[0]
         assert "interpolated_spot_rate" in data[0]
         assert "maturity_years" in data[0]
+
+    def test_man_page_exists(self):
+        """Test that the man page file exists and has expected content."""
+        from pathlib import Path
+
+        # Get the project root directory
+        project_root = Path(__file__).parent.parent
+        man_page_path = project_root / "doc" / "duk.1"
+
+        # Check that man page file exists
+        assert man_page_path.exists(), f"Man page file not found at {man_page_path}"
+
+        # Read and verify basic content
+        with open(man_page_path, 'r') as f:
+            content = f.read()
+
+        # Check for essential man page elements
+        assert ".TH DUK 1" in content, "Man page header not found"
+        assert ".SH NAME" in content, "NAME section not found"
+        assert ".SH SYNOPSIS" in content, "SYNOPSIS section not found"
+        assert ".SH DESCRIPTION" in content, "DESCRIPTION section not found"
+        assert "TurningBull Data Utility Knife" in content, (
+            "Project description not found"
+        )
+        assert "tr" in content, "TR subcommand not documented"
