@@ -178,6 +178,20 @@ def format_data_for_pandas(data: List[Dict[str, Any]]) -> pd.DataFrame:
     if "record_date" in df.columns:
         df["record_date"] = pd.to_datetime(df["record_date"])
 
+    # Normalize column names: convert 1_mo, 2_mo, etc. to month1, month2, etc.
+    # and 1_yr, 2_yr, etc. to year1, year2, etc.
+    columns_to_rename = {}
+    for col in df.columns:
+        if col.endswith("_mo"):
+            number = col.replace("_mo", "")
+            columns_to_rename[col] = f"month{number}"
+        elif col.endswith("_yr"):
+            number = col.replace("_yr", "")
+            columns_to_rename[col] = f"year{number}"
+
+    if columns_to_rename:
+        df = df.rename(columns=columns_to_rename)
+
     # Convert rate columns to numeric, handling None values
     rate_columns = [
         col
