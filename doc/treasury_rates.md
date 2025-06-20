@@ -2,7 +2,9 @@
 
 The `duk tr` subprogram downloads U.S. Treasury par yield curve rates using the Financial Modeling Prep (FMP) API.
 
-Note: An FMP API key is required. Place your key in `etc/.fmp_api.key` before running this command.
+Note: An FMP API key is required. You can provide the key in one of two ways:
+1. Set the `FMP_API_KEY` environment variable (recommended for CI/automated environments)
+2. Place your key in `etc/.fmp_api.key` file
 
 ## Overview
 
