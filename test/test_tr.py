@@ -246,7 +246,8 @@ class TestBootstrapSpotRates:
 
         # Basic checks
         assert len(spot_rates) == len(par_rates)
-        # First spot rate should be approximately equal to first par rate (within rounding)
+        # First spot rate should be approximately equal to first par rate
+        # (within rounding)
         assert abs(spot_rates[0] - par_rates[0]) < 1e-10
         assert all(spot_rates > 0)  # All spot rates should be positive
 
@@ -357,7 +358,7 @@ class TestBootstrapSpotRates:
         assert len(result) > 0
 
     def test_bootstrap_semiannual_coupons_with_different_intervals(self):
-        """Test that bootstrap correctly handles semiannual coupons for different interpolation intervals."""
+        """Test bootstrap correctly handles semiannual coupons for intervals."""
         # Create sample data with sufficient points for interpolation
         data = {
             "record_date": pd.Timestamp("2023-12-01"),
@@ -391,8 +392,14 @@ class TestBootstrapSpotRates:
         assert all(result_quarterly["interpolated_spot_rate"] > 0)
 
         # Check that spot rates are reasonable (within 2% of par rates)
-        semi_diff = np.abs(result_semiannual["interpolated_rate"] - result_semiannual["interpolated_spot_rate"])
-        quarterly_diff = np.abs(result_quarterly["interpolated_rate"] - result_quarterly["interpolated_spot_rate"])
+        semi_diff = np.abs(
+            result_semiannual["interpolated_rate"]
+            - result_semiannual["interpolated_spot_rate"]
+        )
+        quarterly_diff = np.abs(
+            result_quarterly["interpolated_rate"]
+            - result_quarterly["interpolated_spot_rate"]
+        )
         assert all(semi_diff < 2.0)
         assert all(quarterly_diff < 2.0)
 
@@ -514,8 +521,13 @@ class TestInterpolationFunctions:
         }
         df_row = pd.Series(data)
 
-        with pytest.raises(ValueError, match="Not enough valid data points"):
-            interpolate_yield_curve(df_row, "semiannual")
+        # Should return DataFrame with NaN values instead of raising exception
+        result = interpolate_yield_curve(df_row, "semiannual")
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 1
+        assert result["calendar_date"].iloc[0] == "2023-12-01"
+        assert pd.isna(result["maturity_years"].iloc[0])
+        assert pd.isna(result["interpolated_rate"].iloc[0])
 
     def test_interpolate_yield_curve_with_nans(self):
         """Test interpolation with NaN values in data."""
