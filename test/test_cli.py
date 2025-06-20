@@ -317,7 +317,6 @@ class TestTreasuryCLI:
 
     def test_man_page_exists(self):
         """Test that the man page file exists and has expected content."""
-        import os
         from pathlib import Path
 
         # Get the project root directory
@@ -336,5 +335,7 @@ class TestTreasuryCLI:
         assert ".SH NAME" in content, "NAME section not found"
         assert ".SH SYNOPSIS" in content, "SYNOPSIS section not found"
         assert ".SH DESCRIPTION" in content, "DESCRIPTION section not found"
-        assert "TurningBull Data Utility Knife" in content, "Project description not found"
+        assert "TurningBull Data Utility Knife" in content, (
+            "Project description not found"
+        )
         assert "tr" in content, "TR subcommand not documented"
