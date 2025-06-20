@@ -3,6 +3,7 @@ Unit tests for the treasury rate subprogram.
 """
 
 import json
+import os
 import pytest
 from unittest.mock import Mock, patch
 import pandas as pd
@@ -16,6 +17,13 @@ from duk.commands.tr import (
     interpolate_yield_curve,
     bootstrap_spot_rates,
 )
+
+
+@pytest.fixture(autouse=True)
+def set_fmp_api_key():
+    """Set FMP_API_KEY environment variable for all tests."""
+    with patch.dict(os.environ, {"FMP_API_KEY": "dummy_test_key"}):
+        yield
 
 
 class TestTreasuryRateDownloader:

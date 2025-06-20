@@ -3,11 +3,20 @@ Integration tests for the CLI functionality.
 """
 
 import json
+import os
 import tempfile
+import pytest
 from unittest.mock import patch
 from click.testing import CliRunner
 
 from duk.main import main
+
+
+@pytest.fixture(autouse=True)
+def set_fmp_api_key():
+    """Set FMP_API_KEY environment variable for all tests."""
+    with patch.dict(os.environ, {"FMP_API_KEY": "dummy_test_key"}):
+        yield
 
 
 class TestTreasuryCLI:
