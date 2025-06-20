@@ -1,0 +1,137 @@
+.TH DUK 1 "January 2025" "duk 0.1.0" "User Commands"
+.SH NAME
+duk \- TurningBull Data Utility Knife
+.SH SYNOPSIS
+.B duk
+[\fIOPTIONS\fR] \fICOMMAND\fR [\fICOMMAND_ARGS\fR]...
+.SH DESCRIPTION
+\fBduk\fR is a CLI tool for downloading financial market data and performing data preprocessing. It provides various subcommands for accessing different types of financial data through APIs and performing common data transformations.
+
+The general command line signature is \fBduk <subprogram> [optional arguments]\fR, where each subprogram acts like a stand-alone application within the duk interface.
+.SH OPTIONS
+.TP
+.BR \-v ", " \-\-verbose
+Enable verbose logging to stderr
+.TP
+.BR \-\-help
+Show help message and exit
+.SH COMMANDS
+.TP
+.B tr
+Download U.S. Treasury par yield curve rates. See \fBduk tr \-\-help\fR for detailed options.
+.SH EXAMPLES
+.TP
+Get help for the main command:
+.B duk \-\-help
+.TP
+Get help for a specific subcommand:
+.B duk tr \-\-help
+.TP
+Download latest Treasury rates:
+.B duk tr
+.TP
+Download Treasury rates with verbose logging:
+.B duk \-v tr
+.TP
+Download specific date Treasury rates:
+.B duk tr \-\-date 2023\-12\-01
+.TP
+Download Treasury rates for last 5 days and save to file:
+.B duk tr \-\-days 5 \-\-output
+.TP
+Download Treasury rates with interpolation:
+.B duk tr \-\-interpolate
+.TP
+Download Treasury rates with bootstrap spot rates:
+.B duk tr \-\-bootstrap\-spot\-rates
+.SH TR SUBCOMMAND
+The \fBtr\fR subcommand downloads U.S. Treasury par yield curve rates using the Financial Modeling Prep (FMP) API.
+
+\fBNote:\fR An FMP API key is required. Place your key in \fIetc/.fmp_api.key\fR before running this command.
+
+.SS TR Options
+.TP
+.BR \-d ", " \-\-date " " \fIDATE\fR
+Specific date to download (YYYY-MM-DD format)
+.TP
+.BR \-s ", " \-\-start\-date " " \fIDATE\fR
+Start date for date range (YYYY-MM-DD format)
+.TP
+.BR \-e ", " \-\-end\-date " " \fIDATE\fR
+End date for date range (YYYY-MM-DD format)
+.TP
+.BR \-n ", " \-\-days " " \fINUMBER\fR
+Number of days to download from start date (or latest date if no start date)
+.TP
+.BR \-o ", " \-\-output
+Output to file instead of stdout
+.TP
+.BR \-f ", " \-\-filename " " \fINAME\fR
+Specify filename (overrides default naming)
+.TP
+.BR \-\-format " " {\fIcsv\fR|\fIjson\fR}
+Output format (default: csv)
+.TP
+.BR \-D ", " \-\-directory " " \fIDIR\fR
+Output directory (default: var)
+.TP
+.BR \-i ", " \-\-interpolate
+Perform cubic spline interpolation
+.TP
+.BR \-\-interpolate\-interval " " {\fIday\fR|\fImonth\fR|\fIquarter\fR|\fIsemiannual\fR}
+Interpolation interval (default: semiannual)
+.TP
+.BR \-\-bootstrap\-spot\-rates
+Calculate bootstrap spot rates from par rates (implies --interpolate)
+
+.SS TR Examples
+.TP
+Get latest Treasury data:
+.B duk tr
+.TP
+Get data for last trading week:
+.B duk tr \-\-days 5
+.TP
+Get specific date:
+.B duk tr \-\-date 2023\-12\-01
+.TP
+Save last 30 days to default file:
+.B duk tr \-\-days 30 \-\-output
+.TP
+Save to custom filename in JSON format:
+.B duk tr \-\-days 10 \-\-filename rates_december \-\-format json \-\-output
+.TP
+Save to specific directory:
+.B duk tr \-\-output \-\-directory ./data/treasury
+.TP
+Get data with cubic spline interpolation:
+.B duk tr \-\-interpolate
+.TP
+Get data with bootstrap spot rates:
+.B duk tr \-\-bootstrap\-spot\-rates
+.SH FILES
+.TP
+.I etc/.fmp_api.key
+Financial Modeling Prep API key file (required for tr subcommand)
+.TP
+.I var/duk.log
+Default log file location
+.TP
+.I var/
+Default output directory for saved files
+.SH ENVIRONMENT
+The program respects standard Python environment variables and uses the system's Python path for module resolution.
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+General error (invalid arguments, API errors, etc.)
+.SH AUTHOR
+TurningBull
+.SH SEE ALSO
+.BR python (1),
+.BR pip (1)
+
+For detailed documentation, see the files in the \fIdoc/\fR directory of the source distribution.
