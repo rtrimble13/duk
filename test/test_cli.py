@@ -334,7 +334,7 @@ class TestTreasuryCLI:
         assert man_page_path.exists(), f"Man page file not found at {man_page_path}"
 
         # Read and verify basic content
-        with open(man_page_path, 'r') as f:
+        with open(man_page_path, "r") as f:
             content = f.read()
 
         # Check for essential man page elements
@@ -342,10 +342,11 @@ class TestTreasuryCLI:
         assert ".SH NAME" in content, "NAME section not found"
         assert ".SH SYNOPSIS" in content, "SYNOPSIS section not found"
         assert ".SH DESCRIPTION" in content, "DESCRIPTION section not found"
-        assert "TurningBull Data Utility Knife" in content, (
-            "Project description not found"
-        )
+        assert (
+            "TurningBull Data Utility Knife" in content
+        ), "Project description not found"
         assert "tr" in content, "TR subcommand not documented"
+        assert "ph" in content, "PH subcommand not documented"
 
 
 class TestPriceHistoryCLI:
@@ -354,7 +355,7 @@ class TestPriceHistoryCLI:
     def setup_method(self):
         """Set up test fixtures."""
         self.runner = CliRunner()
-        
+
         # Sample FMP price data response (direct list format)
         self.sample_price_data = [
             {
@@ -374,7 +375,7 @@ class TestPriceHistoryCLI:
                 "volume": 900000,
             },
         ]
-        
+
         # Sample dividend data
         self.sample_dividend_data = [
             {
@@ -382,7 +383,7 @@ class TestPriceHistoryCLI:
                 "dividend": 0.25,
             }
         ]
-        
+
         # Sample split data
         self.sample_split_data = [
             {
@@ -396,14 +397,13 @@ class TestPriceHistoryCLI:
     def test_ph_basic_command(self, mock_request):
         """Test basic ph command functionality."""
         mock_request.return_value = self.sample_price_data
-        
+
         # Use explicit date range to avoid issues with current date
-        result = self.runner.invoke(main, [
-            "ph", "AAPL", 
-            "--start-date", "2023-11-01", 
-            "--end-date", "2023-12-01"
-        ])
-        
+        result = self.runner.invoke(
+            main,
+            ["ph", "AAPL", "--start-date", "2023-11-01", "--end-date", "2023-12-01"],
+        )
+
         assert result.exit_code == 0
         assert "symbol" in result.output
         assert "date" in result.output
@@ -413,14 +413,21 @@ class TestPriceHistoryCLI:
     def test_ph_json_output(self, mock_request):
         """Test ph command with JSON output."""
         mock_request.return_value = self.sample_price_data
-        
-        result = self.runner.invoke(main, [
-            "ph", "AAPL", 
-            "--start-date", "2023-11-01", 
-            "--end-date", "2023-12-01",
-            "--format", "json"
-        ])
-        
+
+        result = self.runner.invoke(
+            main,
+            [
+                "ph",
+                "AAPL",
+                "--start-date",
+                "2023-11-01",
+                "--end-date",
+                "2023-12-01",
+                "--format",
+                "json",
+            ],
+        )
+
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert isinstance(data, list)
@@ -431,14 +438,20 @@ class TestPriceHistoryCLI:
     def test_ph_ohlcv_output(self, mock_request):
         """Test ph command with OHLCV output."""
         mock_request.return_value = self.sample_price_data
-        
-        result = self.runner.invoke(main, [
-            "ph", "AAPL", 
-            "--start-date", "2023-11-01", 
-            "--end-date", "2023-12-01",
-            "--ohlcv"
-        ])
-        
+
+        result = self.runner.invoke(
+            main,
+            [
+                "ph",
+                "AAPL",
+                "--start-date",
+                "2023-11-01",
+                "--end-date",
+                "2023-12-01",
+                "--ohlcv",
+            ],
+        )
+
         assert result.exit_code == 0
         assert "volume" in result.output
 
@@ -447,16 +460,14 @@ class TestPriceHistoryCLI:
     def test_ph_with_days(self, mock_datetime, mock_request):
         """Test ph command with days parameter."""
         from datetime import datetime
+
         mock_request.return_value = self.sample_price_data
         # Mock datetime.now to return a predictable date
         mock_datetime.now.return_value = datetime(2023, 12, 1)
         mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
-        
-        result = self.runner.invoke(main, [
-            "ph", "AAPL",
-            "--days", "2"
-        ])
-        
+
+        result = self.runner.invoke(main, ["ph", "AAPL", "--days", "2"])
+
         assert result.exit_code == 0
         assert "AAPL" in result.output
 
@@ -464,13 +475,12 @@ class TestPriceHistoryCLI:
     def test_ph_with_date_range(self, mock_request):
         """Test ph command with date range."""
         mock_request.return_value = self.sample_price_data
-        
-        result = self.runner.invoke(main, [
-            "ph", "AAPL", 
-            "--start-date", "2023-01-01", 
-            "--end-date", "2023-12-31"
-        ])
-        
+
+        result = self.runner.invoke(
+            main,
+            ["ph", "AAPL", "--start-date", "2023-01-01", "--end-date", "2023-12-31"],
+        )
+
         assert result.exit_code == 0
         assert "AAPL" in result.output
 
@@ -478,16 +488,23 @@ class TestPriceHistoryCLI:
     def test_ph_file_output(self, mock_request):
         """Test ph command with file output."""
         mock_request.return_value = self.sample_price_data
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
-            result = self.runner.invoke(main, [
-                "ph", "AAPL", 
-                "--start-date", "2023-11-01", 
-                "--end-date", "2023-12-01",
-                "--output", 
-                "--directory", tmpdir
-            ])
-            
+            result = self.runner.invoke(
+                main,
+                [
+                    "ph",
+                    "AAPL",
+                    "--start-date",
+                    "2023-11-01",
+                    "--end-date",
+                    "2023-12-01",
+                    "--output",
+                    "--directory",
+                    tmpdir,
+                ],
+            )
+
             assert result.exit_code == 0
             assert "Data saved to" in result.output
 
@@ -495,18 +512,24 @@ class TestPriceHistoryCLI:
     def test_ph_multiple_tickers_file(self, mock_request):
         """Test ph command with multiple tickers from file."""
         mock_request.return_value = self.sample_price_data
-        
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
             f.write("AAPL\nMSFT\n")
             f.flush()
-            
+
             try:
-                result = self.runner.invoke(main, [
-                    "ph", f.name,
-                    "--start-date", "2023-11-01", 
-                    "--end-date", "2023-12-01"
-                ])
-                
+                result = self.runner.invoke(
+                    main,
+                    [
+                        "ph",
+                        f.name,
+                        "--start-date",
+                        "2023-11-01",
+                        "--end-date",
+                        "2023-12-01",
+                    ],
+                )
+
                 assert result.exit_code == 0
                 assert "AAPL" in result.output
                 assert "MSFT" in result.output
@@ -516,6 +539,7 @@ class TestPriceHistoryCLI:
     @patch("duk.commands.ph.PriceHistoryDownloader._make_request")
     def test_ph_with_adjustments(self, mock_request):
         """Test ph command with dividend and split adjustments."""
+
         # Mock different API calls based on URL
         def mock_request_side_effect(url, params):
             if "historical-price-eod" in url:
@@ -525,16 +549,24 @@ class TestPriceHistoryCLI:
             elif "splits" in url:
                 return self.sample_split_data
             return None
-        
+
         mock_request.side_effect = mock_request_side_effect
-        
-        result = self.runner.invoke(main, [
-            "ph", "AAPL", 
-            "--start-date", "2023-11-01", 
-            "--end-date", "2023-12-01",
-            "--adj", "--div", "--split"
-        ])
-        
+
+        result = self.runner.invoke(
+            main,
+            [
+                "ph",
+                "AAPL",
+                "--start-date",
+                "2023-11-01",
+                "--end-date",
+                "2023-12-01",
+                "--adj",
+                "--div",
+                "--split",
+            ],
+        )
+
         assert result.exit_code == 0
         assert "adjusted_close" in result.output or "dividend" in result.output
 
@@ -542,34 +574,41 @@ class TestPriceHistoryCLI:
     def test_ph_frequency_aggregation(self, mock_request):
         """Test ph command with frequency aggregation."""
         mock_request.return_value = self.sample_price_data
-        
-        result = self.runner.invoke(main, [
-            "ph", "AAPL", 
-            "--start-date", "2023-11-01", 
-            "--end-date", "2023-12-01",
-            "--frequency", "weekly"
-        ])
-        
+
+        result = self.runner.invoke(
+            main,
+            [
+                "ph",
+                "AAPL",
+                "--start-date",
+                "2023-11-01",
+                "--end-date",
+                "2023-12-01",
+                "--frequency",
+                "weekly",
+            ],
+        )
+
         assert result.exit_code == 0
         assert "AAPL" in result.output
 
     def test_ph_help(self):
         """Test ph command help."""
         result = self.runner.invoke(main, ["ph", "--help"])
-        
+
         assert result.exit_code == 0
         assert "Download historical security price data" in result.output
         assert "TICKER" in result.output
 
     def test_ph_invalid_ticker_file(self):
         """Test ph command with invalid ticker file."""
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
             f.write("")  # Empty file
             f.flush()
-            
+
             try:
                 result = self.runner.invoke(main, ["ph", f.name])
-                
+
                 assert result.exit_code == 1
                 assert "Error:" in result.output
             finally:
@@ -579,8 +618,8 @@ class TestPriceHistoryCLI:
     def test_ph_api_failure(self, mock_request):
         """Test ph command with API failure."""
         mock_request.return_value = None
-        
+
         result = self.runner.invoke(main, ["ph", "INVALID"])
-        
+
         assert result.exit_code == 1
         assert "Error:" in result.output
