@@ -9,17 +9,43 @@ import os
 # Read version from pyproject.toml or __init__.py
 def get_version():
     try:
+        # Try tomllib first (Python 3.11+)
         import tomllib
         with open("pyproject.toml", "rb") as f:
             data = tomllib.load(f)
             return data["project"]["version"]
+    except ImportError:
+        # Python < 3.11, try tomli
+        try:
+            import tomli
+            with open("pyproject.toml", "rb") as f:
+                data = tomli.load(f)
+                return data["project"]["version"]
+        except ImportError:
+            # Fallback to manual parsing
+            pass
     except:
-        # Fallback to reading from __init__.py
+        pass
+    
+    # Manual parsing fallback for maximum compatibility
+    try:
+        with open("pyproject.toml", "r") as f:
+            for line in f:
+                if line.startswith('version = '):
+                    return line.split('=')[1].strip().strip('"').strip("'")
+    except:
+        pass
+    
+    # Final fallback to reading from __init__.py
+    try:
         init_file = os.path.join("src", "duk", "__init__.py")
         with open(init_file) as f:
             for line in f:
                 if line.startswith("__version__"):
                     return line.split("=")[1].strip().strip('"').strip("'")
+    except:
+        pass
+    
     return "0.1.0"
 
 setup(

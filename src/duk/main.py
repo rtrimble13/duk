@@ -10,6 +10,7 @@ from pathlib import Path
 import click
 
 from duk.commands.tr import tr_command
+from duk.commands.ph import ph_command
 
 
 def setup_logging(verbose: bool = False):
@@ -48,6 +49,7 @@ def main(ctx, verbose):
 
 # Add subcommands
 main.add_command(tr_command, name="tr")
+main.add_command(ph_command, name="ph")
 
 
 if __name__ == "__main__":

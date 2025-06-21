@@ -19,6 +19,9 @@ Show help message and exit
 .TP
 .B tr
 Download U.S. Treasury par yield curve rates. See \fBduk tr \-\-help\fR for detailed options.
+.TP
+.B ph
+Download historical security price data. See \fBduk ph \-\-help\fR for detailed options.
 .SH EXAMPLES
 .TP
 Get help for the main command:
@@ -26,6 +29,8 @@ Get help for the main command:
 .TP
 Get help for a specific subcommand:
 .B duk tr \-\-help
+.TP
+.B duk ph \-\-help
 .TP
 Download latest Treasury rates:
 .B duk tr
@@ -44,6 +49,21 @@ Download Treasury rates with interpolation:
 .TP
 Download Treasury rates with bootstrap spot rates:
 .B duk tr \-\-bootstrap\-spot\-rates
+.TP
+Download latest 5 days OHLC for AAPL:
+.B duk ph AAPL
+.TP
+Download price history with date range:
+.B duk ph AAPL \-\-start\-date 2023\-01\-01 \-\-end\-date 2023\-12\-31
+.TP
+Download OHLCV data with adjustments:
+.B duk ph AAPL \-\-ohlcv \-\-adj
+.TP
+Download multiple tickers from file:
+.B duk ph tickers.txt \-\-output
+.TP
+Download monthly aggregated data:
+.B duk ph AAPL \-\-frequency monthly \-\-days 365
 .SH TR SUBCOMMAND
 The \fBtr\fR subcommand downloads U.S. Treasury par yield curve rates using the Financial Modeling Prep (FMP) API.
 
@@ -109,10 +129,81 @@ Get data with cubic spline interpolation:
 .TP
 Get data with bootstrap spot rates:
 .B duk tr \-\-bootstrap\-spot\-rates
+.SH PH SUBCOMMAND
+The \fBph\fR subcommand downloads historical security price data using the Financial Modeling Prep (FMP) API.
+
+\fBNote:\fR An FMP API key is required. Place your key in \fIetc/.fmp_api.key\fR before running this command.
+
+.SS PH Options
+.TP
+.BR \-s ", " \-\-start\-date " " \fIDATE\fR
+Start date for date range (YYYY-MM-DD format)
+.TP
+.BR \-e ", " \-\-end\-date " " \fIDATE\fR
+End date for date range (YYYY-MM-DD format)
+.TP
+.BR \-n ", " \-\-days " " \fINUMBER\fR
+Number of observations to return (default: 5)
+.TP
+.BR \-o ", " \-\-output
+Output to file instead of stdout
+.TP
+.BR \-f ", " \-\-filename " " \fIFILENAME\fR
+Specify filename (overrides default naming)
+.TP
+.BR \-\-format " " {\fIcsv\fR|\fIjson\fR}
+Output format (default: csv)
+.TP
+.BR \-D ", " \-\-directory " " \fIDIRECTORY\fR
+Output directory (default: var)
+.TP
+.BR \-\-frequency " " {\fIdaily\fR|\fIweekly\fR|\fImonthly\fR|\fIquarterly\fR|\fIsemiannual\fR|\fIannual\fR}
+Data frequency (default: daily)
+.TP
+.BR \-\-ohlc
+Include Open, High, Low, Close prices (default)
+.TP
+.BR \-\-hlc
+Include High, Low, Close prices
+.TP
+.BR \-\-ohlcv
+Include Open, High, Low, Close, Volume
+.TP
+.BR \-\-vol
+Include Volume
+.TP
+.BR \-\-adj
+Include adjusted close prices
+.TP
+.BR \-\-div
+Include dividend data
+.TP
+.BR \-\-split
+Include stock split data
+
+.SS PH Examples
+.TP
+Get latest 5 days OHLC for AAPL:
+.B duk ph AAPL
+.TP
+Get last 30 days with volume:
+.B duk ph AAPL \-\-days 30 \-\-ohlcv
+.TP
+Get specific date range:
+.B duk ph AAPL \-\-start\-date 2023\-01\-01 \-\-end\-date 2023\-12\-31
+.TP
+Get data with adjustments:
+.B duk ph AAPL \-\-adj \-\-div \-\-split
+.TP
+Save multiple tickers to file:
+.B duk ph tickers.txt \-\-output
+.TP
+Get monthly aggregated data:
+.B duk ph AAPL \-\-frequency monthly \-\-days 365 \-\-format json \-\-output
 .SH FILES
 .TP
 .I etc/.fmp_api.key
-Financial Modeling Prep API key file (required for tr subcommand)
+Financial Modeling Prep API key file (required for tr and ph subcommands)
 .TP
 .I var/duk.log
 Default log file location
