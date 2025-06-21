@@ -1,4 +1,4 @@
-.PHONY: install test clean lint format build publish doc help
+.PHONY: install test clean lint format build build-standalone dist conda-build publish doc help
 
 # Default target
 help:
@@ -10,6 +10,8 @@ help:
 	@echo "  format     - Format code with black"
 	@echo "  build      - Build distribution packages"
 	@echo "  build-standalone - Build packages using fallback method"
+	@echo "  dist       - Build distribution packages (alias for build)"
+	@echo "  conda-build - Build conda package"
 	@echo "  publish    - Publish to PyPI (requires credentials)"
 	@echo "  doc        - Install man pages"
 
@@ -38,6 +40,27 @@ build:
 
 build-standalone:
 	python scripts/build.py
+
+dist:
+	@echo "Building distribution packages..."
+	@if python -m build --version >/dev/null 2>&1; then \
+		echo "Using standard build method..."; \
+		if ! python -m build; then \
+			echo "Standard build failed, falling back to standalone method..."; \
+			python scripts/build.py; \
+		fi; \
+	else \
+		echo "Using standalone build method..."; \
+		python scripts/build.py; \
+	fi
+
+conda-build:
+	@echo "Building conda package..."
+	@if ! command -v conda-build >/dev/null 2>&1; then \
+		echo "Error: conda-build not found. Install with: conda install conda-build"; \
+		exit 1; \
+	fi
+	conda-build conda-recipe/
 
 publish:
 	python -m twine upload dist/*
