@@ -1,6 +1,6 @@
 # Packaging Guide
 
-This document describes how to build and distribute the `duk` package.
+This document describes how to build and distribute the `duk` package for both PyPI and conda.
 
 ## Prerequisites
 
@@ -8,10 +8,23 @@ The project uses modern Python packaging standards:
 - `pyproject.toml` for project configuration
 - `src/` layout for source code
 - Setuptools with PEP 517/518 support
+- Conda recipe for conda-forge distribution
 
-## Building the Package
+## Building Packages
 
-### Method 1: Using the build module (Recommended)
+### PyPI Distribution
+
+#### Method 1: Using make dist (Recommended)
+
+```bash
+# Install development dependencies
+make install
+
+# Build distribution packages with automatic fallback
+make dist
+```
+
+#### Method 2: Using the build module
 
 ```bash
 # Install development dependencies (includes build tool)
@@ -21,7 +34,7 @@ make install
 make build
 ```
 
-### Method 2: Standalone build script (Fallback)
+#### Method 3: Standalone build script (Fallback)
 
 If the standard build method fails (e.g., due to network issues), use the standalone build script:
 
@@ -34,13 +47,41 @@ This method:
 - Uses setuptools directly to build packages
 - More resilient to network issues during CI/CD
 
+### Conda Distribution
+
+#### Building Conda Packages
+
+```bash
+# Install conda-build (if not already installed)
+conda install conda-build
+
+# Build conda package
+make conda-build
+```
+
+#### Alternative Manual Build
+
+```bash
+# Build conda package manually
+conda-build conda-recipe/
+```
+
 ### Built Packages
 
-Both methods create distribution packages in the `dist/` directory:
+#### PyPI Packages
+
+All methods create distribution packages in the `dist/` directory:
 - `duk-X.Y.Z-py3-none-any.whl` - Universal wheel
 - `duk-X.Y.Z.tar.gz` - Source distribution
 
+#### Conda Packages
+
+Conda packages are built in the conda-build output directory (typically `~/miniconda3/conda-bld/`):
+- `duk-X.Y.Z-py_0.tar.bz2` - Conda package
+
 ## Installation Testing
+
+### PyPI Packages
 
 Test that built packages can be installed:
 
@@ -55,9 +96,23 @@ pip install dist/duk-*.tar.gz
 duk --help
 ```
 
-## Publishing to PyPI
+### Conda Packages
 
-### Manual Publishing
+Test conda package installation:
+
+```bash
+# Install from local build
+conda install --use-local duk
+
+# Verify CLI works
+duk --help
+```
+
+## Publishing
+
+### Publishing to PyPI
+
+#### Manual Publishing
 
 ```bash
 # Install twine if not already installed
@@ -71,6 +126,15 @@ make publish
 # or
 twine upload dist/*
 ```
+
+### Publishing to Conda-Forge
+
+For conda-forge distribution:
+
+1. Fork the [conda-forge/staged-recipes](https://github.com/conda-forge/staged-recipes) repository
+2. Create a new recipe in `recipes/duk/meta.yaml` based on the `conda-recipe/meta.yaml` 
+3. Submit a pull request
+4. Once merged, the package will be available via `conda install -c conda-forge duk`
 
 ### Automated Publishing
 
@@ -97,6 +161,8 @@ duk/
 │   └── commands/         # Subcommands
 ├── test/                 # Unit tests
 ├── doc/                  # Documentation
+├── conda-recipe/         # Conda packaging recipe
+│   └── meta.yaml         # Conda package configuration
 ├── pyproject.toml        # Package configuration
 ├── setup.cfg             # Tool configuration
 ├── Makefile              # Development commands

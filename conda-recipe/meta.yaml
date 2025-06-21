@@ -1,0 +1,53 @@
+{% set name = "duk" %}
+{% set version = "0.1.0" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  path: ../
+
+build:
+  noarch: python
+  number: 0
+  script: {{ PYTHON }} -m pip install . -vv
+  entry_points:
+    - duk = duk.main:main
+
+requirements:
+  host:
+    - python >=3.8
+    - pip
+    - setuptools >=61.0
+  run:
+    - python >=3.8
+    - requests >=2.25.0
+    - pandas >=1.3.0
+    - click >=8.0.0
+    - python-dateutil >=2.8.0
+    - scipy >=1.7.0
+
+test:
+  imports:
+    - duk
+    - duk.commands
+    - duk.commands.tr
+  commands:
+    - duk --help
+    - duk tr --help
+
+about:
+  home: https://github.com/rtrimble13/duk
+  license: MIT
+  license_file: LICENSE
+  summary: TurningBull Data Utility Knife - CLI tool for downloading financial data
+  description: |
+    duk is a command-line tool for downloading and processing financial data
+    from various APIs. It provides subcommands for different data sources
+    and includes data preprocessing and transformation capabilities.
+  dev_url: https://github.com/rtrimble13/duk
+
+extra:
+  recipe-maintainers:
+    - rtrimble13
