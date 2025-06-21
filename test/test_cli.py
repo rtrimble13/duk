@@ -334,7 +334,7 @@ class TestTreasuryCLI:
         assert man_page_path.exists(), f"Man page file not found at {man_page_path}"
 
         # Read and verify basic content
-        with open(man_page_path, 'r') as f:
+        with open(man_page_path, "r") as f:
             content = f.read()
 
         # Check for essential man page elements
@@ -342,7 +342,7 @@ class TestTreasuryCLI:
         assert ".SH NAME" in content, "NAME section not found"
         assert ".SH SYNOPSIS" in content, "SYNOPSIS section not found"
         assert ".SH DESCRIPTION" in content, "DESCRIPTION section not found"
-        assert "TurningBull Data Utility Knife" in content, (
-            "Project description not found"
-        )
+        assert (
+            "TurningBull Data Utility Knife" in content
+        ), "Project description not found"
         assert "tr" in content, "TR subcommand not documented"
