@@ -360,12 +360,26 @@ def aggregate_by_frequency(df: pd.DataFrame, frequency: str) -> pd.DataFrame:
     if df.empty:
         return df
 
-    # Map frequency to pandas offset
+    # Map frequency to pandas offset - handle version compatibility
+    # Use 'ME' for pandas 2.0+ and 'M' for older versions
+    import pandas as pd
+    pandas_version = pd.__version__
+    major_version = int(pandas_version.split('.')[0])
+
+    if major_version >= 2:
+        # pandas 2.0+ uses 'ME' instead of deprecated 'M'
+        monthly_freq = "ME"
+        semiannual_freq = "6ME"
+    else:
+        # pandas < 2.0 uses 'M'
+        monthly_freq = "M"
+        semiannual_freq = "6M"
+
     freq_map = {
         "weekly": "W",
-        "monthly": "ME",  # Use 'ME' (Month End) instead of deprecated 'M'
+        "monthly": monthly_freq,
         "quarterly": "Q",
-        "semiannual": "6ME",  # Use 'ME' instead of 'M'
+        "semiannual": semiannual_freq,
         "annual": "A",
     }
 
