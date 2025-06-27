@@ -76,8 +76,8 @@ class TestCacheIntegration:
             assert result2.exit_code == 0
             assert "2023-12-01" in result2.output
 
-            # Should only call get_latest_date, not download_data due to cache
-            assert mock_request.call_count == 1
+            # Should not make any API calls due to cache hit
+            assert mock_request.call_count == 0
 
             # Test --no-cache flag bypasses cache
             mock_request.reset_mock()
@@ -89,8 +89,8 @@ class TestCacheIntegration:
             result3 = self.runner.invoke(main, ["tr", "--date", "2023-12-01", "--no-cache"])
             assert result3.exit_code == 0
             assert "2023-12-01" in result3.output
-            # Should hit API again due to --no-cache
-            assert mock_request.call_count == 2
+            # Should hit API again due to --no-cache (only download_data, not get_latest_date for specific date)
+            assert mock_request.call_count == 1
 
     @patch.dict("os.environ", {"FMP_API_KEY": "test_key"})
     @patch("duk.commands.ph.PriceHistoryDownloader._make_request")
@@ -120,8 +120,8 @@ class TestCacheIntegration:
             assert result1.exit_code == 0
             assert "AAPL" in result1.output or "2023-12-01" in result1.output
 
-            # Verify data is in cache
-            cached_data = real_cache.get_price_data("AAPL", "price", "2023-12-01", "2023-12-01")
+            # Verify data is in cache - need to use same parameters as ph command (includes days=5)
+            cached_data = real_cache.get_price_data("AAPL", "price", "2023-12-01", "2023-12-01", days=5)
             assert cached_data is not None
             assert len(cached_data) == 1
 

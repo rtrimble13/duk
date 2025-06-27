@@ -419,8 +419,8 @@ def interpolate_yield_curve(
     # Filter out columns with NaN values for interpolation
     valid_columns = [col for col in rate_columns if not pd.isna(normalized_row[col])]
 
-    if len(valid_columns) < 3:
-        # Not enough data points for cubic spline interpolation
+    if len(valid_columns) < 2:
+        # Not enough data points for interpolation (need at least 2)
         # Return a DataFrame with NaN values
         logger.warning(
             f"Insufficient data points ({len(valid_columns)}) for interpolation, "
