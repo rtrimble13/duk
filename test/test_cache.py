@@ -161,17 +161,21 @@ class TestCacheManager:
     def test_default_cache_directory_creation(self):
         """Test that default cache directory is created correctly."""
         # Test with var directory not existing (package install mode)
-        with tempfile.TemporaryDirectory() as temp_root:
-            os.chdir(temp_root)
-            # Ensure var doesn't exist
-            if Path("var").exists():
-                import shutil
-                shutil.rmtree("var")
-            
-            # This should use ~/var/duk/ path
-            cache_manager = CacheManager()
-            expected_path = Path.home() / "var" / "duk" / "duk_cache.db"
-            assert cache_manager.db_path.name == "duk_cache.db"
+        original_cwd = os.getcwd()
+        try:
+            with tempfile.TemporaryDirectory() as temp_root:
+                os.chdir(temp_root)
+                # Ensure var doesn't exist
+                if Path("var").exists():
+                    import shutil
+                    shutil.rmtree("var")
+                
+                # This should use ~/var/duk/ path
+                cache_manager = CacheManager()
+                expected_path = Path.home() / "var" / "duk" / "duk_cache.db"
+                assert cache_manager.db_path.name == "duk_cache.db"
+        finally:
+            os.chdir(original_cwd)
 
     @patch('duk.cache.logger')
     def test_error_handling_in_cache_operations(self, mock_logger):
