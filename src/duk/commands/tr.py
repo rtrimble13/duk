@@ -17,6 +17,7 @@ from dateutil.parser import parse as parse_date
 from scipy import interpolate
 
 from duk.config import get_api_key
+from duk.cache import CacheManager
 
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ class TreasuryRateDownloader:
     # Financial Modeling Prep API endpoint for daily treasury par yield curve rates
     BASE_URL = "https://financialmodelingprep.com/stable/treasury-rates"
 
-    def __init__(self):
+    def __init__(self, use_cache: bool = True):
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "duk-treasury-downloader/0.1.0"})
         # Load FMP API key from configuration system
@@ -41,6 +42,15 @@ class TreasuryRateDownloader:
             logger.error("  - duk/etc/tb.rc")
             logger.error("  - Environment variable: FMP_API_KEY")
             sys.exit(1)
+        
+        # Initialize cache manager
+        self.use_cache = use_cache
+        if self.use_cache:
+            try:
+                self.cache = CacheManager()
+            except Exception as e:
+                logger.warning(f"Failed to initialize cache: {e}. Proceeding without cache.")
+                self.use_cache = False
 
     def get_latest_date(self) -> Optional[str]:
         """Get the most recent date available in the treasury data."""
@@ -80,6 +90,31 @@ class TreasuryRateDownloader:
 
         Returns:
             List of treasury rate records or None if failed
+        """
+        # Check cache first if enabled
+        if self.use_cache:
+            cached_data = self.cache.get_treasury_data(start_date, end_date, days)
+            if cached_data is not None:
+                logger.info(f"Retrieved {len(cached_data)} records from cache")
+                return cached_data
+        
+        # If not in cache or cache disabled, fetch from API
+        data = self._fetch_from_api(start_date, end_date, days)
+        
+        # Store in cache if successful and cache is enabled
+        if data is not None and self.use_cache:
+            self.cache.store_treasury_data(data, start_date, end_date, days)
+        
+        return data
+
+    def _fetch_from_api(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        days: Optional[int] = None,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Fetch treasury data from API (extracted from original download_data method).
         """
         try:
             params: Dict[str, Any] = {}
@@ -561,6 +596,11 @@ def save_data(data: pd.DataFrame, filename: str, format_type: str, directory: st
     is_flag=True,
     help="Calculate bootstrap spot rates from par rates (implies --interpolate)",
 )
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    help="Disable caching and always fetch fresh data from API",
+)
 @click.pass_context
 def tr_command(
     ctx,
@@ -575,6 +615,7 @@ def tr_command(
     interpolate,
     interpolate_interval,
     bootstrap_spot_rates,
+    no_cache,
 ):
     """Download treasury par yield curve rates.
 
@@ -593,7 +634,7 @@ def tr_command(
       duk tr --bootstrap-spot-rates    # Latest data with spot rates
                                        # (implies interpolation)
     """
-    downloader = TreasuryRateDownloader()
+    downloader = TreasuryRateDownloader(use_cache=not no_cache)
 
     # Validate date arguments
     if date and (start_date or end_date):
