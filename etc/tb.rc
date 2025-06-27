@@ -1,0 +1,15 @@
+# TurningBull Configuration File (.tbrc)
+# This is the project-specific configuration file with highest priority
+
+[api_keys]
+# Financial Modeling Prep API key
+# Get your free API key at: https://financialmodelingprep.com/developer/docs
+# fmp_api_key = "your_fmp_api_key_here"
+
+# Add other API keys as needed
+# example_api_key = "your_example_key_here"
+
+[settings]
+# General application settings can be added here
+# log_level = "INFO"
+# default_output_directory = "var"

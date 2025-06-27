@@ -17,6 +17,8 @@ import numpy as np
 from dateutil.parser import parse as parse_date
 from scipy import interpolate
 
+from duk.config import get_api_key, validate_required_keys
+
 
 logger = logging.getLogger(__name__)
 
@@ -30,15 +32,16 @@ class TreasuryRateDownloader:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "duk-treasury-downloader/0.1.0"})
-        # Load FMP API key from environment variable or etc directory
-        self.api_key = os.environ.get("FMP_API_KEY")
+        # Load FMP API key from configuration system
+        self.api_key = get_api_key("fmp_api_key")
         if not self.api_key:
-            key_file = Path(__file__).parents[3] / "etc" / ".fmp_api.key"
-            try:
-                self.api_key = key_file.read_text().strip()
-            except Exception as e:
-                logger.error(f"Failed to read API key: {e}")
-                sys.exit(1)
+            logger.error("FMP API key not found in configuration")
+            logger.error("Configure your API key in one of these locations:")
+            logger.error("  - /usr/local/etc/tb.rc")
+            logger.error("  - ~/.tbrc") 
+            logger.error("  - duk/etc/tb.rc")
+            logger.error("  - Environment variable: FMP_API_KEY")
+            sys.exit(1)
 
     def get_latest_date(self) -> Optional[str]:
         """Get the most recent date available in the treasury data."""
