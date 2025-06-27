@@ -15,6 +15,7 @@ import requests
 from dateutil.parser import parse as parse_date
 
 from duk.config import get_api_key
+from duk.cache import CacheManager
 
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ class PriceHistoryDownloader:
     DIVIDENDS_URL = "https://financialmodelingprep.com/stable/dividends"
     SPLITS_URL = "https://financialmodelingprep.com/stable/splits"
 
-    def __init__(self):
+    def __init__(self, use_cache: bool = True):
         self.session = requests.Session()
         self.session.headers.update(
             {"User-Agent": "duk-price-history-downloader/0.1.0"}
@@ -45,6 +46,15 @@ class PriceHistoryDownloader:
             logger.error("  - duk/etc/tb.rc")
             logger.error("  - Environment variable: FMP_API_KEY")
             sys.exit(1)
+
+        # Initialize cache manager
+        self.use_cache = use_cache
+        if self.use_cache:
+            try:
+                self.cache = CacheManager()
+            except Exception as e:
+                logger.warning(f"Failed to initialize cache: {e}. Proceeding without cache.")
+                self.use_cache = False
 
     def download_price_data(
         self,
@@ -64,6 +74,32 @@ class PriceHistoryDownloader:
 
         Returns:
             List of price records or None if failed
+        """
+        # Check cache first if enabled
+        if self.use_cache:
+            cached_data = self.cache.get_price_data(symbol, "price", start_date, end_date, days)
+            if cached_data is not None:
+                logger.info(f"Retrieved {len(cached_data)} price records for {symbol} from cache")
+                return cached_data
+
+        # If not in cache or cache disabled, fetch from API
+        data = self._fetch_price_data_from_api(symbol, start_date, end_date, days)
+        
+        # Store in cache if successful and cache is enabled
+        if data is not None and self.use_cache:
+            self.cache.store_price_data(symbol, data, "price", start_date, end_date, days)
+        
+        return data
+
+    def _fetch_price_data_from_api(
+        self,
+        symbol: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        days: Optional[int] = None,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Fetch price data from API (extracted from original download_price_data method).
         """
         try:
             params = {"apikey": self.api_key}
@@ -134,6 +170,29 @@ class PriceHistoryDownloader:
         end_date: Optional[str] = None,
     ) -> Optional[List[Dict[str, Any]]]:
         """Download dividend data for a symbol."""
+        # Check cache first if enabled
+        if self.use_cache:
+            cached_data = self.cache.get_price_data(symbol, "dividend", start_date, end_date)
+            if cached_data is not None:
+                logger.info(f"Retrieved {len(cached_data)} dividend records for {symbol} from cache")
+                return cached_data
+
+        # If not in cache or cache disabled, fetch from API
+        data = self._fetch_dividends_data_from_api(symbol, start_date, end_date)
+        
+        # Store in cache if successful and cache is enabled
+        if data is not None and self.use_cache:
+            self.cache.store_price_data(symbol, data, "dividend", start_date, end_date)
+        
+        return data
+
+    def _fetch_dividends_data_from_api(
+        self,
+        symbol: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Fetch dividend data from API (extracted from original method)."""
         try:
             params = {"apikey": self.api_key, "symbol": symbol}
 
@@ -163,6 +222,29 @@ class PriceHistoryDownloader:
         end_date: Optional[str] = None,
     ) -> Optional[List[Dict[str, Any]]]:
         """Download stock split data for a symbol."""
+        # Check cache first if enabled
+        if self.use_cache:
+            cached_data = self.cache.get_price_data(symbol, "split", start_date, end_date)
+            if cached_data is not None:
+                logger.info(f"Retrieved {len(cached_data)} split records for {symbol} from cache")
+                return cached_data
+
+        # If not in cache or cache disabled, fetch from API
+        data = self._fetch_splits_data_from_api(symbol, start_date, end_date)
+        
+        # Store in cache if successful and cache is enabled
+        if data is not None and self.use_cache:
+            self.cache.store_price_data(symbol, data, "split", start_date, end_date)
+        
+        return data
+
+    def _fetch_splits_data_from_api(
+        self,
+        symbol: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Fetch split data from API (extracted from original method)."""
         try:
             params = {"apikey": self.api_key, "symbol": symbol}
 
@@ -483,6 +565,11 @@ def save_data(df: pd.DataFrame, filename: str, output_format: str, directory: st
 @click.option("--adj", is_flag=True, help="Include adjusted close prices")
 @click.option("--div", is_flag=True, help="Include dividend data")
 @click.option("--split", is_flag=True, help="Include stock split data")
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    help="Disable caching and always fetch fresh data from API",
+)
 @click.pass_context
 def ph_command(
     ctx,
@@ -502,6 +589,7 @@ def ph_command(
     adj,
     div,
     split,
+    no_cache,
 ):
     """Download historical security price data.
 
@@ -520,7 +608,7 @@ def ph_command(
       duk ph AAPL --frequency monthly       # Monthly aggregated data
       duk ph tickers.txt --output           # Process multiple tickers from file
     """
-    downloader = PriceHistoryDownloader()
+    downloader = PriceHistoryDownloader(use_cache=not no_cache)
 
     # Validate date arguments
     if start_date and end_date and days:

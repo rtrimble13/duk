@@ -36,7 +36,7 @@ class TestTreasuryRateDownloader:
 
     def setup_method(self):
         """Set up test fixtures."""
-        self.downloader = TreasuryRateDownloader()
+        self.downloader = TreasuryRateDownloader(use_cache=False)  # Disable cache for tests
 
         # Sample treasury data for testing
         self.sample_data = [
@@ -526,11 +526,10 @@ class TestInterpolationFunctions:
 
     def test_interpolate_yield_curve_insufficient_data(self):
         """Test interpolation with insufficient data points."""
-        # Create sample data with only 2 points (need at least 3 for cubic spline)
+        # Create sample data with only 1 point (need at least 2 for any interpolation)
         data = {
             "record_date": pd.Timestamp("2023-12-01"),
             "year1": 4.95,
-            "year10": 4.45,
         }
         df_row = pd.Series(data)
 

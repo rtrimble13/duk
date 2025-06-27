@@ -96,7 +96,7 @@ class TestTreasuryCLI:
         """Test tr command with specific date."""
         mock_request.return_value = {"data": self.sample_data}
 
-        result = self.runner.invoke(main, ["tr", "--date", "2023-12-01"])
+        result = self.runner.invoke(main, ["tr", "--date", "2023-12-01", "--no-cache"])
 
         assert result.exit_code == 0
         assert "2023-12-01" in result.output
@@ -229,12 +229,11 @@ class TestTreasuryCLI:
     @patch("duk.commands.tr.TreasuryRateDownloader._make_request")
     def test_tr_interpolation_insufficient_data(self, mock_request):
         """Test tr command with interpolation when there's insufficient data."""
-        # Only provide 2 data points - insufficient for cubic spline
+        # Only provide 1 data point - insufficient for any interpolation
         insufficient_data = [
             {
                 "record_date": "2023-12-01",
                 "1_yr": "4.95",
-                "10_yr": "4.45",
             }
         ]
 
@@ -243,7 +242,7 @@ class TestTreasuryCLI:
             {"data": insufficient_data},
         ]
 
-        result = self.runner.invoke(main, ["tr", "--interpolate"])
+        result = self.runner.invoke(main, ["tr", "--interpolate", "--no-cache"])
 
         # Should exit with code 1 because no data could be interpolated
         assert result.exit_code == 1
