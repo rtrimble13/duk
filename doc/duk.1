@@ -202,16 +202,51 @@ Get monthly aggregated data:
 .B duk ph AAPL \-\-frequency monthly \-\-days 365 \-\-format json \-\-output
 .SH FILES
 .TP
+.I /usr/local/etc/tb.rc
+System-wide configuration file (lowest priority)
+.TP
+.I ~/.tbrc
+User-specific configuration file (medium priority)
+.TP
+.I etc/tb.rc
+Project-specific configuration file (highest priority)
+.TP
 .I etc/.fmp_api.key
-Financial Modeling Prep API key file (required for tr and ph subcommands)
+Financial Modeling Prep API key file (legacy, for backward compatibility)
 .TP
 .I var/duk.log
 Default log file location
 .TP
 .I var/
 Default output directory for saved files
+.SH CONFIGURATION
+\\fBduk\\fR uses a flexible configuration system based on TOML format \\fI.tbrc\\fR files to manage API keys and settings. Configuration files are loaded with the following priority order:
+
+1. Project config: \\fIetc/tb.rc\\fR (highest priority)
+2. User config: \\fI~/.tbrc\\fR (medium priority)  
+3. System config: \\fI/usr/local/etc/tb.rc\\fR (lowest priority)
+
+API keys can also be set via environment variables for backward compatibility (e.g., \\fIFMP_API_KEY\\fR).
+
+Example configuration file:
+.nf
+.ft CW
+[api_keys]
+fmp_api_key = "your_api_key_here"
+
+[settings]
+log_level = "INFO"
+.ft
+.fi
+
+For detailed configuration documentation, see \\fIconfiguration.md\\fR in the documentation directory.
 .SH ENVIRONMENT
 The program respects standard Python environment variables and uses the system's Python path for module resolution.
+
+For backward compatibility, API keys can be set via environment variables:
+.TP
+.I FMP_API_KEY
+Financial Modeling Prep API key (used if not set in configuration files)
 .SH EXIT STATUS
 .TP
 .B 0

@@ -15,6 +15,11 @@ from duk.main import main
 @pytest.fixture(autouse=True)
 def set_fmp_api_key():
     """Set FMP_API_KEY environment variable for all tests."""
+    # Reset the global config manager to ensure clean state
+    import duk.config
+
+    duk.config._config_manager = None
+
     with patch.dict(os.environ, {"FMP_API_KEY": "dummy_test_key"}):
         yield
 

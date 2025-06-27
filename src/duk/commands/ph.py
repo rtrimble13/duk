@@ -4,7 +4,6 @@ Price history subprogram for downloading historical security price data.
 
 import json
 import logging
-import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -14,6 +13,8 @@ import click
 import pandas as pd
 import requests
 from dateutil.parser import parse as parse_date
+
+from duk.config import get_api_key
 
 
 logger = logging.getLogger(__name__)
@@ -34,15 +35,16 @@ class PriceHistoryDownloader:
         self.session.headers.update(
             {"User-Agent": "duk-price-history-downloader/0.1.0"}
         )
-        # Load FMP API key from environment variable or etc directory
-        self.api_key = os.environ.get("FMP_API_KEY")
+        # Load FMP API key from configuration system
+        self.api_key = get_api_key("fmp_api_key")
         if not self.api_key:
-            key_file = Path(__file__).parents[3] / "etc" / ".fmp_api.key"
-            try:
-                self.api_key = key_file.read_text().strip()
-            except Exception as e:
-                logger.error(f"Failed to read API key: {e}")
-                sys.exit(1)
+            logger.error("FMP API key not found in configuration")
+            logger.error("Configure your API key in one of these locations:")
+            logger.error("  - /usr/local/etc/tb.rc")
+            logger.error("  - ~/.tbrc")
+            logger.error("  - duk/etc/tb.rc")
+            logger.error("  - Environment variable: FMP_API_KEY")
+            sys.exit(1)
 
     def download_price_data(
         self,
@@ -363,8 +365,9 @@ def aggregate_by_frequency(df: pd.DataFrame, frequency: str) -> pd.DataFrame:
     # Map frequency to pandas offset - handle version compatibility
     # Use 'ME' for pandas 2.0+ and 'M' for older versions
     import pandas as pd
+
     pandas_version = pd.__version__
-    major_version = int(pandas_version.split('.')[0])
+    major_version = int(pandas_version.split(".")[0])
 
     if major_version >= 2:
         # pandas 2.0+ uses 'ME' instead of deprecated 'M'
