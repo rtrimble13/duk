@@ -4,7 +4,6 @@ Treasury rate subprogram for downloading par treasury yield data.
 
 import json
 import logging
-import os
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -17,7 +16,7 @@ import numpy as np
 from dateutil.parser import parse as parse_date
 from scipy import interpolate
 
-from duk.config import get_api_key, validate_required_keys
+from duk.config import get_api_key
 
 
 logger = logging.getLogger(__name__)
@@ -38,7 +37,7 @@ class TreasuryRateDownloader:
             logger.error("FMP API key not found in configuration")
             logger.error("Configure your API key in one of these locations:")
             logger.error("  - /usr/local/etc/tb.rc")
-            logger.error("  - ~/.tbrc") 
+            logger.error("  - ~/.tbrc")
             logger.error("  - duk/etc/tb.rc")
             logger.error("  - Environment variable: FMP_API_KEY")
             sys.exit(1)

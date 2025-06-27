@@ -4,7 +4,6 @@ Price history subprogram for downloading historical security price data.
 
 import json
 import logging
-import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -15,7 +14,7 @@ import pandas as pd
 import requests
 from dateutil.parser import parse as parse_date
 
-from duk.config import get_api_key, validate_required_keys
+from duk.config import get_api_key
 
 
 logger = logging.getLogger(__name__)
@@ -42,7 +41,7 @@ class PriceHistoryDownloader:
             logger.error("FMP API key not found in configuration")
             logger.error("Configure your API key in one of these locations:")
             logger.error("  - /usr/local/etc/tb.rc")
-            logger.error("  - ~/.tbrc") 
+            logger.error("  - ~/.tbrc")
             logger.error("  - duk/etc/tb.rc")
             logger.error("  - Environment variable: FMP_API_KEY")
             sys.exit(1)
@@ -366,8 +365,9 @@ def aggregate_by_frequency(df: pd.DataFrame, frequency: str) -> pd.DataFrame:
     # Map frequency to pandas offset - handle version compatibility
     # Use 'ME' for pandas 2.0+ and 'M' for older versions
     import pandas as pd
+
     pandas_version = pd.__version__
-    major_version = int(pandas_version.split('.')[0])
+    major_version = int(pandas_version.split(".")[0])
 
     if major_version >= 2:
         # pandas 2.0+ uses 'ME' instead of deprecated 'M'
