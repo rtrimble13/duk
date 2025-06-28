@@ -11,11 +11,18 @@ import click
 
 from duk.commands.tr import tr_command
 from duk.commands.ph import ph_command
+import duk.config
 
 
 def setup_logging(verbose: bool = False):
     """Set up logging configuration."""
-    level = logging.DEBUG if verbose else logging.INFO
+    # Load log_level from config if present
+    config = duk.config.get_config_manager().config_data
+    log_level_str = config.get("settings", {}).get("log_level", None)
+    if log_level_str:
+        level = getattr(logging, log_level_str.upper(), logging.INFO)
+    else:
+        level = logging.DEBUG if verbose else logging.INFO
 
     # Create var directory if it doesn't exist
     var_dir = Path("var")
