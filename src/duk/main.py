@@ -11,6 +11,7 @@ import click
 
 from duk.commands.tr import tr_command
 from duk.commands.ph import ph_command
+from duk.commands.ls import ls_command
 import duk.config
 
 
@@ -57,6 +58,7 @@ def main(ctx, verbose):
 # Add subcommands
 main.add_command(tr_command, name="tr")
 main.add_command(ph_command, name="ph")
+main.add_command(ls_command, name="ls")
 
 
 if __name__ == "__main__":

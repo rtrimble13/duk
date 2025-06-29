@@ -70,6 +70,18 @@ class CacheManager:
                 )
             ''')
             
+            # List data cache table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS list_cache (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    cache_key TEXT UNIQUE NOT NULL,
+                    list_type TEXT NOT NULL,  -- 'index', 'sector', 'industry', 'exchange', 'etf', 'fund', 'stock', etc.
+                    data TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
             # Create indexes for better performance
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_treasury_cache_key 
@@ -86,6 +98,14 @@ class CacheManager:
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_price_ticker_dates 
                 ON price_history_cache(ticker, start_date, end_date, data_type)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_list_cache_key 
+                ON list_cache(cache_key)
+            ''')
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_list_type 
+                ON list_cache(list_type)
             ''')
             
             conn.commit()
@@ -257,6 +277,61 @@ class CacheManager:
         except Exception as e:
             logger.error(f"Error clearing cache: {e}")
 
+    def get_list_data(self, list_type: str) -> Optional[List[Dict[str, Any]]]:
+        """Get list data from cache if available."""
+        try:
+            cache_key = self._generate_cache_key(list_type=list_type)
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    SELECT data FROM list_cache 
+                    WHERE cache_key = ?
+                ''', (cache_key,))
+                
+                result = cursor.fetchone()
+                if result:
+                    # Update accessed_at
+                    cursor.execute('''
+                        UPDATE list_cache 
+                        SET accessed_at = CURRENT_TIMESTAMP 
+                        WHERE cache_key = ?
+                    ''', (cache_key,))
+                    conn.commit()
+                    
+                    data = json.loads(result[0])
+                    logger.debug(f"Cache hit for list data: {list_type}")
+                    return data
+                
+                logger.debug(f"Cache miss for list data: {list_type}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error reading from list cache: {e}")
+            return None
+
+    def store_list_data(self, list_type: str, data: List[Dict[str, Any]]):
+        """Store list data in cache."""
+        try:
+            cache_key = self._generate_cache_key(list_type=list_type)
+            data_json = json.dumps(data)
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    INSERT OR REPLACE INTO list_cache 
+                    (cache_key, list_type, data, created_at, accessed_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ''', (cache_key, list_type, data_json))
+                
+                conn.commit()
+                logger.debug(f"Stored list data in cache: {list_type}")
+                
+        except Exception as e:
+            logger.error(f"Error storing list data in cache: {e}")
+
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics."""
         try:
@@ -269,9 +344,13 @@ class CacheManager:
                 cursor.execute('SELECT COUNT(*) FROM price_history_cache')
                 price_count = cursor.fetchone()[0]
                 
+                cursor.execute('SELECT COUNT(*) FROM list_cache')
+                list_count = cursor.fetchone()[0]
+                
                 return {
                     "treasury_entries": treasury_count,
                     "price_history_entries": price_count,
+                    "list_entries": list_count,
                     "cache_file": str(self.db_path),
                     "cache_size_bytes": self.db_path.stat().st_size if self.db_path.exists() else 0
                 }

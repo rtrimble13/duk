@@ -38,8 +38,12 @@ class TestConfigurationManager:
 
     def test_load_environment_variables(self):
         """Test loading API keys from environment variables."""
-        with patch.dict(os.environ, {"FMP_API_KEY": "test_fmp_key"}):
-            self.config_manager.load_configuration()
+        # Mock config file paths to empty list so no files are loaded
+        with patch.object(
+            self.config_manager, "_get_config_file_paths", return_value=[]
+        ):
+            with patch.dict(os.environ, {"FMP_API_KEY": "test_fmp_key"}):
+                self.config_manager.load_configuration()
 
         assert (
             self.config_manager.config_data["api_keys"]["fmp_api_key"] == "test_fmp_key"
@@ -47,8 +51,12 @@ class TestConfigurationManager:
 
     def test_load_environment_variables_missing(self):
         """Test loading when environment variables are not set."""
-        with patch.dict(os.environ, {}, clear=True):
-            self.config_manager.load_configuration()
+        # Mock config file paths to empty list so no files are loaded
+        with patch.object(
+            self.config_manager, "_get_config_file_paths", return_value=[]
+        ):
+            with patch.dict(os.environ, {}, clear=True):
+                self.config_manager.load_configuration()
 
         assert (
             self.config_manager.config_data.get("api_keys", {}).get("fmp_api_key")
@@ -256,8 +264,12 @@ class TestBackwardCompatibility:
         """Test that environment variables work with the new system."""
         config_manager = ConfigurationManager()
 
-        with patch.dict(os.environ, {"FMP_API_KEY": "env_test_key"}):
-            config_manager.load_configuration()
+        # Mock config file paths to empty list so no files are loaded
+        with patch.object(
+            config_manager, "_get_config_file_paths", return_value=[]
+        ):
+            with patch.dict(os.environ, {"FMP_API_KEY": "env_test_key"}):
+                config_manager.load_configuration()
 
         assert config_manager.get_api_key("fmp_api_key") == "env_test_key"
 
