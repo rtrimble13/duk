@@ -53,7 +53,9 @@ class PriceHistoryDownloader:
             try:
                 self.cache = CacheManager()
             except Exception as e:
-                logger.warning(f"Failed to initialize cache: {e}. Proceeding without cache.")
+                logger.warning(
+                    f"Failed to initialize cache: {e}. Proceeding without cache."
+                )
                 self.use_cache = False
 
     def download_price_data(
@@ -77,18 +79,24 @@ class PriceHistoryDownloader:
         """
         # Check cache first if enabled
         if self.use_cache:
-            cached_data = self.cache.get_price_data(symbol, "price", start_date, end_date, days)
+            cached_data = self.cache.get_price_data(
+                symbol, "price", start_date, end_date, days
+            )
             if cached_data is not None:
-                logger.info(f"Retrieved {len(cached_data)} price records for {symbol} from cache")
+                logger.info(
+                    f"Retrieved {len(cached_data)} price records for {symbol} from cache"
+                )
                 return cached_data
 
         # If not in cache or cache disabled, fetch from API
         data = self._fetch_price_data_from_api(symbol, start_date, end_date, days)
-        
+
         # Store in cache if successful and cache is enabled
         if data is not None and self.use_cache:
-            self.cache.store_price_data(symbol, data, "price", start_date, end_date, days)
-        
+            self.cache.store_price_data(
+                symbol, data, "price", start_date, end_date, days
+            )
+
         return data
 
     def _fetch_price_data_from_api(
@@ -172,18 +180,22 @@ class PriceHistoryDownloader:
         """Download dividend data for a symbol."""
         # Check cache first if enabled
         if self.use_cache:
-            cached_data = self.cache.get_price_data(symbol, "dividend", start_date, end_date)
+            cached_data = self.cache.get_price_data(
+                symbol, "dividend", start_date, end_date
+            )
             if cached_data is not None:
-                logger.info(f"Retrieved {len(cached_data)} dividend records for {symbol} from cache")
+                logger.info(
+                    f"Retrieved {len(cached_data)} dividend records for {symbol} from cache"
+                )
                 return cached_data
 
         # If not in cache or cache disabled, fetch from API
         data = self._fetch_dividends_data_from_api(symbol, start_date, end_date)
-        
+
         # Store in cache if successful and cache is enabled
         if data is not None and self.use_cache:
             self.cache.store_price_data(symbol, data, "dividend", start_date, end_date)
-        
+
         return data
 
     def _fetch_dividends_data_from_api(
@@ -224,18 +236,22 @@ class PriceHistoryDownloader:
         """Download stock split data for a symbol."""
         # Check cache first if enabled
         if self.use_cache:
-            cached_data = self.cache.get_price_data(symbol, "split", start_date, end_date)
+            cached_data = self.cache.get_price_data(
+                symbol, "split", start_date, end_date
+            )
             if cached_data is not None:
-                logger.info(f"Retrieved {len(cached_data)} split records for {symbol} from cache")
+                logger.info(
+                    f"Retrieved {len(cached_data)} split records for {symbol} from cache"
+                )
                 return cached_data
 
         # If not in cache or cache disabled, fetch from API
         data = self._fetch_splits_data_from_api(symbol, start_date, end_date)
-        
+
         # Store in cache if successful and cache is enabled
         if data is not None and self.use_cache:
             self.cache.store_price_data(symbol, data, "split", start_date, end_date)
-        
+
         return data
 
     def _fetch_splits_data_from_api(

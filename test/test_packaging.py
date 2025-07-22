@@ -67,6 +67,30 @@ class TestPackagingConfiguration:
         assert "conda-build:" in content, "conda-build target not found"
         assert "build:" in content, "build target not found"
         assert "build-standalone:" in content, "build-standalone target not found"
+        assert "install-user:" in content, "install-user target not found"
+
+    def test_install_user_target_exists(self):
+        """Test that install-user target exists and has correct functionality."""
+        project_root = Path(__file__).parent.parent
+        makefile_path = project_root / "Makefile"
+
+        assert makefile_path.exists(), "Makefile not found"
+
+        # Read and verify install-user target content
+        with open(makefile_path, "r") as f:
+            content = f.read()
+
+        # Check that install-user target is defined
+        assert "install-user:" in content, "install-user target not found"
+        
+        # Check that it mentions ~/.local installation
+        assert "~/.local" in content, "install-user doesn't reference ~/.local"
+        
+        # Check that it installs man page
+        assert "~/.local/share/man/man1" in content, "install-user doesn't install man page to correct location"
+        
+        # Check that it uses pip install --user
+        assert "pip install --user" in content, "install-user doesn't use pip install --user"
 
 
 class TestDistributionBuilding:

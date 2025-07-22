@@ -1,9 +1,10 @@
-.PHONY: install test clean lint format build build-standalone dist conda-build publish doc help dev env-create env-update env-export env-remove
+.PHONY: install install-user test clean lint format build build-standalone dist conda-build publish doc help dev env-create env-update env-export env-remove
 
 # Default target
 help:
 	@echo "Available targets:"
 	@echo "  install       - Install the package in development mode"
+	@echo "  install-user  - Install the package for production use in ~/.local"
 	@echo "  test          - Run unit tests"
 	@echo "  clean         - Clean build artifacts"
 	@echo "  lint          - Run linting checks"
@@ -24,6 +25,26 @@ help:
 
 install:
 	pip install -e .[dev]
+
+install-user:
+	@echo "Installing duk for production use in ~/.local..."
+	@if [ ! -f dist/duk-0.1.0-py3-none-any.whl ]; then \
+		echo "Building package first..."; \
+		make build-standalone; \
+	fi
+	pip install --user dist/duk-0.1.0-py3-none-any.whl
+	@echo "Installing man page to ~/.local/share/man/man1/..."
+	@mkdir -p ~/.local/share/man/man1
+	@cp doc/duk.1 ~/.local/share/man/man1/duk.1
+	@if command -v mandb >/dev/null 2>&1; then \
+		mandb -q ~/.local/share/man 2>/dev/null || true; \
+	fi
+	@echo "Installation complete!"
+	@echo "- duk CLI installed to ~/.local/bin/duk"
+	@echo "- Man page installed to ~/.local/share/man/man1/duk.1"
+	@echo ""
+	@echo "Make sure ~/.local/bin is in your PATH to use the duk command."
+	@echo "You can now use 'man duk' to view the documentation."
 
 test:
 	python -m pytest test/ -v

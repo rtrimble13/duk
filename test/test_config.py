@@ -265,9 +265,7 @@ class TestBackwardCompatibility:
         config_manager = ConfigurationManager()
 
         # Mock config file paths to empty list so no files are loaded
-        with patch.object(
-            config_manager, "_get_config_file_paths", return_value=[]
-        ):
+        with patch.object(config_manager, "_get_config_file_paths", return_value=[]):
             with patch.dict(os.environ, {"FMP_API_KEY": "env_test_key"}):
                 config_manager.load_configuration()
 

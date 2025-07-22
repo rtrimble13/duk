@@ -45,7 +45,9 @@ class TestCacheIntegration:
         mock_request.side_effect = [
             {"data": [{"record_date": "2023-12-01"}]},  # get_latest_date
             {"data": sample_data},  # download_data
-            {"data": [{"record_date": "2023-12-01"}]},  # get_latest_date for second call
+            {
+                "data": [{"record_date": "2023-12-01"}]
+            },  # get_latest_date for second call
             {"data": sample_data},  # download_data for --no-cache
         ]
 
@@ -86,7 +88,9 @@ class TestCacheIntegration:
                 {"data": sample_data},
             ]
 
-            result3 = self.runner.invoke(main, ["tr", "--date", "2023-12-01", "--no-cache"])
+            result3 = self.runner.invoke(
+                main, ["tr", "--date", "2023-12-01", "--no-cache"]
+            )
             assert result3.exit_code == 0
             assert "2023-12-01" in result3.output
             # Should hit API again due to --no-cache (only download_data, not get_latest_date for specific date)
@@ -116,12 +120,24 @@ class TestCacheIntegration:
             mock_cache_class.return_value = real_cache
 
             # First call - should hit API and store in cache
-            result1 = self.runner.invoke(main, ["ph", "AAPL", "--start-date", "2023-12-01", "--end-date", "2023-12-01"])
+            result1 = self.runner.invoke(
+                main,
+                [
+                    "ph",
+                    "AAPL",
+                    "--start-date",
+                    "2023-12-01",
+                    "--end-date",
+                    "2023-12-01",
+                ],
+            )
             assert result1.exit_code == 0
             assert "AAPL" in result1.output or "2023-12-01" in result1.output
 
             # Verify data is in cache - need to use same parameters as ph command (includes days=5)
-            cached_data = real_cache.get_price_data("AAPL", "price", "2023-12-01", "2023-12-01", days=5)
+            cached_data = real_cache.get_price_data(
+                "AAPL", "price", "2023-12-01", "2023-12-01", days=5
+            )
             assert cached_data is not None
             assert len(cached_data) == 1
 
@@ -130,14 +146,35 @@ class TestCacheIntegration:
             mock_request.return_value = sample_price_data
 
             # Second call with same parameters - should use cache
-            result2 = self.runner.invoke(main, ["ph", "AAPL", "--start-date", "2023-12-01", "--end-date", "2023-12-01"])
+            result2 = self.runner.invoke(
+                main,
+                [
+                    "ph",
+                    "AAPL",
+                    "--start-date",
+                    "2023-12-01",
+                    "--end-date",
+                    "2023-12-01",
+                ],
+            )
             assert result2.exit_code == 0
 
             # Should not call API due to cache
             assert mock_request.call_count == 0
 
             # Test --no-cache flag bypasses cache
-            result3 = self.runner.invoke(main, ["ph", "AAPL", "--start-date", "2023-12-01", "--end-date", "2023-12-01", "--no-cache"])
+            result3 = self.runner.invoke(
+                main,
+                [
+                    "ph",
+                    "AAPL",
+                    "--start-date",
+                    "2023-12-01",
+                    "--end-date",
+                    "2023-12-01",
+                    "--no-cache",
+                ],
+            )
             assert result3.exit_code == 0
             # Should hit API again due to --no-cache
             assert mock_request.call_count == 1
@@ -146,7 +183,7 @@ class TestCacheIntegration:
         """Test that cache database is created in correct location."""
         # Test with explicit cache directory
         cache_manager = CacheManager(cache_dir=self.cache_dir)
-        
+
         db_path = Path(self.cache_dir) / "duk_cache.db"
         assert db_path.exists()
 
@@ -159,15 +196,19 @@ class TestCacheIntegration:
     def test_cache_key_uniqueness(self):
         """Test that different request parameters create different cache keys."""
         cache_manager = CacheManager(cache_dir=self.cache_dir)
-        
+
         sample_data = [{"test": "data"}]
-        
+
         # Store data with different parameters
         cache_manager.store_treasury_data(sample_data, "2023-12-01", "2023-12-01")
         cache_manager.store_treasury_data(sample_data, "2023-12-02", "2023-12-02")
-        cache_manager.store_price_data("AAPL", sample_data, "price", "2023-12-01", "2023-12-01")
-        cache_manager.store_price_data("MSFT", sample_data, "price", "2023-12-01", "2023-12-01")
-        
+        cache_manager.store_price_data(
+            "AAPL", sample_data, "price", "2023-12-01", "2023-12-01"
+        )
+        cache_manager.store_price_data(
+            "MSFT", sample_data, "price", "2023-12-01", "2023-12-01"
+        )
+
         # Check that all entries are stored separately
         stats = cache_manager.get_cache_stats()
         assert stats["treasury_entries"] == 2
@@ -191,12 +232,12 @@ class TestCacheIntegration:
         """Test that cache errors don't break normal operation."""
         # Test cache initialization with error handling
         from duk.cache import CacheManager
-        
+
         # Try creating cache in a path that requires error handling
         # This tests the graceful degradation when cache fails
         with patch("sqlite3.connect") as mock_connect:
             mock_connect.side_effect = Exception("Database error")
-            
+
             # Cache creation should handle the error gracefully
             # The cache manager should disable caching on error
             try:
@@ -210,23 +251,25 @@ class TestCacheIntegration:
     def test_cache_stats_accuracy(self):
         """Test that cache statistics are accurate."""
         cache_manager = CacheManager(cache_dir=self.cache_dir)
-        
+
         # Initially empty
         stats = cache_manager.get_cache_stats()
         assert stats["treasury_entries"] == 0
         assert stats["price_history_entries"] == 0
-        
+
         # Add treasury data
         sample_data = [{"test": "data"}]
         cache_manager.store_treasury_data(sample_data, "2023-12-01", "2023-12-01")
-        
+
         stats = cache_manager.get_cache_stats()
         assert stats["treasury_entries"] == 1
         assert stats["price_history_entries"] == 0
-        
+
         # Add price data
-        cache_manager.store_price_data("AAPL", sample_data, "price", "2023-12-01", "2023-12-01")
-        
+        cache_manager.store_price_data(
+            "AAPL", sample_data, "price", "2023-12-01", "2023-12-01"
+        )
+
         stats = cache_manager.get_cache_stats()
         assert stats["treasury_entries"] == 1
         assert stats["price_history_entries"] == 1

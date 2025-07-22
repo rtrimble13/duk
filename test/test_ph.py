@@ -36,7 +36,9 @@ class TestPriceHistoryDownloader:
 
     def setup_method(self):
         """Set up test fixtures."""
-        self.downloader = PriceHistoryDownloader(use_cache=False)  # Disable cache for tests
+        self.downloader = PriceHistoryDownloader(
+            use_cache=False
+        )  # Disable cache for tests
 
         # Sample FMP price data response
         self.sample_price_data = [
