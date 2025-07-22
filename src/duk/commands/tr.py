@@ -42,14 +42,16 @@ class TreasuryRateDownloader:
             logger.error("  - duk/etc/tb.rc")
             logger.error("  - Environment variable: FMP_API_KEY")
             sys.exit(1)
-        
+
         # Initialize cache manager
         self.use_cache = use_cache
         if self.use_cache:
             try:
                 self.cache = CacheManager()
             except Exception as e:
-                logger.warning(f"Failed to initialize cache: {e}. Proceeding without cache.")
+                logger.warning(
+                    f"Failed to initialize cache: {e}. Proceeding without cache."
+                )
                 self.use_cache = False
 
     def get_latest_date(self) -> Optional[str]:
@@ -97,14 +99,14 @@ class TreasuryRateDownloader:
             if cached_data is not None:
                 logger.info(f"Retrieved {len(cached_data)} records from cache")
                 return cached_data
-        
+
         # If not in cache or cache disabled, fetch from API
         data = self._fetch_from_api(start_date, end_date, days)
-        
+
         # Store in cache if successful and cache is enabled
         if data is not None and self.use_cache:
             self.cache.store_treasury_data(data, start_date, end_date, days)
-        
+
         return data
 
     def _fetch_from_api(

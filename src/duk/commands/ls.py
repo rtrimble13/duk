@@ -24,7 +24,7 @@ class FinancialListDownloader:
 
     # Financial Modeling Prep API endpoints
     BASE_URL = "https://financialmodelingprep.com/stable"
-    
+
     def __init__(self, use_cache: bool = True):
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "duk-list-downloader/0.1.0"})
@@ -38,7 +38,7 @@ class FinancialListDownloader:
             logger.error("  - duk/etc/tb.rc")
             logger.error("  - Environment variable: FMP_API_KEY")
             sys.exit(1)
-        
+
         # Initialize cache manager
         self.use_cache = use_cache
         if self.use_cache:
@@ -48,18 +48,20 @@ class FinancialListDownloader:
                 logger.warning(f"Failed to initialize cache: {e}")
                 self.use_cache = False
 
-    def _make_request(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Optional[List[Dict[str, Any]]]:
+    def _make_request(
+        self, endpoint: str, params: Optional[Dict[str, Any]] = None
+    ) -> Optional[List[Dict[str, Any]]]:
         """Make API request to Financial Modeling Prep."""
         try:
             if params is None:
                 params = {}
             params["apikey"] = self.api_key
-            
+
             url = f"{self.BASE_URL}/{endpoint}"
             response = self.session.get(url, params=params, timeout=30)
             response.raise_for_status()
             result = response.json()
-            
+
             # Handle both list and dict responses
             if isinstance(result, list):
                 return result
@@ -75,185 +77,211 @@ class FinancialListDownloader:
     def get_index_list(self) -> Optional[List[Dict[str, Any]]]:
         """Get index list from FMP API."""
         logger.info("Downloading index list")
-        
+
         # Check cache first
         if self.use_cache:
             cached_data = self.cache.get_list_data("index")
             if cached_data:
                 logger.debug("Cache hit for index list")
                 return cached_data
-        
+
         # Fetch from API
         data = self._make_request("index-list")
         if data:
             # Filter for USD currency only
             filtered_data = [item for item in data if item.get("currency") == "USD"]
-            logger.info(f"Downloaded {len(filtered_data)} index records (filtered from {len(data)})")
-            
+            logger.info(
+                f"Downloaded {len(filtered_data)} index records (filtered from {len(data)})"
+            )
+
             # Store in cache
             if self.use_cache and filtered_data:
                 self.cache.store_list_data("index", filtered_data)
-                
+
             return filtered_data
         return None
 
     def get_sector_list(self) -> Optional[List[Dict[str, Any]]]:
         """Get sector list from FMP API."""
         logger.info("Downloading sector list")
-        
+
         # Check cache first
         if self.use_cache:
             cached_data = self.cache.get_list_data("sector")
             if cached_data:
                 logger.debug("Cache hit for sector list")
                 return cached_data
-        
+
         # Fetch from API
         data = self._make_request("available-sectors")
         if data:
             logger.info(f"Downloaded {len(data)} sector records")
-            
+
             # Store in cache
             if self.use_cache:
                 self.cache.store_list_data("sector", data)
-                
+
             return data
         return None
 
     def get_industry_list(self) -> Optional[List[Dict[str, Any]]]:
         """Get industry list from FMP API."""
         logger.info("Downloading industry list")
-        
+
         # Check cache first
         if self.use_cache:
             cached_data = self.cache.get_list_data("industry")
             if cached_data:
                 logger.debug("Cache hit for industry list")
                 return cached_data
-        
+
         # Fetch from API
         data = self._make_request("available-industries")
         if data:
             logger.info(f"Downloaded {len(data)} industry records")
-            
+
             # Store in cache
             if self.use_cache:
                 self.cache.store_list_data("industry", data)
-                
+
             return data
         return None
 
     def get_exchange_list(self) -> Optional[List[Dict[str, Any]]]:
         """Get exchange list from FMP API, filtered for US exchanges."""
         logger.info("Downloading exchange list")
-        
+
         # Check cache first
         if self.use_cache:
             cached_data = self.cache.get_list_data("exchange")
             if cached_data:
                 logger.debug("Cache hit for exchange list")
                 return cached_data
-        
+
         # Fetch from API
         data = self._make_request("available-exchanges")
         if data:
             # Filter for US country code only
             filtered_data = [item for item in data if item.get("countryCode") == "US"]
-            logger.info(f"Downloaded {len(filtered_data)} exchange records (filtered from {len(data)})")
-            
+            logger.info(
+                f"Downloaded {len(filtered_data)} exchange records (filtered from {len(data)})"
+            )
+
             # Store in cache
             if self.use_cache and filtered_data:
                 self.cache.store_list_data("exchange", filtered_data)
-                
+
             return filtered_data
         return None
 
     def get_etf_list(self) -> Optional[List[Dict[str, Any]]]:
         """Get ETF list from FMP API."""
         logger.info("Downloading ETF list")
-        
+
         # Check cache first
         if self.use_cache:
             cached_data = self.cache.get_list_data("etf")
             if cached_data:
                 logger.debug("Cache hit for ETF list")
                 return cached_data
-        
+
         # Get US exchanges for filtering
         exchanges = self.get_exchange_list()
         if not exchanges:
             logger.error("Failed to get exchange list for ETF filtering")
             return None
-            
-        us_exchange_names = {ex.get("exchangeShortName") for ex in exchanges if ex.get("exchangeShortName")}
-        
+
+        us_exchange_names = {
+            ex.get("exchangeShortName")
+            for ex in exchanges
+            if ex.get("exchangeShortName")
+        }
+
         # Fetch ETF data from API
         params = {"country": "US", "isEtf": "true", "isFund": "false"}
         data = self._make_request("company-screener", params)
         if data:
             # Filter by US exchanges
-            filtered_data = [item for item in data if item.get("exchangeShortName") in us_exchange_names]
-            logger.info(f"Downloaded {len(filtered_data)} ETF records (filtered from {len(data)})")
-            
+            filtered_data = [
+                item
+                for item in data
+                if item.get("exchangeShortName") in us_exchange_names
+            ]
+            logger.info(
+                f"Downloaded {len(filtered_data)} ETF records (filtered from {len(data)})"
+            )
+
             # Store in cache
             if self.use_cache and filtered_data:
                 self.cache.store_list_data("etf", filtered_data)
-                
+
             return filtered_data
         return None
 
     def get_fund_list(self) -> Optional[List[Dict[str, Any]]]:
         """Get fund list from FMP API."""
         logger.info("Downloading fund list")
-        
+
         # Check cache first
         if self.use_cache:
             cached_data = self.cache.get_list_data("fund")
             if cached_data:
                 logger.debug("Cache hit for fund list")
                 return cached_data
-        
+
         # Get US exchanges for filtering
         exchanges = self.get_exchange_list()
         if not exchanges:
             logger.error("Failed to get exchange list for fund filtering")
             return None
-            
-        us_exchange_names = {ex.get("exchangeShortName") for ex in exchanges if ex.get("exchangeShortName")}
-        
+
+        us_exchange_names = {
+            ex.get("exchangeShortName")
+            for ex in exchanges
+            if ex.get("exchangeShortName")
+        }
+
         # Fetch fund data from API
         params = {"country": "US", "isEtf": "false", "isFund": "true"}
         data = self._make_request("company-screener", params)
         if data:
             # Filter by US exchanges
-            filtered_data = [item for item in data if item.get("exchangeShortName") in us_exchange_names]
-            logger.info(f"Downloaded {len(filtered_data)} fund records (filtered from {len(data)})")
-            
+            filtered_data = [
+                item
+                for item in data
+                if item.get("exchangeShortName") in us_exchange_names
+            ]
+            logger.info(
+                f"Downloaded {len(filtered_data)} fund records (filtered from {len(data)})"
+            )
+
             # Store in cache
             if self.use_cache and filtered_data:
                 self.cache.store_list_data("fund", filtered_data)
-                
+
             return filtered_data
         return None
 
-    def get_stock_list(self, sp500_only: bool = False, nasdaq_only: bool = False) -> Optional[List[Dict[str, Any]]]:
+    def get_stock_list(
+        self, sp500_only: bool = False, nasdaq_only: bool = False
+    ) -> Optional[List[Dict[str, Any]]]:
         """Get stock list from FMP API with optional filtering."""
         logger.info("Downloading stock list")
-        
+
         # Build cache key based on filters
         cache_key = "stock"
         if sp500_only:
             cache_key = "stock_sp500"
         elif nasdaq_only:
             cache_key = "stock_nasdaq"
-        
+
         # Check cache first
         if self.use_cache:
             cached_data = self.cache.get_list_data(cache_key)
             if cached_data:
                 logger.debug(f"Cache hit for {cache_key} list")
                 return cached_data
-        
+
         # Handle special filtering cases
         if sp500_only:
             data = self._make_request("sp500-constituent")
@@ -278,21 +306,31 @@ class FinancialListDownloader:
             if not exchanges:
                 logger.error("Failed to get exchange list for stock filtering")
                 return None
-                
-            us_exchange_names = {ex.get("exchangeShortName") for ex in exchanges if ex.get("exchangeShortName")}
-            
+
+            us_exchange_names = {
+                ex.get("exchangeShortName")
+                for ex in exchanges
+                if ex.get("exchangeShortName")
+            }
+
             # Fetch stock data from API
             params = {"country": "US", "isEtf": "false", "isFund": "false"}
             data = self._make_request("company-screener", params)
             if data:
                 # Filter by US exchanges
-                filtered_data = [item for item in data if item.get("exchangeShortName") in us_exchange_names]
-                logger.info(f"Downloaded {len(filtered_data)} stock records (filtered from {len(data)})")
-                
+                filtered_data = [
+                    item
+                    for item in data
+                    if item.get("exchangeShortName") in us_exchange_names
+                ]
+                logger.info(
+                    f"Downloaded {len(filtered_data)} stock records (filtered from {len(data)})"
+                )
+
                 # Store in cache
                 if self.use_cache and filtered_data:
                     self.cache.store_list_data(cache_key, filtered_data)
-                    
+
                 return filtered_data
         return None
 
@@ -301,7 +339,7 @@ def format_index_data(data: List[Dict[str, Any]]) -> pd.DataFrame:
     """Format index data for output."""
     if not data:
         return pd.DataFrame()
-    
+
     df = pd.DataFrame(data)
     # Select and rename columns as needed
     columns = ["symbol", "name", "exchange"]
@@ -313,7 +351,7 @@ def format_basic_list_data(data: List[Dict[str, Any]], list_type: str) -> pd.Dat
     """Format basic list data (sectors, industries) for output."""
     if not data:
         return pd.DataFrame()
-    
+
     # For sectors and industries, data might be just strings or dictionaries
     if data and isinstance(data[0], str):
         return pd.DataFrame({list_type: data})
@@ -325,7 +363,7 @@ def format_exchange_data(data: List[Dict[str, Any]]) -> pd.DataFrame:
     """Format exchange data for output."""
     if not data:
         return pd.DataFrame()
-    
+
     return pd.DataFrame(data)
 
 
@@ -333,16 +371,16 @@ def format_company_data(data: List[Dict[str, Any]]) -> pd.DataFrame:
     """Format company data (ETF, fund, stock) for output."""
     if not data:
         return pd.DataFrame()
-    
+
     df = pd.DataFrame(data)
-    
+
     # Standardize company name field
     if "companyName" not in df.columns and "name" in df.columns:
         df["companyName"] = df["name"]
     elif "name" in df.columns:
         # Both fields exist, fill companyName with name where companyName is missing
         df["companyName"] = df["companyName"].fillna(df["name"])
-    
+
     # Select specific columns for ETF/fund/stock data
     columns = ["symbol", "companyName", "sector", "industry"]
     available_columns = [col for col in columns if col in df.columns]
@@ -373,8 +411,19 @@ def save_data(data: pd.DataFrame, filename: str, format_type: str, directory: st
 
 @click.command()
 @click.argument("list_type", required=False)
-@click.option("--sp500", "--s&p", "sp500_filter", is_flag=True, help="Filter stocks to S&P 500 constituents only")
-@click.option("--nasdaq", "nasdaq_filter", is_flag=True, help="Filter stocks to NASDAQ 100 constituents only")
+@click.option(
+    "--sp500",
+    "--s&p",
+    "sp500_filter",
+    is_flag=True,
+    help="Filter stocks to S&P 500 constituents only",
+)
+@click.option(
+    "--nasdaq",
+    "nasdaq_filter",
+    is_flag=True,
+    help="Filter stocks to NASDAQ 100 constituents only",
+)
 @click.option("--output", "-o", is_flag=True, help="Output to file instead of stdout")
 @click.option("--filename", "-f", help="Specify filename (overrides default naming)")
 @click.option(
@@ -421,32 +470,46 @@ def ls_command(
       duk ls stock --nasdaq      # List NASDAQ 100 stocks only
     """
     # Available list types
-    available_lists = ["index", "sector", "industry", "exchange", "etf", "fund", "stock"]
-    
+    available_lists = [
+        "index",
+        "sector",
+        "industry",
+        "exchange",
+        "etf",
+        "fund",
+        "stock",
+    ]
+
     # If no list type specified, show available options
     if not list_type:
         click.echo("Available lists:")
         for lst in available_lists:
             click.echo(f"  {lst}")
         return
-    
+
     # Validate list type
     if list_type not in available_lists:
-        click.echo(f"Error: Unknown list type '{list_type}'. Available types: {', '.join(available_lists)}", err=True)
+        click.echo(
+            f"Error: Unknown list type '{list_type}'. Available types: {', '.join(available_lists)}",
+            err=True,
+        )
         sys.exit(1)
-    
+
     # Validate stock filter options
     if (sp500_filter or nasdaq_filter) and list_type != "stock":
-        click.echo("Error: --sp500 and --nasdaq options can only be used with 'stock' list type", err=True)
+        click.echo(
+            "Error: --sp500 and --nasdaq options can only be used with 'stock' list type",
+            err=True,
+        )
         sys.exit(1)
-    
+
     if sp500_filter and nasdaq_filter:
         click.echo("Error: Cannot specify both --sp500 and --nasdaq filters", err=True)
         sys.exit(1)
-    
+
     # Create downloader
     downloader = FinancialListDownloader(use_cache=not no_cache)
-    
+
     # Download data based on list type
     data = None
     if list_type == "index":
@@ -468,18 +531,20 @@ def ls_command(
         data = downloader.get_fund_list()
         df = format_company_data(data) if data else pd.DataFrame()
     elif list_type == "stock":
-        data = downloader.get_stock_list(sp500_only=sp500_filter, nasdaq_only=nasdaq_filter)
+        data = downloader.get_stock_list(
+            sp500_only=sp500_filter, nasdaq_only=nasdaq_filter
+        )
         df = format_company_data(data) if data else pd.DataFrame()
-    
+
     # Check if data was retrieved
     if data is None:
         click.echo(f"Error: Failed to download {list_type} data", err=True)
         sys.exit(1)
-    
+
     if df.empty:
         click.echo(f"No {list_type} data found", err=True)
         sys.exit(1)
-    
+
     # Output data
     if output or filename:
         # Determine filename

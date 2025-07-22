@@ -36,7 +36,9 @@ class TestTreasuryRateDownloader:
 
     def setup_method(self):
         """Set up test fixtures."""
-        self.downloader = TreasuryRateDownloader(use_cache=False)  # Disable cache for tests
+        self.downloader = TreasuryRateDownloader(
+            use_cache=False
+        )  # Disable cache for tests
 
         # Sample treasury data for testing
         self.sample_data = [

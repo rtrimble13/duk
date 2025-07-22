@@ -58,7 +58,9 @@ class TestCacheManager:
         self.cache_manager.store_treasury_data(sample_data, "2023-12-01", "2023-12-01")
 
         # Retrieve data
-        retrieved_data = self.cache_manager.get_treasury_data("2023-12-01", "2023-12-01")
+        retrieved_data = self.cache_manager.get_treasury_data(
+            "2023-12-01", "2023-12-01"
+        )
 
         assert retrieved_data is not None
         assert len(retrieved_data) == 1
@@ -84,10 +86,14 @@ class TestCacheManager:
         ]
 
         # Store data
-        self.cache_manager.store_price_data("AAPL", sample_data, "price", "2023-12-01", "2023-12-01")
+        self.cache_manager.store_price_data(
+            "AAPL", sample_data, "price", "2023-12-01", "2023-12-01"
+        )
 
         # Retrieve data
-        retrieved_data = self.cache_manager.get_price_data("AAPL", "price", "2023-12-01", "2023-12-01")
+        retrieved_data = self.cache_manager.get_price_data(
+            "AAPL", "price", "2023-12-01", "2023-12-01"
+        )
 
         assert retrieved_data is not None
         assert len(retrieved_data) == 1
@@ -101,34 +107,48 @@ class TestCacheManager:
         split_data = [{"date": "2023-12-01", "ratio": "2:1"}]
 
         # Store different data types
-        self.cache_manager.store_price_data("AAPL", price_data, "price", "2023-12-01", "2023-12-01")
-        self.cache_manager.store_price_data("AAPL", dividend_data, "dividend", "2023-12-01", "2023-12-01")
-        self.cache_manager.store_price_data("AAPL", split_data, "split", "2023-12-01", "2023-12-01")
+        self.cache_manager.store_price_data(
+            "AAPL", price_data, "price", "2023-12-01", "2023-12-01"
+        )
+        self.cache_manager.store_price_data(
+            "AAPL", dividend_data, "dividend", "2023-12-01", "2023-12-01"
+        )
+        self.cache_manager.store_price_data(
+            "AAPL", split_data, "split", "2023-12-01", "2023-12-01"
+        )
 
         # Retrieve different data types
-        retrieved_price = self.cache_manager.get_price_data("AAPL", "price", "2023-12-01", "2023-12-01")
-        retrieved_dividend = self.cache_manager.get_price_data("AAPL", "dividend", "2023-12-01", "2023-12-01")
-        retrieved_split = self.cache_manager.get_price_data("AAPL", "split", "2023-12-01", "2023-12-01")
+        retrieved_price = self.cache_manager.get_price_data(
+            "AAPL", "price", "2023-12-01", "2023-12-01"
+        )
+        retrieved_dividend = self.cache_manager.get_price_data(
+            "AAPL", "dividend", "2023-12-01", "2023-12-01"
+        )
+        retrieved_split = self.cache_manager.get_price_data(
+            "AAPL", "split", "2023-12-01", "2023-12-01"
+        )
 
         assert retrieved_price is not None and retrieved_price[0]["close"] == 100.0
-        assert retrieved_dividend is not None and retrieved_dividend[0]["dividend"] == 0.5
+        assert (
+            retrieved_dividend is not None and retrieved_dividend[0]["dividend"] == 0.5
+        )
         assert retrieved_split is not None and retrieved_split[0]["ratio"] == "2:1"
 
     def test_cache_key_generation(self):
         """Test that different parameters generate different cache keys."""
         # Store data with different parameters
         sample_data = [{"test": "data"}]
-        
+
         self.cache_manager.store_treasury_data(sample_data, "2023-12-01", "2023-12-01")
         self.cache_manager.store_treasury_data(sample_data, "2023-12-02", "2023-12-02")
-        
+
         # These should be different cache entries
         data1 = self.cache_manager.get_treasury_data("2023-12-01", "2023-12-01")
         data2 = self.cache_manager.get_treasury_data("2023-12-02", "2023-12-02")
         data3 = self.cache_manager.get_treasury_data("2023-12-03", "2023-12-03")
-        
+
         assert data1 is not None
-        assert data2 is not None  
+        assert data2 is not None
         assert data3 is None  # Not stored
 
     def test_get_cache_stats(self):
@@ -141,7 +161,9 @@ class TestCacheManager:
         # Add some data
         sample_data = [{"test": "data"}]
         self.cache_manager.store_treasury_data(sample_data, "2023-12-01", "2023-12-01")
-        self.cache_manager.store_price_data("AAPL", sample_data, "price", "2023-12-01", "2023-12-01")
+        self.cache_manager.store_price_data(
+            "AAPL", sample_data, "price", "2023-12-01", "2023-12-01"
+        )
 
         # Check updated stats
         stats = self.cache_manager.get_cache_stats()
@@ -153,7 +175,7 @@ class TestCacheManager:
         """Test cache handles invalid data gracefully."""
         # Try to store None data - should not raise exception
         self.cache_manager.store_treasury_data(None, "2023-12-01", "2023-12-01")
-        
+
         # Cache should still be functional
         stats = self.cache_manager.get_cache_stats()
         assert isinstance(stats, dict)
@@ -168,8 +190,9 @@ class TestCacheManager:
                 # Ensure var doesn't exist
                 if Path("var").exists():
                     import shutil
+
                     shutil.rmtree("var")
-                
+
                 # This should use ~/var/duk/ path
                 cache_manager = CacheManager()
                 expected_path = Path.home() / "var" / "duk" / "duk_cache.db"
@@ -177,19 +200,21 @@ class TestCacheManager:
         finally:
             os.chdir(original_cwd)
 
-    @patch('duk.cache.logger')
+    @patch("duk.cache.logger")
     def test_error_handling_in_cache_operations(self, mock_logger):
         """Test error handling in cache operations."""
         # Corrupt the database file to trigger errors
-        with open(self.cache_manager.db_path, 'w') as f:
+        with open(self.cache_manager.db_path, "w") as f:
             f.write("corrupted data")
-        
+
         # These operations should not raise exceptions, but log errors
         result = self.cache_manager.get_treasury_data("2023-12-01", "2023-12-01")
         assert result is None
-        
+
         # Store operation should also handle errors gracefully
-        self.cache_manager.store_treasury_data([{"test": "data"}], "2023-12-01", "2023-12-01")
-        
+        self.cache_manager.store_treasury_data(
+            [{"test": "data"}], "2023-12-01", "2023-12-01"
+        )
+
         # Verify error was logged
         assert mock_logger.error.called
