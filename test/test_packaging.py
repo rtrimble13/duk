@@ -162,8 +162,12 @@ class TestDistributionBuilding:
 
         # The command should fail with a specific error message about conda-build not being found
         # This is expected behavior when conda-build is not installed
-        assert result.returncode != 0, "make dist should fail when conda-build is not available"
-        assert "conda-build not found" in result.stdout, f"Expected conda-build error message, got: {result.stdout}"
+        assert (
+            result.returncode != 0
+        ), "make dist should fail when conda-build is not available"
+        assert (
+            "conda-build not found" in result.stdout
+        ), f"Expected conda-build error message, got: {result.stdout}"
 
     def test_conda_recipe_is_valid(self):
         """Test that conda recipe can be parsed (syntax check)."""

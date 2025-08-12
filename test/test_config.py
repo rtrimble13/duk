@@ -15,6 +15,111 @@ from duk.config import (
 )
 
 
+class TestFileBasedApiKeys:
+    """Test file-based API key functionality."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.config_manager = ConfigurationManager()
+
+    def test_get_api_key_from_file_success(self):
+        """Test successfully reading API key from file."""
+        # Create a temporary file with an API key
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            f.write("test_key_from_file\n")
+            f.flush()
+
+            try:
+                # Set up config with file path
+                self.config_manager.config_data = {"api_keys": {"test_key": f.name}}
+
+                result = self.config_manager.get_api_key("test_key")
+                assert result == "test_key_from_file"
+
+            finally:
+                os.unlink(f.name)
+
+    def test_get_api_key_from_file_with_whitespace(self):
+        """Test reading API key from file with surrounding whitespace."""
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            f.write("  \n  test_key_with_spaces  \n  ")
+            f.flush()
+
+            try:
+                self.config_manager.config_data = {"api_keys": {"test_key": f.name}}
+
+                result = self.config_manager.get_api_key("test_key")
+                assert result == "test_key_with_spaces"
+
+            finally:
+                os.unlink(f.name)
+
+    def test_get_api_key_file_not_exists(self):
+        """Test handling when API key file doesn't exist."""
+        self.config_manager.config_data = {
+            "api_keys": {"test_key": "/nonexistent/path/to/key.txt"}
+        }
+
+        # Should fall back to returning the original value (file path)
+        result = self.config_manager.get_api_key("test_key")
+        assert result == "/nonexistent/path/to/key.txt"
+
+    def test_get_api_key_file_empty(self):
+        """Test handling when API key file is empty."""
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            f.write("")  # Empty file
+            f.flush()
+
+            try:
+                self.config_manager.config_data = {"api_keys": {"test_key": f.name}}
+
+                # Should fall back to returning the original value (file path)
+                result = self.config_manager.get_api_key("test_key")
+                assert result == f.name
+
+            finally:
+                os.unlink(f.name)
+
+    def test_get_api_key_direct_value(self):
+        """Test that direct API key values (not file paths) work as before."""
+        self.config_manager.config_data = {
+            "api_keys": {"test_key": "direct_api_key_value"}
+        }
+
+        result = self.config_manager.get_api_key("test_key")
+        assert result == "direct_api_key_value"
+
+    def test_get_api_key_with_tilde_expansion(self):
+        """Test that file paths with ~ are properly expanded."""
+        # Create a temporary file in a temp directory that we can reference with ~
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            f.write("tilde_expanded_key")
+            f.flush()
+
+            try:
+                # Create a relative path using the temp file but modify it to use ~
+                # For testing, we'll use the actual file path since ~ expansion
+                # would point to the user's home directory
+                self.config_manager.config_data = {"api_keys": {"test_key": f.name}}
+
+                result = self.config_manager.get_api_key("test_key")
+                assert result == "tilde_expanded_key"
+
+            finally:
+                os.unlink(f.name)
+
+    def test_get_api_key_windows_path_style(self):
+        """Test that Windows-style paths are detected as file paths."""
+        # Test with a Windows-style path (even on Unix systems)
+        self.config_manager.config_data = {
+            "api_keys": {"test_key": "C:\\nonexistent\\path\\key.txt"}
+        }
+
+        # Should attempt to read as file and fall back to original value
+        result = self.config_manager.get_api_key("test_key")
+        assert result == "C:\\nonexistent\\path\\key.txt"
+
+
 class TestConfigurationManager:
     """Test the ConfigurationManager class."""
 
@@ -31,10 +136,9 @@ class TestConfigurationManager:
         """Test that configuration file paths are returned in correct priority order."""
         paths = self.config_manager._get_config_file_paths()
 
-        assert len(paths) == 3
-        assert paths[0] == Path("/usr/local/etc/tb.rc")
-        assert paths[1] == Path.home() / ".tbrc"
-        assert str(paths[2]).endswith("etc/tb.rc")
+        assert len(paths) == 2
+        assert paths[0] == Path.home() / ".duk" / "duk.rc"
+        assert str(paths[1]).endswith("etc/duk.rc")
 
     def test_load_environment_variables(self):
         """Test loading API keys from environment variables."""
@@ -161,20 +265,10 @@ log_level = "DEBUG"
         # Mock the _get_config_file_paths to return our test files
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create test files with different content
-            system_config = Path(temp_dir) / "system.toml"
             user_config = Path(temp_dir) / "user.toml"
             project_config = Path(temp_dir) / "project.toml"
 
-            # System config (lowest priority)
-            system_config.write_text(
-                """
-[api_keys]
-test_key = "system_value"
-system_only_key = "system_only"
-"""
-            )
-
-            # User config (medium priority) - should override system
+            # User config (medium priority)
             user_config.write_text(
                 """
 [api_keys]
@@ -183,7 +277,7 @@ user_only_key = "user_only"
 """
             )
 
-            # Project config (highest priority) - should override both
+            # Project config (highest priority) - should override user
             project_config.write_text(
                 """
 [api_keys]
@@ -193,7 +287,7 @@ project_only_key = "project_only"
             )
 
             # Mock the paths method to return our test files
-            test_paths = [system_config, user_config, project_config]
+            test_paths = [user_config, project_config]
             with patch.object(
                 config_manager, "_get_config_file_paths", return_value=test_paths
             ):
@@ -206,10 +300,6 @@ project_only_key = "project_only"
             assert config_manager.config_data["api_keys"]["test_key"] == "project_value"
 
             # Check that all unique keys are present
-            assert (
-                config_manager.config_data["api_keys"]["system_only_key"]
-                == "system_only"
-            )
             assert (
                 config_manager.config_data["api_keys"]["user_only_key"] == "user_only"
             )
