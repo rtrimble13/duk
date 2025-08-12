@@ -95,9 +95,7 @@ class TestPackagingConfiguration:
         ), "install doesn't install man page to correct location"
 
         # Check that it uses pip install --user
-        assert (
-            "pip install --user" in content
-        ), "install doesn't use pip install --user"
+        assert "pip install --user" in content, "install doesn't use pip install --user"
 
         # Check that it copies configuration file
         assert "~/.duk/duk.rc" in content, "install should copy config file"
@@ -117,15 +115,19 @@ class TestDistributionBuilding:
 
         # Check that the dry run succeeds and shows expected commands
         assert result.returncode == 0, f"make -n install failed: {result.stderr}"
-        
+
         # Check that it references building packages and installing
-        build_command_present = ("python -m build" in result.stdout or 
-                               "python scripts/build.py" in result.stdout)
+        build_command_present = (
+            "python -m build" in result.stdout
+            or "python scripts/build.py" in result.stdout
+        )
         assert build_command_present, "install should build packages"
-        assert "pip install --user" in result.stdout, "install should use pip install --user"
+        assert (
+            "pip install --user" in result.stdout
+        ), "install should use pip install --user"
 
     def test_make_dist_builds_conda_package(self):
-        """Test that make dist builds conda package successfully when conda-build is available."""
+        """Test that make dist builds conda package when conda-build is available."""
         project_root = Path(__file__).parent.parent
 
         # Run make dist (should build conda package)
@@ -133,8 +135,10 @@ class TestDistributionBuilding:
             ["make", "dist"], cwd=project_root, capture_output=True, text=True
         )
 
-        # The dist command should succeed since conda-build is available in the test environment
-        assert result.returncode == 0, f"make dist should succeed when conda-build is available: {result.stderr}"
+        # The dist command should succeed since conda-build is available
+        assert (
+            result.returncode == 0
+        ), f"make dist should succeed when conda-build is available: {result.stderr}"
         assert "conda-build" in result.stdout, "dist should use conda-build"
 
     def test_conda_recipe_is_valid(self):
