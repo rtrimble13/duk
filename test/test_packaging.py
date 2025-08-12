@@ -82,15 +82,19 @@ class TestPackagingConfiguration:
 
         # Check that install-user target is defined
         assert "install-user:" in content, "install-user target not found"
-        
+
         # Check that it mentions ~/.local installation
         assert "~/.local" in content, "install-user doesn't reference ~/.local"
-        
+
         # Check that it installs man page
-        assert "~/.local/share/man/man1" in content, "install-user doesn't install man page to correct location"
-        
+        assert (
+            "~/.local/share/man/man1" in content
+        ), "install-user doesn't install man page to correct location"
+
         # Check that it uses pip install --user
-        assert "pip install --user" in content, "install-user doesn't use pip install --user"
+        assert (
+            "pip install --user" in content
+        ), "install-user doesn't use pip install --user"
 
 
 class TestDistributionBuilding:
