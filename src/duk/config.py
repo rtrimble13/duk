@@ -2,9 +2,8 @@
 Configuration management for duk CLI tool.
 
 Supports multiple configuration file locations with priority order:
-1. /usr/local/etc/tb.rc (system-wide, lowest priority)
-2. ~/.tbrc (user-specific, medium priority)
-3. duk/etc/tb.rc (project-specific, highest priority)
+1. ~/.duk/duk.rc (user-specific, medium priority)
+2. duk/etc/duk.rc (project-specific, highest priority)
 
 Configuration files use TOML format for modern standardization.
 """
@@ -70,11 +69,10 @@ class ConfigurationManager:
     def _get_config_file_paths(self) -> list[Path]:
         """Get list of potential configuration file paths in priority order."""
         paths = [
-            Path("/usr/local/etc/tb.rc"),  # System-wide (lowest priority)
-            Path.home() / ".tbrc",  # User-specific (medium priority)
+            Path.home() / ".duk" / "duk.rc",  # User-specific (medium priority)
             Path(__file__).parents[2]
             / "etc"
-            / "tb.rc",  # Project-specific (highest priority)
+            / "duk.rc",  # Project-specific (highest priority)
         ]
         return paths
 
@@ -108,9 +106,39 @@ class ConfigurationManager:
             logger.warning(f"Failed to load configuration from {config_file}: {e}")
 
     def get_api_key(self, key_name: str) -> Optional[str]:
-        """Get API key by name from configuration."""
+        """Get API key by name from configuration.
+
+        If the key value appears to be a file path, attempts to read the key
+        from that file.
+        """
         api_keys = self.config_data.get("api_keys", {})
-        return api_keys.get(key_name)
+        key_value = api_keys.get(key_name)
+
+        if not key_value:
+            return None
+
+        # Check if the value appears to be a file path
+        if "/" in key_value or "\\" in key_value:
+            try:
+                # Try to read from file
+                file_path = Path(key_value).expanduser()
+                if file_path.exists():
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        file_content = f.read().strip()
+                    if file_content:
+                        logger.debug(f"Read {key_name} from file: {file_path}")
+                        return file_content
+                    else:
+                        logger.warning(f"File {file_path} is empty for {key_name}")
+                else:
+                    logger.warning(
+                        f"API key file not found: {file_path} for {key_name}"
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to read API key from file {key_value}: {e}")
+
+        # Return the original value if not a file path or file reading failed
+        return key_value
 
     def validate_required_keys(self, required_keys: list[str]) -> bool:
         """Validate that all required API keys are present."""
