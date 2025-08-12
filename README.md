@@ -42,7 +42,7 @@ For local development using miniconda3/anaconda:
 
 2. Activate the environment:
    ```bash
-   conda activate duk-dev
+   conda activate duk
    ```
 
 3. Install duk in development mode:
