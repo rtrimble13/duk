@@ -5,8 +5,7 @@ Unit tests for the ls subprogram.
 import tempfile
 import json
 import os
-from unittest.mock import patch, MagicMock
-import pytest
+from unittest.mock import patch
 from click.testing import CliRunner
 
 from duk.main import main

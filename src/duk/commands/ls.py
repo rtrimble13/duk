@@ -91,7 +91,8 @@ class FinancialListDownloader:
             # Filter for USD currency only
             filtered_data = [item for item in data if item.get("currency") == "USD"]
             logger.info(
-                f"Downloaded {len(filtered_data)} index records (filtered from {len(data)})"
+                f"Downloaded {len(filtered_data)} index records "
+                f"(filtered from {len(data)})"
             )
 
             # Store in cache
@@ -164,7 +165,8 @@ class FinancialListDownloader:
             # Filter for US country code only
             filtered_data = [item for item in data if item.get("countryCode") == "US"]
             logger.info(
-                f"Downloaded {len(filtered_data)} exchange records (filtered from {len(data)})"
+                f"Downloaded {len(filtered_data)} exchange records "
+                f"(filtered from {len(data)})"
             )
 
             # Store in cache
@@ -208,7 +210,8 @@ class FinancialListDownloader:
                 if item.get("exchangeShortName") in us_exchange_names
             ]
             logger.info(
-                f"Downloaded {len(filtered_data)} ETF records (filtered from {len(data)})"
+                f"Downloaded {len(filtered_data)} ETF records "
+                f"(filtered from {len(data)})"
             )
 
             # Store in cache
@@ -252,7 +255,8 @@ class FinancialListDownloader:
                 if item.get("exchangeShortName") in us_exchange_names
             ]
             logger.info(
-                f"Downloaded {len(filtered_data)} fund records (filtered from {len(data)})"
+                f"Downloaded {len(filtered_data)} fund records "
+                f"(filtered from {len(data)})"
             )
 
             # Store in cache
@@ -324,7 +328,8 @@ class FinancialListDownloader:
                     if item.get("exchangeShortName") in us_exchange_names
                 ]
                 logger.info(
-                    f"Downloaded {len(filtered_data)} stock records (filtered from {len(data)})"
+                    f"Downloaded {len(filtered_data)} stock records "
+                    f"(filtered from {len(data)})"
                 )
 
                 # Store in cache
@@ -490,7 +495,8 @@ def ls_command(
     # Validate list type
     if list_type not in available_lists:
         click.echo(
-            f"Error: Unknown list type '{list_type}'. Available types: {', '.join(available_lists)}",
+            f"Error: Unknown list type '{list_type}'. "
+            f"Available types: {', '.join(available_lists)}",
             err=True,
         )
         sys.exit(1)
@@ -498,7 +504,8 @@ def ls_command(
     # Validate stock filter options
     if (sp500_filter or nasdaq_filter) and list_type != "stock":
         click.echo(
-            "Error: --sp500 and --nasdaq options can only be used with 'stock' list type",
+            "Error: --sp500 and --nasdaq options can only be used "
+            "with 'stock' list type",
             err=True,
         )
         sys.exit(1)
