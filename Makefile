@@ -1,18 +1,20 @@
-.PHONY: install install-user test clean lint format build build-standalone dist conda-build publish doc help dev env-create env-update env-export env-remove
+.PHONY: install install-user install-dev test clean lint format build build-standalone build-packages dist conda-build publish doc help dev env-create env-update env-export env-remove
 
 # Default target
 help:
 	@echo "Available targets:"
-	@echo "  install       - Install the package in development mode"
-	@echo "  install-user  - Install the package for production use in ~/.local"
+	@echo "  install       - Build and install the package as a standalone program"
+	@echo "  install-dev   - Install the package in development mode"
+	@echo "  install-user  - Install the package for production use in ~/.local (alias for install)"
 	@echo "  test          - Run unit tests"
 	@echo "  clean         - Clean build artifacts"
 	@echo "  lint          - Run linting checks"
-	@echo "  format        - Format code with black"
+	@echo "  format        - Format code with black and run flake8 checks"
 	@echo "  build         - Build distribution packages"
 	@echo "  build-standalone - Build packages using fallback method"
-	@echo "  dist          - Build distribution packages (alias for build)"
-	@echo "  conda-build   - Build conda package"
+	@echo "  build-packages - Build regular distribution packages"
+	@echo "  dist          - Build conda distribution package"
+	@echo "  conda-build   - Build conda package (alias for dist)"
 	@echo "  publish       - Publish to PyPI (requires credentials)"
 	@echo "  doc           - Install man pages"
 	@echo ""
@@ -24,7 +26,24 @@ help:
 	@echo "  env-remove    - Remove the conda development environment"
 
 install:
-	pip install -e .[dev]
+	@echo "Building and installing duk as a standalone program..."
+	@if [ ! -f dist/duk-0.1.0-py3-none-any.whl ]; then \
+		echo "Building package first..."; \
+		make build-standalone; \
+	fi
+	pip install --user dist/duk-0.1.0-py3-none-any.whl
+	@echo "Installing man page to ~/.local/share/man/man1/..."
+	@mkdir -p ~/.local/share/man/man1
+	@cp doc/duk.1 ~/.local/share/man/man1/duk.1
+	@if command -v mandb >/dev/null 2>&1; then \
+		mandb -q ~/.local/share/man 2>/dev/null || true; \
+	fi
+	@echo "Installation complete!"
+	@echo "- duk CLI installed to ~/.local/bin/duk"
+	@echo "- Man page installed to ~/.local/share/man/man1/duk.1"
+	@echo ""
+	@echo "Make sure ~/.local/bin is in your PATH to use the duk command."
+	@echo "You can now use 'man duk' to view the documentation."
 
 install-user:
 	@echo "Installing duk for production use in ~/.local..."
@@ -46,6 +65,9 @@ install-user:
 	@echo "Make sure ~/.local/bin is in your PATH to use the duk command."
 	@echo "You can now use 'man duk' to view the documentation."
 
+install-dev:
+	pip install -e .[dev]
+
 test:
 	python -m pytest test/ -v
 
@@ -62,6 +84,7 @@ lint:
 
 format:
 	black src/ test/
+	flake8 src/ test/
 
 build:
 	python -m build
@@ -69,7 +92,7 @@ build:
 build-standalone:
 	python scripts/build.py
 
-dist:
+build-packages:
 	@echo "Building distribution packages..."
 	@if python -m build --version >/dev/null 2>&1; then \
 		echo "Using standard build method..."; \
@@ -81,6 +104,14 @@ dist:
 		echo "Using standalone build method..."; \
 		python scripts/build.py; \
 	fi
+
+dist:
+	@echo "Building conda distribution package..."
+	@if ! command -v conda-build >/dev/null 2>&1; then \
+		echo "Error: conda-build not found. Install with: conda install conda-build"; \
+		exit 1; \
+	fi
+	conda-build conda-recipe/
 
 conda-build:
 	@echo "Building conda package..."

@@ -82,22 +82,26 @@ class TestPackagingConfiguration:
 
         # Check that install-user target is defined
         assert "install-user:" in content, "install-user target not found"
-        
+
         # Check that it mentions ~/.local installation
         assert "~/.local" in content, "install-user doesn't reference ~/.local"
-        
+
         # Check that it installs man page
-        assert "~/.local/share/man/man1" in content, "install-user doesn't install man page to correct location"
-        
+        assert (
+            "~/.local/share/man/man1" in content
+        ), "install-user doesn't install man page to correct location"
+
         # Check that it uses pip install --user
-        assert "pip install --user" in content, "install-user doesn't use pip install --user"
+        assert (
+            "pip install --user" in content
+        ), "install-user doesn't use pip install --user"
 
 
 class TestDistributionBuilding:
     """Test actual distribution building."""
 
-    def test_make_dist_builds_packages(self):
-        """Test that make dist creates distribution packages."""
+    def test_make_build_packages_creates_distribution_files(self):
+        """Test that make build-packages creates wheel and tar.gz distribution packages."""
         project_root = Path(__file__).parent.parent
 
         # Clean any existing dist directory
@@ -107,15 +111,15 @@ class TestDistributionBuilding:
 
             shutil.rmtree(dist_dir)
 
-        # Run make dist
+        # Run make build-packages
         result = subprocess.run(
-            ["make", "dist"], cwd=project_root, capture_output=True, text=True
+            ["make", "build-packages"], cwd=project_root, capture_output=True, text=True
         )
 
         # Check that the command succeeded (exit code 0)
         if result.returncode != 0:
             pytest.fail(
-                f"make dist failed with exit code {result.returncode}:\n"
+                f"make build-packages failed with exit code {result.returncode}:\n"
                 f"stdout: {result.stdout}\n"
                 f"stderr: {result.stderr}"
             )
@@ -146,6 +150,20 @@ class TestDistributionBuilding:
         assert (
             "duk-0.1.0" in tar_file.name
         ), f"Tar file name doesn't contain version: {tar_file.name}"
+
+    def test_make_dist_builds_conda_package(self):
+        """Test that make dist attempts to build conda packages."""
+        project_root = Path(__file__).parent.parent
+
+        # Run make dist (should attempt conda build)
+        result = subprocess.run(
+            ["make", "dist"], cwd=project_root, capture_output=True, text=True
+        )
+
+        # The command should fail with a specific error message about conda-build not being found
+        # This is expected behavior when conda-build is not installed
+        assert result.returncode != 0, "make dist should fail when conda-build is not available"
+        assert "conda-build not found" in result.stdout, f"Expected conda-build error message, got: {result.stdout}"
 
     def test_conda_recipe_is_valid(self):
         """Test that conda recipe can be parsed (syntax check)."""
