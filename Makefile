@@ -148,18 +148,18 @@ dev:
 		echo "Error: conda not found. Please install miniconda3 or anaconda first."; \
 		exit 1; \
 	fi
-	@if conda env list | grep -q "^duk-dev "; then \
-		echo "Environment 'duk-dev' already exists. Updating..."; \
+	@if conda env list | grep -q "^duk "; then \
+		echo "Environment 'duk' already exists. Updating..."; \
 		conda env update -f environment.yml; \
 	else \
-		echo "Creating new environment 'duk-dev'..."; \
+		echo "Creating new environment 'duk'..."; \
 		conda env create -f environment.yml; \
 	fi
 	@echo ""
 	@echo "Development environment ready!"
-	@echo "To activate: conda activate duk-dev"
-	@echo "To install duk in development mode: conda activate duk-dev && pip install -e ."
-	@echo "To run tests: conda activate duk-dev && make test"
+	@echo "To activate: conda activate duk"
+	@echo "To install duk in development mode: conda activate duk && pip install -e ."
+	@echo "To run tests: conda activate duk && make test"
 
 env-create:
 	@echo "Creating conda environment from environment.yml..."
@@ -168,7 +168,7 @@ env-create:
 		exit 1; \
 	fi
 	conda env create -f environment.yml
-	@echo "Environment created. Activate with: conda activate duk-dev"
+	@echo "Environment created. Activate with: conda activate duk"
 
 env-update:
 	@echo "Updating conda environment from environment.yml..."
@@ -185,11 +185,11 @@ env-export:
 		echo "Error: conda not found. Please install miniconda3 or anaconda first."; \
 		exit 1; \
 	fi
-	@if [ "$$CONDA_DEFAULT_ENV" = "duk-dev" ]; then \
+	@if [ "$$CONDA_DEFAULT_ENV" = "duk" ]; then \
 		conda env export > environment.yml; \
 		echo "Environment exported to environment.yml"; \
 	else \
-		echo "Please activate the duk-dev environment first: conda activate duk-dev"; \
+		echo "Please activate the duk environment first: conda activate duk"; \
 		exit 1; \
 	fi
 
@@ -199,9 +199,9 @@ env-remove:
 		echo "Error: conda not found. Please install miniconda3 or anaconda first."; \
 		exit 1; \
 	fi
-	@if conda env list | grep -q "^duk-dev "; then \
-		conda env remove -n duk-dev; \
-		echo "Environment 'duk-dev' removed."; \
+	@if conda env list | grep -q "^duk "; then \
+		conda env remove -n duk; \
+		echo "Environment 'duk' removed."; \
 	else \
-		echo "Environment 'duk-dev' does not exist."; \
+		echo "Environment 'duk' does not exist."; \
 	fi
