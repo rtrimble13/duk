@@ -26,7 +26,7 @@ jobs:
     
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip setuptools
+        python -m pip install --upgrade pip setuptools pytest
         make install
     
     - name: Run linting
@@ -56,14 +56,14 @@ jobs:
     
     - name: Install build dependencies
       run: |
-        python -m pip install --upgrade pip setuptools
+        python -m pip install --upgrade pip setuptools pytest
         pip install build twine
         make install
     
     - name: Build packages
       run: |
         # Try the standard build first, fall back to standalone if needed
-        make build || make build-standalone
+        make build
     
     - name: Verify packages
       run: |
