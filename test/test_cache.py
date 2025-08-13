@@ -2,15 +2,11 @@
 Unit tests for the SQLite cache functionality.
 """
 
-import json
 import os
 import sqlite3
 import tempfile
-import unittest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import patch
 
 from duk.cache import CacheManager
 
@@ -195,7 +191,7 @@ class TestCacheManager:
 
                 # This should use ~/var/duk/ path
                 cache_manager = CacheManager()
-                expected_path = Path.home() / "var" / "duk" / "duk_cache.db"
+                # Verify the cache database file name is correct
                 assert cache_manager.db_path.name == "duk_cache.db"
         finally:
             os.chdir(original_cwd)

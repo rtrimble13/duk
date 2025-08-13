@@ -84,7 +84,8 @@ class PriceHistoryDownloader:
             )
             if cached_data is not None:
                 logger.info(
-                    f"Retrieved {len(cached_data)} price records for {symbol} from cache"
+                    f"Retrieved {len(cached_data)} price records for {symbol} "
+                    f"from cache"
                 )
                 return cached_data
 
@@ -185,7 +186,8 @@ class PriceHistoryDownloader:
             )
             if cached_data is not None:
                 logger.info(
-                    f"Retrieved {len(cached_data)} dividend records for {symbol} from cache"
+                    f"Retrieved {len(cached_data)} dividend records for {symbol} "
+                    f"from cache"
                 )
                 return cached_data
 
@@ -241,7 +243,8 @@ class PriceHistoryDownloader:
             )
             if cached_data is not None:
                 logger.info(
-                    f"Retrieved {len(cached_data)} split records for {symbol} from cache"
+                    f"Retrieved {len(cached_data)} split records for {symbol} "
+                    f"from cache"
                 )
                 return cached_data
 

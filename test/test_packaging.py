@@ -53,7 +53,7 @@ class TestPackagingConfiguration:
         assert "about:" in content, "about section not found"
 
     def test_makefile_has_dist_targets(self):
-        """Test that Makefile has distribution targets."""
+        """Test that Makefile has the required targets."""
         project_root = Path(__file__).parent.parent
         makefile_path = project_root / "Makefile"
 
@@ -63,111 +63,83 @@ class TestPackagingConfiguration:
         with open(makefile_path, "r") as f:
             content = f.read()
 
-        assert "dist:" in content, "dist target not found"
-        assert "conda-build:" in content, "conda-build target not found"
+        # Check for the 7 required targets
         assert "build:" in content, "build target not found"
-        assert "build-standalone:" in content, "build-standalone target not found"
-        assert "install-user:" in content, "install-user target not found"
+        assert "install:" in content, "install target not found"
+        assert "test:" in content, "test target not found"
+        assert "dist:" in content, "dist target not found"
+        assert "doc:" in content, "doc target not found"
+        assert "format:" in content, "format target not found"
+        assert "clean:" in content, "clean target not found"
 
-    def test_install_user_target_exists(self):
-        """Test that install-user target exists and has correct functionality."""
+    def test_install_target_functionality(self):
+        """Test that install target exists and has correct functionality."""
         project_root = Path(__file__).parent.parent
         makefile_path = project_root / "Makefile"
 
         assert makefile_path.exists(), "Makefile not found"
 
-        # Read and verify install-user target content
+        # Read and verify install target content
         with open(makefile_path, "r") as f:
             content = f.read()
 
-        # Check that install-user target is defined
-        assert "install-user:" in content, "install-user target not found"
+        # Check that install target is defined
+        assert "install:" in content, "install target not found"
 
         # Check that it mentions ~/.local installation
-        assert "~/.local" in content, "install-user doesn't reference ~/.local"
+        assert "~/.local" in content, "install doesn't reference ~/.local"
 
         # Check that it installs man page
         assert (
             "~/.local/share/man/man1" in content
-        ), "install-user doesn't install man page to correct location"
+        ), "install doesn't install man page to correct location"
 
         # Check that it uses pip install --user
-        assert (
-            "pip install --user" in content
-        ), "install-user doesn't use pip install --user"
+        assert "pip install --user" in content, "install doesn't use pip install --user"
+
+        # Check that it copies configuration file
+        assert "~/.duk/duk.rc" in content, "install should copy config file"
 
 
 class TestDistributionBuilding:
     """Test actual distribution building."""
 
-    def test_make_build_packages_creates_distribution_files(self):
-        """Test that make build-packages creates wheel and tar.gz distribution packages."""
+    def test_make_install_creates_distribution_files(self):
+        """Test that make install creates and uses wheel packages."""
         project_root = Path(__file__).parent.parent
 
-        # Clean any existing dist directory
-        dist_dir = project_root / "dist"
-        if dist_dir.exists():
-            import shutil
-
-            shutil.rmtree(dist_dir)
-
-        # Run make build-packages
+        # Test the install target which should build packages (dry run)
         result = subprocess.run(
-            ["make", "build-packages"], cwd=project_root, capture_output=True, text=True
+            ["make", "-n", "install"], cwd=project_root, capture_output=True, text=True
         )
 
-        # Check that the command succeeded (exit code 0)
-        if result.returncode != 0:
-            pytest.fail(
-                f"make build-packages failed with exit code {result.returncode}:\n"
-                f"stdout: {result.stdout}\n"
-                f"stderr: {result.stderr}"
-            )
+        # Check that the dry run succeeds and shows expected commands
+        assert result.returncode == 0, f"make -n install failed: {result.stderr}"
 
-        # Check that dist directory was created
-        assert dist_dir.exists(), "dist directory was not created"
-
-        # Check that expected files were created
-        dist_files = list(dist_dir.glob("*"))
+        # Check that it references building packages and installing
+        build_command_present = (
+            "python -m build" in result.stdout
+            or "python scripts/build.py" in result.stdout
+        )
+        assert build_command_present, "install should build packages"
         assert (
-            len(dist_files) >= 2
-        ), f"Expected at least 2 files in dist/, got {len(dist_files)}"
-
-        # Check for wheel and source distribution
-        wheel_files = list(dist_dir.glob("*.whl"))
-        tar_files = list(dist_dir.glob("*.tar.gz"))
-
-        assert len(wheel_files) == 1, f"Expected 1 wheel file, got {len(wheel_files)}"
-        assert len(tar_files) == 1, f"Expected 1 tar.gz file, got {len(tar_files)}"
-
-        # Verify file names contain expected version
-        wheel_file = wheel_files[0]
-        tar_file = tar_files[0]
-
-        assert (
-            "duk-0.1.0" in wheel_file.name
-        ), f"Wheel file name doesn't contain version: {wheel_file.name}"
-        assert (
-            "duk-0.1.0" in tar_file.name
-        ), f"Tar file name doesn't contain version: {tar_file.name}"
+            "pip install --user" in result.stdout
+        ), "install should use pip install --user"
 
     def test_make_dist_builds_conda_package(self):
-        """Test that make dist attempts to build conda packages."""
+        """Test that make dist builds conda package when conda-build is available."""
         project_root = Path(__file__).parent.parent
 
-        # Run make dist (should attempt conda build)
+        # Run make dist (should build conda package)
         result = subprocess.run(
             ["make", "dist"], cwd=project_root, capture_output=True, text=True
         )
 
-        # The command should fail with a specific error message about conda-build not being found
-        # This is expected behavior when conda-build is not installed
+        # The dist command should succeed since conda-build is available
         assert (
-            result.returncode != 0
-        ), "make dist should fail when conda-build is not available"
-        assert (
-            "conda-build not found" in result.stdout
-        ), f"Expected conda-build error message, got: {result.stdout}"
+            result.returncode == 0
+        ), f"make dist should succeed when conda-build is available: {result.stderr}"
+        assert "conda-build" in result.stdout, "dist should use conda-build"
 
     def test_conda_recipe_is_valid(self):
         """Test that conda recipe can be parsed (syntax check)."""

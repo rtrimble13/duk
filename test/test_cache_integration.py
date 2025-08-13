@@ -2,12 +2,9 @@
 Integration tests for cache functionality with CLI commands.
 """
 
-import json
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import patch
 from click.testing import CliRunner
 
 from duk.main import main
@@ -93,7 +90,8 @@ class TestCacheIntegration:
             )
             assert result3.exit_code == 0
             assert "2023-12-01" in result3.output
-            # Should hit API again due to --no-cache (only download_data, not get_latest_date for specific date)
+            # Should hit API again due to --no-cache
+            # (only download_data, not get_latest_date for specific date)
             assert mock_request.call_count == 1
 
     @patch.dict("os.environ", {"FMP_API_KEY": "test_key"})
@@ -134,7 +132,8 @@ class TestCacheIntegration:
             assert result1.exit_code == 0
             assert "AAPL" in result1.output or "2023-12-01" in result1.output
 
-            # Verify data is in cache - need to use same parameters as ph command (includes days=5)
+            # Verify data is in cache - need to use same parameters as ph command
+            # (includes days=5)
             cached_data = real_cache.get_price_data(
                 "AAPL", "price", "2023-12-01", "2023-12-01", days=5
             )
@@ -241,7 +240,8 @@ class TestCacheIntegration:
             # Cache creation should handle the error gracefully
             # The cache manager should disable caching on error
             try:
-                cache_manager = CacheManager(cache_dir=self.cache_dir)
+                # Create cache manager to verify cache directory setup
+                CacheManager(cache_dir=self.cache_dir)
                 # If we get here, error handling worked
                 assert True
             except Exception:

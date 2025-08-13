@@ -8,7 +8,7 @@ import sqlite3
 import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any
 import os
 
 logger = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ class CacheManager:
                 CREATE TABLE IF NOT EXISTS list_cache (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     cache_key TEXT UNIQUE NOT NULL,
-                    list_type TEXT NOT NULL,  -- 'index', 'sector', 'industry', 'exchange', 'etf', 'fund', 'stock', etc.
+                    list_type TEXT NOT NULL,  -- list type: index, sector, etc.
                     data TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -91,37 +91,37 @@ class CacheManager:
             # Create indexes for better performance
             cursor.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_treasury_cache_key 
+                CREATE INDEX IF NOT EXISTS idx_treasury_cache_key
                 ON treasury_cache(cache_key)
             """
             )
             cursor.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_treasury_dates 
+                CREATE INDEX IF NOT EXISTS idx_treasury_dates
                 ON treasury_cache(start_date, end_date)
             """
             )
             cursor.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_price_cache_key 
+                CREATE INDEX IF NOT EXISTS idx_price_cache_key
                 ON price_history_cache(cache_key)
             """
             )
             cursor.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_price_ticker_dates 
+                CREATE INDEX IF NOT EXISTS idx_price_ticker_dates
                 ON price_history_cache(ticker, start_date, end_date, data_type)
             """
             )
             cursor.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_list_cache_key 
+                CREATE INDEX IF NOT EXISTS idx_list_cache_key
                 ON list_cache(cache_key)
             """
             )
             cursor.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_list_type 
+                CREATE INDEX IF NOT EXISTS idx_list_type
                 ON list_cache(list_type)
             """
             )
@@ -151,7 +151,7 @@ class CacheManager:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    SELECT data FROM treasury_cache 
+                    SELECT data FROM treasury_cache
                     WHERE cache_key = ?
                 """,
                     (cache_key,),
@@ -162,8 +162,8 @@ class CacheManager:
                     # Update access time
                     cursor.execute(
                         """
-                        UPDATE treasury_cache 
-                        SET accessed_at = CURRENT_TIMESTAMP 
+                        UPDATE treasury_cache
+                        SET accessed_at = CURRENT_TIMESTAMP
                         WHERE cache_key = ?
                     """,
                         (cache_key,),
@@ -198,7 +198,7 @@ class CacheManager:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    INSERT OR REPLACE INTO treasury_cache 
+                    INSERT OR REPLACE INTO treasury_cache
                     (cache_key, start_date, end_date, data, created_at, accessed_at)
                     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """,
@@ -232,7 +232,7 @@ class CacheManager:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    SELECT data FROM price_history_cache 
+                    SELECT data FROM price_history_cache
                     WHERE cache_key = ?
                 """,
                     (cache_key,),
@@ -243,8 +243,8 @@ class CacheManager:
                     # Update access time
                     cursor.execute(
                         """
-                        UPDATE price_history_cache 
-                        SET accessed_at = CURRENT_TIMESTAMP 
+                        UPDATE price_history_cache
+                        SET accessed_at = CURRENT_TIMESTAMP
                         WHERE cache_key = ?
                     """,
                         (cache_key,),
@@ -287,8 +287,8 @@ class CacheManager:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    INSERT OR REPLACE INTO price_history_cache 
-                    (cache_key, ticker, start_date, end_date, data_type, data, 
+                    INSERT OR REPLACE INTO price_history_cache
+                    (cache_key, ticker, start_date, end_date, data_type, data,
                      created_at, accessed_at)
                     VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """,
@@ -318,7 +318,7 @@ class CacheManager:
 
                 cursor.execute(
                     """
-                    DELETE FROM treasury_cache 
+                    DELETE FROM treasury_cache
                     WHERE created_at < ?
                 """,
                     (cutoff_date,),
@@ -326,7 +326,7 @@ class CacheManager:
 
                 cursor.execute(
                     """
-                    DELETE FROM price_history_cache 
+                    DELETE FROM price_history_cache
                     WHERE created_at < ?
                 """,
                     (cutoff_date,),
@@ -348,7 +348,7 @@ class CacheManager:
 
                 cursor.execute(
                     """
-                    SELECT data FROM list_cache 
+                    SELECT data FROM list_cache
                     WHERE cache_key = ?
                 """,
                     (cache_key,),
@@ -359,8 +359,8 @@ class CacheManager:
                     # Update accessed_at
                     cursor.execute(
                         """
-                        UPDATE list_cache 
-                        SET accessed_at = CURRENT_TIMESTAMP 
+                        UPDATE list_cache
+                        SET accessed_at = CURRENT_TIMESTAMP
                         WHERE cache_key = ?
                     """,
                         (cache_key,),
@@ -389,7 +389,7 @@ class CacheManager:
 
                 cursor.execute(
                     """
-                    INSERT OR REPLACE INTO list_cache 
+                    INSERT OR REPLACE INTO list_cache
                     (cache_key, list_type, data, created_at, accessed_at)
                     VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """,
