@@ -67,6 +67,10 @@ format:
 	black src/ test/
 	flake8 src/ test/
 
+# Run linting checks (alias for format)
+lint:
+	flake8 src/ test/
+
 # Clean build artifacts and remove local installation
 clean:
 	@echo "Cleaning build artifacts..."

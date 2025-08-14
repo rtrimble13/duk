@@ -113,23 +113,6 @@ class PriceHistoryDownloader:
         try:
             params = {"apikey": self.api_key}
 
-            # Handle date parameters
-            if days and not start_date and not end_date:
-                # Get last N days from today
-                end_date = datetime.now().strftime("%Y-%m-%d")
-                start_date_obj = datetime.now() - timedelta(days=days - 1)
-                start_date = start_date_obj.strftime("%Y-%m-%d")
-            elif days and start_date and not end_date:
-                # Get N days from start date
-                start_date_obj = parse_date(start_date)
-                end_date_obj = start_date_obj + timedelta(days=days - 1)
-                end_date = end_date_obj.strftime("%Y-%m-%d")
-            elif days and end_date and not start_date:
-                # Get N days before end date
-                end_date_obj = parse_date(end_date)
-                start_date_obj = end_date_obj - timedelta(days=days - 1)
-                start_date = start_date_obj.strftime("%Y-%m-%d")
-
             # Add date range parameters if specified
             if start_date:
                 params["from"] = start_date
@@ -157,10 +140,6 @@ class PriceHistoryDownloader:
                 # Filter by date range if specified
                 if start_date or end_date:
                     data = self._filter_by_date_range(data, start_date, end_date)
-
-                # Limit to specified number of days if requested
-                if days and len(data) > days:
-                    data = data[:days]
 
                 logger.info(f"Downloaded {len(data)} price records for {symbol}")
                 return data
@@ -554,7 +533,6 @@ def save_data(df: pd.DataFrame, filename: str, output_format: str, directory: st
     "--days",
     "-n",
     type=int,
-    default=5,
     help="Number of observations to return (default: 5)",
 )
 @click.option("--output", "-o", is_flag=True, help="Output to file instead of stdout")
@@ -629,14 +607,36 @@ def ph_command(
     """
     downloader = PriceHistoryDownloader(use_cache=not no_cache)
 
+    # Handle default value for days if not provided
+    days_was_explicitly_set = days is not None
+    if days is None:
+        days = 5
+
     # Validate date arguments
-    if start_date and end_date and days:
-        if days != 5:  # Only error if user explicitly set days different from default
-            click.echo(
-                "Error: Cannot specify --days with both --start-date and --end-date",
-                err=True,
-            )
-            sys.exit(1)
+    if start_date and end_date and days_was_explicitly_set:
+        click.echo(
+            "Error: Cannot specify --days with both --start-date and --end-date",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Handle date parameter calculations and validation
+    # Calculate actual start/end dates based on days parameter
+    if days and not start_date and not end_date:
+        # Get last N days from today
+        end_date = datetime.now().strftime("%Y-%m-%d")
+        start_date_obj = datetime.now() - timedelta(days=days - 1)
+        start_date = start_date_obj.strftime("%Y-%m-%d")
+    elif days and start_date and not end_date:
+        # Get N days from start date
+        start_date_obj = parse_date(start_date)
+        end_date_obj = start_date_obj + timedelta(days=days - 1)
+        end_date = end_date_obj.strftime("%Y-%m-%d")
+    elif days and end_date and not start_date:
+        # Get N days before end date
+        end_date_obj = parse_date(end_date)
+        start_date_obj = end_date_obj - timedelta(days=days - 1)
+        start_date = start_date_obj.strftime("%Y-%m-%d")
 
     # Get list of tickers
     try:
@@ -678,14 +678,29 @@ def ph_command(
 
     for symbol in tickers:
         # Download price data
-        price_data = downloader.download_price_data(symbol, start_date, end_date, days)
+        price_data = downloader.download_price_data(
+            symbol, start_date, end_date, days
+        )
         if price_data is None:
-            click.echo(f"Error: Failed to download price data for {symbol}", err=True)
+            click.echo(
+                f"Error: Failed to download price data for {symbol}", err=True
+            )
             continue
 
         if not price_data:
             click.echo(f"Warning: No price data found for {symbol}", err=True)
             continue
+
+        # If --days was explicitly specified, ensure we return exactly that many days
+        if days_was_explicitly_set and price_data:
+            # Sort by date descending (most recent first) for proper limiting
+            price_data_sorted = sorted(
+                price_data, key=lambda x: x.get("date", ""), reverse=True
+            )
+            if len(price_data_sorted) > days:
+                price_data = price_data_sorted[:days]
+            else:
+                price_data = price_data_sorted
 
         # Download dividend data if needed
         dividends_data = None
