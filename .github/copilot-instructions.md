@@ -9,10 +9,10 @@ This is a Python based repository for a python CLI tool.  It is primarily used f
 
 ### Required Before Each Commit
 - Follow best practices for python coding.
-- Develop a unit test for each new feature added to the code base.
+- Develop a unit test for each new feature added to the code base.  Use the pytest framework to create unit tests.
 - Unit tests should all pass.
 - Usage documentation should be written to explain each feature, and documentation should include example use cases.
-- Each new feature should include support for logging.
+- Include logging for all new functionality.
 
 ### Repository Structure
 - `src/`: Source code location.
@@ -23,14 +23,12 @@ This is a Python based repository for a python CLI tool.  It is primarily used f
 
 ### Development Flow
 - Test: `make test`
-- Install: `make install`
-
-### Project Versioning
-- The project version should be reflected in `pyproject.toml` and `src/duk/__init__.py`.
-- The project version formatting convention is `<major release>.<minor release>.<bug fix>`.
-- All issues associated with an `enhancement` label are considered a minor release.
-- All issues associated with a `bug` label are considered a bug fix.
-- Only update the major release version when explicitly directed.
+- Build: `make build` to set up project in conda environment.
+- Install: `make install` to install project as a standalone application independent of conda.
+- Linting: `make fmt` to apply linting checks.
+- Doc: `make doc` to build man files.
+- Dist: `make dist` to create distribution files for uploading to pypi.
+- Clean: `make clean` to remove installed files and distritbution builds.
 
 ### Key Guidelines
 1. Follow Python best practices and idiomatic patterns
