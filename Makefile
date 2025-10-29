@@ -29,12 +29,16 @@ install:
 	fi
 	@# Install to ~/.local
 	pip install --user dist/duk-0.1.0-py3-none-any.whl
-	@# Copy configuration file
-	@mkdir -p ~/.duk
-	@cp etc/duk.rc ~/.duk/duk.rc
+	@# Copy configuration file if it doesn't exist
+	@if [ ! -f ~/.dukrc ]; then \
+		cp etc/duk.rc ~/.dukrc; \
+		echo "Configuration template copied to ~/.dukrc"; \
+	else \
+		echo "Configuration file ~/.dukrc already exists, not overwriting"; \
+	fi
 	@echo "Installation complete!"
 	@echo "- duk CLI installed to ~/.local/bin/duk"
-	@echo "- Configuration copied to ~/.duk/duk.rc"
+	@echo "- Configuration available at ~/.dukrc"
 	@echo ""
 	@echo "Make sure ~/.local/bin is in your PATH to use the duk command."
 

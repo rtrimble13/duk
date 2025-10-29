@@ -325,6 +325,7 @@ class TestLSCommand:
         assert result.exit_code == 1
         assert "Cannot specify both --sp500 and --nasdaq filters" in result.output
 
+    @patch.dict("os.environ", {"FMP_API_KEY": "test_key"})
     @patch("duk.commands.ls.FinancialListDownloader.get_sector_list")
     def test_ls_sector_success(self, mock_get_sectors):
         """Test successful sector listing."""
@@ -335,6 +336,7 @@ class TestLSCommand:
         assert result.exit_code == 0
         assert "Technology" in result.output
 
+    @patch.dict("os.environ", {"FMP_API_KEY": "test_key"})
     @patch("duk.commands.ls.FinancialListDownloader.get_sector_list")
     def test_ls_sector_failure(self, mock_get_sectors):
         """Test sector listing with API failure."""
@@ -345,6 +347,7 @@ class TestLSCommand:
         assert result.exit_code == 1
         assert "Failed to download sector data" in result.output
 
+    @patch.dict("os.environ", {"FMP_API_KEY": "test_key"})
     @patch("duk.commands.ls.FinancialListDownloader.get_stock_list")
     def test_ls_stock_sp500(self, mock_get_stocks):
         """Test stock listing with S&P 500 filter."""
@@ -364,6 +367,7 @@ class TestLSCommand:
         assert "AAPL" in result.output
         mock_get_stocks.assert_called_once_with(sp500_only=True, nasdaq_only=False)
 
+    @patch.dict("os.environ", {"FMP_API_KEY": "test_key"})
     @patch("duk.commands.ls.FinancialListDownloader.get_index_list")
     def test_ls_index_json_output(self, mock_get_index):
         """Test index listing with JSON output."""
@@ -381,6 +385,7 @@ class TestLSCommand:
         assert len(output_data) == 1
         assert output_data[0]["symbol"] == "SPX"
 
+    @patch.dict("os.environ", {"FMP_API_KEY": "test_key"})
     @patch("duk.commands.ls.FinancialListDownloader.get_sector_list")
     def test_ls_sector_file_output(self, mock_get_sectors):
         """Test sector listing with file output."""
