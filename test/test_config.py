@@ -82,9 +82,7 @@ class TestConfigurationManager:
         """Test getting API key from file reference using
         configistate's file:// feature."""
         # Create a secret file
-        with tempfile.NamedTemporaryFile(
-            mode="w", delete=False
-        ) as secret_file:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as secret_file:
             secret_file.write("secret_from_file")
             secret_path = secret_file.name
 
