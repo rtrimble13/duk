@@ -676,13 +676,9 @@ def ph_command(
 
     for symbol in tickers:
         # Download price data
-        price_data = downloader.download_price_data(
-            symbol, start_date, end_date, days
-        )
+        price_data = downloader.download_price_data(symbol, start_date, end_date, days)
         if price_data is None:
-            click.echo(
-                f"Error: Failed to download price data for {symbol}", err=True
-            )
+            click.echo(f"Error: Failed to download price data for {symbol}", err=True)
             continue
 
         if not price_data:

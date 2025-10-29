@@ -37,7 +37,9 @@ class ConfigurationManager:
                 self._config = Config(str(self.config_path))
                 logger.debug(f"Loaded configuration from {self.config_path}")
             except Exception as e:
-                logger.warning(f"Failed to load configuration from {self.config_path}: {e}")
+                logger.warning(
+                    f"Failed to load configuration from {self.config_path}: {e}"
+                )
                 self._config = None
 
         self._loaded = True
@@ -78,7 +80,8 @@ class ConfigurationManager:
         """Get a configuration value by key path.
 
         Args:
-            key_path: Dot-separated path to the config value (e.g., "settings.log_level")
+            key_path: Dot-separated path to the config value
+                (e.g., "settings.log_level")
             default: Default value to return if key is not found
 
         Returns:

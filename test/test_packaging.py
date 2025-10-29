@@ -135,11 +135,13 @@ class TestDistributionBuilding:
             ["make", "dist"], cwd=project_root, capture_output=True, text=True
         )
 
-        # The dist command should either succeed or fail with a clear message about conda-build
+        # The dist command should either succeed or fail with a clear
+        # message about conda-build
         if result.returncode != 0:
             # If it fails, it should be because conda-build is not installed
-            assert "conda-build not found" in result.stdout, \
-                f"Unexpected error: {result.stdout}\n{result.stderr}"
+            assert (
+                "conda-build not found" in result.stdout
+            ), f"Unexpected error: {result.stdout}\n{result.stderr}"
         else:
             # If it succeeds, it should use conda-build
             assert "conda-build" in result.stdout, "dist should use conda-build"
