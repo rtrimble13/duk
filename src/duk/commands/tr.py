@@ -37,9 +37,7 @@ class TreasuryRateDownloader:
         if not self.api_key:
             logger.error("FMP API key not found in configuration")
             logger.error("Configure your API key in one of these locations:")
-            logger.error("  - /usr/local/etc/tb.rc")
-            logger.error("  - ~/.tbrc")
-            logger.error("  - duk/etc/tb.rc")
+            logger.error("  - ~/.dukrc")
             logger.error("  - Environment variable: FMP_API_KEY")
             sys.exit(1)
 

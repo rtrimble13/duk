@@ -18,8 +18,8 @@ import duk.config
 def setup_logging(verbose: bool = False):
     """Set up logging configuration."""
     # Load log_level from config if present
-    config = duk.config.get_config_manager().config_data
-    log_level_str = config.get("settings", {}).get("log_level", None)
+    config_manager = duk.config.get_config_manager()
+    log_level_str = config_manager.get("settings.log_level")
     if log_level_str:
         level = getattr(logging, log_level_str.upper(), logging.INFO)
     else:

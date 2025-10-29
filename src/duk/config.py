@@ -1,144 +1,104 @@
 """
-Configuration management for duk CLI tool.
+Configuration management for duk CLI tool using configistate.
 
-Supports multiple configuration file locations with priority order:
-1. ~/.duk/duk.rc (user-specific, medium priority)
-2. duk/etc/duk.rc (project-specific, highest priority)
-
-Configuration files use TOML format for modern standardization.
+Reads configuration from a single user config file: ~/.dukrc
+Configuration files use TOML format.
 """
 
 import logging
 import os
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional
 
-try:
-    import tomllib  # Python 3.11+
-except ImportError:
-    try:
-        import tomli as tomllib  # Fallback for older Python versions
-    except ImportError:
-        tomllib = None
+from configistate import Config
 
 logger = logging.getLogger(__name__)
 
 
 class ConfigurationManager:
-    """Manages configuration loading from multiple sources with priority order."""
+    """Manages configuration loading using configistate."""
 
     def __init__(self):
-        self.config_data: Dict[str, Any] = {}
-        self._loaded_files: list = []
+        self.config_path = Path.home() / ".dukrc"
+        self._config = None
+        self._loaded = False
 
-    def load_configuration(self) -> Dict[str, Any]:
-        """Load configuration from all available sources in priority order."""
-        config_files = self._get_config_file_paths()
+    def load_configuration(self):
+        """Load configuration from ~/.dukrc."""
+        if self._loaded:
+            return
 
-        # Load files in priority order (lowest priority first)
-        # so higher priority files can override settings
-        for config_file in config_files:
-            if config_file.exists():
-                self._load_config_file(config_file)
-
-        # Load environment variables last so they don't override file configs
-        # This maintains backward compatibility while allowing file
-        # configs to take precedence
-        env_data = {}
-        env_vars = {"FMP_API_KEY": "fmp_api_key"}
-
-        for env_var, config_key in env_vars.items():
-            value = os.environ.get(env_var)
-            if value:
-                if "api_keys" not in env_data:
-                    env_data["api_keys"] = {}
-                env_data["api_keys"][config_key] = value
-                logger.debug(f"Found {config_key} in environment variable {env_var}")
-
-        # Only use environment variables if not already set in config files
-        for section, values in env_data.items():
-            if section not in self.config_data:
-                self.config_data[section] = {}
-            for key, value in values.items():
-                if key not in self.config_data[section]:
-                    self.config_data[section][key] = value
-                    logger.debug(f"Using {key} from environment variable")
-
-        return self.config_data
-
-    def _get_config_file_paths(self) -> list[Path]:
-        """Get list of potential configuration file paths in priority order."""
-        paths = [
-            Path.home() / ".duk" / "duk.rc",  # User-specific (medium priority)
-            Path(__file__).parents[2]
-            / "etc"
-            / "duk.rc",  # Project-specific (highest priority)
-        ]
-        return paths
-
-    def _load_config_file(self, config_file: Path) -> None:
-        """Load configuration from a single TOML file."""
-        try:
-            if tomllib is None:
+        # Create config file if it doesn't exist
+        if not self.config_path.exists():
+            logger.debug(f"Config file {self.config_path} does not exist")
+            self._config = None
+        else:
+            try:
+                self._config = Config(str(self.config_path))
+                logger.debug(f"Loaded configuration from {self.config_path}")
+            except Exception as e:
                 logger.warning(
-                    f"TOML support not available. Cannot load {config_file}. "
-                    "Install tomli for Python < 3.11 support."
+                    f"Failed to load configuration from {self.config_path}: {e}"
                 )
-                return
+                self._config = None
 
-            with open(config_file, "rb") as f:
-                file_config = tomllib.load(f)
-
-            # Merge configuration with proper nesting
-            for section, values in file_config.items():
-                if section not in self.config_data:
-                    self.config_data[section] = {}
-
-                if isinstance(values, dict):
-                    self.config_data[section].update(values)
-                else:
-                    self.config_data[section] = values
-
-            self._loaded_files.append(str(config_file))
-            logger.debug(f"Loaded configuration from {config_file}")
-
-        except Exception as e:
-            logger.warning(f"Failed to load configuration from {config_file}: {e}")
+        self._loaded = True
 
     def get_api_key(self, key_name: str) -> Optional[str]:
         """Get API key by name from configuration.
 
-        If the key value appears to be a file path, attempts to read the key
-        from that file.
+        First tries to get from config file, then falls back to environment variables.
+        Supports file:// references in config values.
         """
-        api_keys = self.config_data.get("api_keys", {})
-        key_value = api_keys.get(key_name)
+        # Ensure config is loaded
+        if not self._loaded:
+            self.load_configuration()
 
-        if not key_value:
-            return None
-
-        # Check if the value appears to be a file path
-        if "/" in key_value or "\\" in key_value:
+        # Try config file first
+        if self._config:
             try:
-                # Try to read from file
-                file_path = Path(key_value).expanduser()
-                if file_path.exists():
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        file_content = f.read().strip()
-                    if file_content:
-                        logger.debug(f"Read {key_name} from file: {file_path}")
-                        return file_content
-                    else:
-                        logger.warning(f"File {file_path} is empty for {key_name}")
-                else:
-                    logger.warning(
-                        f"API key file not found: {file_path} for {key_name}"
-                    )
+                # configistate uses dot notation, e.g., "api_keys.fmp_api_key"
+                key_value = self._config.get(f"api_keys.{key_name}")
+                if key_value:
+                    logger.debug(f"Found {key_name} in config file")
+                    return key_value
             except Exception as e:
-                logger.warning(f"Failed to read API key from file {key_value}: {e}")
+                logger.debug(f"Could not get {key_name} from config: {e}")
 
-        # Return the original value if not a file path or file reading failed
-        return key_value
+        # Fall back to environment variables
+        env_vars = {"FMP_API_KEY": "fmp_api_key"}
+        for env_var, config_key in env_vars.items():
+            if config_key == key_name:
+                value = os.environ.get(env_var)
+                if value:
+                    logger.debug(f"Found {key_name} in environment variable {env_var}")
+                    return value
+
+        return None
+
+    def get(self, key_path: str, default=None):
+        """Get a configuration value by key path.
+
+        Args:
+            key_path: Dot-separated path to the config value
+                (e.g., "settings.log_level")
+            default: Default value to return if key is not found
+
+        Returns:
+            The configuration value or default if not found
+        """
+        # Ensure config is loaded
+        if not self._loaded:
+            self.load_configuration()
+
+        if self._config:
+            try:
+                value = self._config.get(key_path)
+                return value if value is not None else default
+            except Exception as e:
+                logger.debug(f"Could not get {key_path} from config: {e}")
+
+        return default
 
     def validate_required_keys(self, required_keys: list[str]) -> bool:
         """Validate that all required API keys are present."""
@@ -150,9 +110,8 @@ class ConfigurationManager:
 
         if missing_keys:
             logger.error(f"Missing required API keys: {missing_keys}")
-            logger.error("Configure API keys in one of the following locations:")
-            for path in self._get_config_file_paths():
-                logger.error(f"  - {path}")
+            logger.error("Configure API keys in:")
+            logger.error(f"  - {self.config_path}")
             logger.error("Or set environment variables (e.g., FMP_API_KEY)")
             return False
 
@@ -160,7 +119,9 @@ class ConfigurationManager:
 
     def get_loaded_files(self) -> list[str]:
         """Get list of configuration files that were successfully loaded."""
-        return self._loaded_files.copy()
+        if self._config and self.config_path.exists():
+            return [str(self.config_path)]
+        return []
 
 
 # Global configuration manager instance

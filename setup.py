@@ -64,6 +64,7 @@ setup(
         "click>=8.0.0",
         "python-dateutil>=2.8.0",
         "scipy>=1.7.0",
+        "configistate>=1.0.0",
     ],
     extras_require={
         "dev": [

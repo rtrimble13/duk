@@ -41,9 +41,7 @@ class PriceHistoryDownloader:
         if not self.api_key:
             logger.error("FMP API key not found in configuration")
             logger.error("Configure your API key in one of these locations:")
-            logger.error("  - /usr/local/etc/tb.rc")
-            logger.error("  - ~/.tbrc")
-            logger.error("  - duk/etc/tb.rc")
+            logger.error("  - ~/.dukrc")
             logger.error("  - Environment variable: FMP_API_KEY")
             sys.exit(1)
 
@@ -678,13 +676,9 @@ def ph_command(
 
     for symbol in tickers:
         # Download price data
-        price_data = downloader.download_price_data(
-            symbol, start_date, end_date, days
-        )
+        price_data = downloader.download_price_data(symbol, start_date, end_date, days)
         if price_data is None:
-            click.echo(
-                f"Error: Failed to download price data for {symbol}", err=True
-            )
+            click.echo(f"Error: Failed to download price data for {symbol}", err=True)
             continue
 
         if not price_data:

@@ -1,11 +1,11 @@
 """
-Tests for the configuration management system.
+Tests for the configuration management system using configistate.
 """
 
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from duk.config import (
     ConfigurationManager,
@@ -15,381 +15,297 @@ from duk.config import (
 )
 
 
-class TestFileBasedApiKeys:
-    """Test file-based API key functionality."""
-
-    def setup_method(self):
-        """Set up test fixtures."""
-        self.config_manager = ConfigurationManager()
-
-    def test_get_api_key_from_file_success(self):
-        """Test successfully reading API key from file."""
-        # Create a temporary file with an API key
-        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
-            f.write("test_key_from_file\n")
-            f.flush()
-
-            try:
-                # Set up config with file path
-                self.config_manager.config_data = {"api_keys": {"test_key": f.name}}
-
-                result = self.config_manager.get_api_key("test_key")
-                assert result == "test_key_from_file"
-
-            finally:
-                os.unlink(f.name)
-
-    def test_get_api_key_from_file_with_whitespace(self):
-        """Test reading API key from file with surrounding whitespace."""
-        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
-            f.write("  \n  test_key_with_spaces  \n  ")
-            f.flush()
-
-            try:
-                self.config_manager.config_data = {"api_keys": {"test_key": f.name}}
-
-                result = self.config_manager.get_api_key("test_key")
-                assert result == "test_key_with_spaces"
-
-            finally:
-                os.unlink(f.name)
-
-    def test_get_api_key_file_not_exists(self):
-        """Test handling when API key file doesn't exist."""
-        self.config_manager.config_data = {
-            "api_keys": {"test_key": "/nonexistent/path/to/key.txt"}
-        }
-
-        # Should fall back to returning the original value (file path)
-        result = self.config_manager.get_api_key("test_key")
-        assert result == "/nonexistent/path/to/key.txt"
-
-    def test_get_api_key_file_empty(self):
-        """Test handling when API key file is empty."""
-        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
-            f.write("")  # Empty file
-            f.flush()
-
-            try:
-                self.config_manager.config_data = {"api_keys": {"test_key": f.name}}
-
-                # Should fall back to returning the original value (file path)
-                result = self.config_manager.get_api_key("test_key")
-                assert result == f.name
-
-            finally:
-                os.unlink(f.name)
-
-    def test_get_api_key_direct_value(self):
-        """Test that direct API key values (not file paths) work as before."""
-        self.config_manager.config_data = {
-            "api_keys": {"test_key": "direct_api_key_value"}
-        }
-
-        result = self.config_manager.get_api_key("test_key")
-        assert result == "direct_api_key_value"
-
-    def test_get_api_key_with_tilde_expansion(self):
-        """Test that file paths with ~ are properly expanded."""
-        # Create a temporary file in a temp directory that we can reference with ~
-        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
-            f.write("tilde_expanded_key")
-            f.flush()
-
-            try:
-                # Create a relative path using the temp file but modify it to use ~
-                # For testing, we'll use the actual file path since ~ expansion
-                # would point to the user's home directory
-                self.config_manager.config_data = {"api_keys": {"test_key": f.name}}
-
-                result = self.config_manager.get_api_key("test_key")
-                assert result == "tilde_expanded_key"
-
-            finally:
-                os.unlink(f.name)
-
-    def test_get_api_key_windows_path_style(self):
-        """Test that Windows-style paths are detected as file paths."""
-        # Test with a Windows-style path (even on Unix systems)
-        self.config_manager.config_data = {
-            "api_keys": {"test_key": "C:\\nonexistent\\path\\key.txt"}
-        }
-
-        # Should attempt to read as file and fall back to original value
-        result = self.config_manager.get_api_key("test_key")
-        assert result == "C:\\nonexistent\\path\\key.txt"
-
-
 class TestConfigurationManager:
     """Test the ConfigurationManager class."""
 
     def setup_method(self):
         """Set up test fixtures."""
+        # Reset the global config manager for each test
+        import duk.config
+
+        duk.config._config_manager = None
+
         self.config_manager = ConfigurationManager()
 
     def test_init(self):
         """Test ConfigurationManager initialization."""
-        assert self.config_manager.config_data == {}
-        assert self.config_manager._loaded_files == []
+        assert self.config_manager.config_path == Path.home() / ".dukrc"
+        assert self.config_manager._config is None
+        assert self.config_manager._loaded is False
 
-    def test_get_config_file_paths(self):
-        """Test that configuration file paths are returned in correct priority order."""
-        paths = self.config_manager._get_config_file_paths()
+    def test_load_configuration_no_file(self):
+        """Test loading configuration when file doesn't exist."""
+        with patch.object(Path, "exists", return_value=False):
+            self.config_manager.load_configuration()
+            assert self.config_manager._loaded is True
+            assert self.config_manager._config is None
 
-        assert len(paths) == 2
-        assert paths[0] == Path.home() / ".duk" / "duk.rc"
-        assert str(paths[1]).endswith("etc/duk.rc")
+    def test_load_configuration_with_file(self):
+        """Test loading configuration from existing file."""
+        # Create a temporary config file
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            f.write('[api_keys]\ntest_key = "test_value"\n')
+            temp_path = f.name
 
-    def test_load_environment_variables(self):
-        """Test loading API keys from environment variables."""
-        # Mock config file paths to empty list so no files are loaded
-        with patch.object(
-            self.config_manager, "_get_config_file_paths", return_value=[]
-        ):
-            with patch.dict(os.environ, {"FMP_API_KEY": "test_fmp_key"}):
+        try:
+            # Patch the config path to use our temp file
+            with patch.object(self.config_manager, "config_path", Path(temp_path)):
                 self.config_manager.load_configuration()
+                assert self.config_manager._loaded is True
+                assert self.config_manager._config is not None
+        finally:
+            os.unlink(temp_path)
 
-        assert (
-            self.config_manager.config_data["api_keys"]["fmp_api_key"] == "test_fmp_key"
-        )
+    def test_get_api_key_from_config(self):
+        """Test getting API key from config file."""
+        # Create a temporary config file
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            f.write('[api_keys]\nfmp_api_key = "test_fmp_key"\n')
+            temp_path = f.name
 
-    def test_load_environment_variables_missing(self):
-        """Test loading when environment variables are not set."""
-        # Mock config file paths to empty list so no files are loaded
-        with patch.object(
-            self.config_manager, "_get_config_file_paths", return_value=[]
-        ):
-            with patch.dict(os.environ, {}, clear=True):
-                self.config_manager.load_configuration()
+        try:
+            with patch.object(self.config_manager, "config_path", Path(temp_path)):
+                key = self.config_manager.get_api_key("fmp_api_key")
+                assert key == "test_fmp_key"
+        finally:
+            os.unlink(temp_path)
 
-        assert (
-            self.config_manager.config_data.get("api_keys", {}).get("fmp_api_key")
-            is None
-        )
+    def test_get_api_key_from_environment(self):
+        """Test getting API key from environment variable."""
+        # Mock config file not existing
+        with patch.object(Path, "exists", return_value=False):
+            with patch.dict(os.environ, {"FMP_API_KEY": "env_test_key"}):
+                key = self.config_manager.get_api_key("fmp_api_key")
+                assert key == "env_test_key"
 
-    def test_get_api_key_existing(self):
-        """Test getting an existing API key."""
-        self.config_manager.config_data = {"api_keys": {"test_key": "test_value"}}
+    def test_get_api_key_file_reference(self):
+        """Test getting API key from file reference using
+        configistate's file:// feature."""
+        # Create a secret file
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as secret_file:
+            secret_file.write("secret_from_file")
+            secret_path = secret_file.name
 
-        assert self.config_manager.get_api_key("test_key") == "test_value"
+        # Create a config file with file reference
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            f.write(f'[api_keys]\nfmp_api_key = "file://{secret_path}"\n')
+            temp_path = f.name
+
+        try:
+            with patch.object(self.config_manager, "config_path", Path(temp_path)):
+                key = self.config_manager.get_api_key("fmp_api_key")
+                assert key == "secret_from_file"
+        finally:
+            os.unlink(temp_path)
+            os.unlink(secret_path)
 
     def test_get_api_key_missing(self):
         """Test getting a non-existent API key."""
-        assert self.config_manager.get_api_key("nonexistent_key") is None
+        with patch.object(Path, "exists", return_value=False):
+            with patch.dict(os.environ, {}, clear=True):
+                key = self.config_manager.get_api_key("nonexistent_key")
+                assert key is None
 
-    def test_get_api_key_no_api_keys_section(self):
-        """Test getting API key when api_keys section doesn't exist."""
-        self.config_manager.config_data = {}
-        assert self.config_manager.get_api_key("test_key") is None
+    def test_get_api_key_config_overrides_env(self):
+        """Test that config file values override environment variables."""
+        # Create a temporary config file
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            f.write('[api_keys]\nfmp_api_key = "config_key"\n')
+            temp_path = f.name
+
+        try:
+            with patch.object(self.config_manager, "config_path", Path(temp_path)):
+                with patch.dict(os.environ, {"FMP_API_KEY": "env_key"}):
+                    key = self.config_manager.get_api_key("fmp_api_key")
+                    # Config should override environment
+                    assert key == "config_key"
+        finally:
+            os.unlink(temp_path)
 
     def test_validate_required_keys_success(self):
         """Test validation when all required keys are present."""
-        self.config_manager.config_data = {
-            "api_keys": {"key1": "value1", "key2": "value2"}
-        }
+        # Create a temporary config file
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            f.write('[api_keys]\nkey1 = "value1"\nkey2 = "value2"\n')
+            temp_path = f.name
 
-        assert self.config_manager.validate_required_keys(["key1", "key2"]) is True
+        try:
+            with patch.object(self.config_manager, "config_path", Path(temp_path)):
+                result = self.config_manager.validate_required_keys(["key1", "key2"])
+                assert result is True
+        finally:
+            os.unlink(temp_path)
 
     def test_validate_required_keys_missing(self):
         """Test validation when some required keys are missing."""
-        self.config_manager.config_data = {"api_keys": {"key1": "value1"}}
+        with patch.object(Path, "exists", return_value=False):
+            with patch.dict(os.environ, {}, clear=True):
+                result = self.config_manager.validate_required_keys(["key1", "key2"])
+                assert result is False
 
-        assert self.config_manager.validate_required_keys(["key1", "key2"]) is False
-
-    def test_validate_required_keys_empty_config(self):
-        """Test validation with empty configuration."""
-        assert self.config_manager.validate_required_keys(["key1"]) is False
-
-    def test_get_loaded_files(self):
+    def test_get_loaded_files_with_config(self):
         """Test getting list of loaded configuration files."""
-        self.config_manager._loaded_files = ["/path/to/config1", "/path/to/config2"]
-
-        loaded_files = self.config_manager.get_loaded_files()
-        assert loaded_files == ["/path/to/config1", "/path/to/config2"]
-
-        # Ensure it returns a copy, not the original list
-        loaded_files.append("/path/to/config3")
-        assert len(self.config_manager._loaded_files) == 2
-
-
-class TestConfigurationFileLoading:
-    """Test configuration file loading functionality."""
-
-    def test_load_config_file_success(self):
-        """Test successful loading of a TOML configuration file."""
-        config_manager = ConfigurationManager()
-
-        toml_content = """
-[api_keys]
-test_key = "test_value"
-another_key = "another_value"
-
-[settings]
-log_level = "DEBUG"
-"""
-
+        # Create a temporary config file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
-            f.write(toml_content)
-            f.flush()
+            f.write('[api_keys]\ntest_key = "test_value"\n')
+            temp_path = f.name
 
-            try:
-                config_manager._load_config_file(Path(f.name))
+        try:
+            with patch.object(self.config_manager, "config_path", Path(temp_path)):
+                self.config_manager.load_configuration()
+                loaded_files = self.config_manager.get_loaded_files()
+                assert len(loaded_files) == 1
+                assert loaded_files[0] == temp_path
+        finally:
+            os.unlink(temp_path)
 
-                assert (
-                    config_manager.config_data["api_keys"]["test_key"] == "test_value"
-                )
-                assert (
-                    config_manager.config_data["api_keys"]["another_key"]
-                    == "another_value"
-                )
-                assert config_manager.config_data["settings"]["log_level"] == "DEBUG"
-                assert f.name in config_manager._loaded_files
+    def test_get_loaded_files_no_config(self):
+        """Test getting loaded files when no config exists."""
+        with patch.object(Path, "exists", return_value=False):
+            self.config_manager.load_configuration()
+            loaded_files = self.config_manager.get_loaded_files()
+            assert loaded_files == []
 
-            finally:
-                os.unlink(f.name)
+    def test_load_configuration_idempotent(self):
+        """Test that loading configuration multiple times doesn't reload."""
+        with patch.object(Path, "exists", return_value=False):
+            self.config_manager.load_configuration()
+            assert self.config_manager._loaded is True
 
-    def test_load_config_file_not_exists(self):
-        """Test loading a configuration file that doesn't exist."""
-        config_manager = ConfigurationManager()
-        non_existent_file = Path("/nonexistent/path/config.toml")
-
-        # Should not raise an exception
-        config_manager._load_config_file(non_existent_file)
-        assert config_manager.config_data == {}
-        assert len(config_manager._loaded_files) == 0
-
-    def test_load_configuration_priority_order(self):
-        """Test that configuration files are loaded in correct priority order."""
-        config_manager = ConfigurationManager()
-
-        # Mock the _get_config_file_paths to return our test files
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Create test files with different content
-            user_config = Path(temp_dir) / "user.toml"
-            project_config = Path(temp_dir) / "project.toml"
-
-            # User config (medium priority)
-            user_config.write_text(
-                """
-[api_keys]
-test_key = "user_value"
-user_only_key = "user_only"
-"""
-            )
-
-            # Project config (highest priority) - should override user
-            project_config.write_text(
-                """
-[api_keys]
-test_key = "project_value"
-project_only_key = "project_only"
-"""
-            )
-
-            # Mock the paths method to return our test files
-            test_paths = [user_config, project_config]
-            with patch.object(
-                config_manager, "_get_config_file_paths", return_value=test_paths
-            ):
-                with patch.dict(
-                    os.environ, {}, clear=True
-                ):  # Clear environment vars for this test
-                    config_manager.load_configuration()
-
-            # Check that project config (highest priority) won
-            assert config_manager.config_data["api_keys"]["test_key"] == "project_value"
-
-            # Check that all unique keys are present
-            assert (
-                config_manager.config_data["api_keys"]["user_only_key"] == "user_only"
-            )
-            assert (
-                config_manager.config_data["api_keys"]["project_only_key"]
-                == "project_only"
-            )
+            # Load again
+            self.config_manager.load_configuration()
+            # Should still be loaded
+            assert self.config_manager._loaded is True
 
 
 class TestGlobalFunctions:
     """Test global configuration functions."""
 
-    def test_get_config_manager_singleton(self):
-        """Test that get_config_manager returns the same instance."""
-        # Reset the global config manager
+    def setup_method(self):
+        """Reset global state before each test."""
         import duk.config
 
         duk.config._config_manager = None
 
+    def test_get_config_manager_singleton(self):
+        """Test that get_config_manager returns the same instance."""
         manager1 = get_config_manager()
         manager2 = get_config_manager()
-
         assert manager1 is manager2
 
-    @patch("duk.config.get_config_manager")
-    def test_get_api_key_convenience_function(self, mock_get_config_manager):
+    def test_get_api_key_convenience_function(self):
         """Test the get_api_key convenience function."""
-        mock_manager = mock_get_config_manager.return_value
-        mock_manager.get_api_key.return_value = "test_value"
+        with patch("duk.config.get_config_manager") as mock_get_manager:
+            mock_manager = MagicMock()
+            mock_manager.get_api_key.return_value = "test_value"
+            mock_get_manager.return_value = mock_manager
 
-        result = get_api_key("test_key")
+            result = get_api_key("test_key")
 
-        mock_manager.get_api_key.assert_called_once_with("test_key")
-        assert result == "test_value"
+            mock_manager.get_api_key.assert_called_once_with("test_key")
+            assert result == "test_value"
 
-    @patch("duk.config.get_config_manager")
-    def test_validate_required_keys_convenience_function(self, mock_get_config_manager):
+    def test_validate_required_keys_convenience_function(self):
         """Test the validate_required_keys convenience function."""
-        mock_manager = mock_get_config_manager.return_value
-        mock_manager.validate_required_keys.return_value = True
+        with patch("duk.config.get_config_manager") as mock_get_manager:
+            mock_manager = MagicMock()
+            mock_manager.validate_required_keys.return_value = True
+            mock_get_manager.return_value = mock_manager
 
-        result = validate_required_keys(["key1", "key2"])
+            result = validate_required_keys(["key1", "key2"])
 
-        mock_manager.validate_required_keys.assert_called_once_with(["key1", "key2"])
-        assert result is True
+            mock_manager.validate_required_keys.assert_called_once_with(
+                ["key1", "key2"]
+            )
+            assert result is True
 
 
 class TestBackwardCompatibility:
     """Test backward compatibility with existing API key mechanisms."""
 
+    def setup_method(self):
+        """Reset global state before each test."""
+        import duk.config
+
+        duk.config._config_manager = None
+
     def test_environment_variable_integration(self):
         """Test that environment variables work with the new system."""
         config_manager = ConfigurationManager()
 
-        # Mock config file paths to empty list so no files are loaded
-        with patch.object(config_manager, "_get_config_file_paths", return_value=[]):
+        with patch.object(Path, "exists", return_value=False):
             with patch.dict(os.environ, {"FMP_API_KEY": "env_test_key"}):
-                config_manager.load_configuration()
+                key = config_manager.get_api_key("fmp_api_key")
+                assert key == "env_test_key"
 
-        assert config_manager.get_api_key("fmp_api_key") == "env_test_key"
-
-    def test_file_overrides_environment(self):
-        """Test that configuration file values override environment variables."""
+    def test_config_file_location(self):
+        """Test that config is read from ~/.dukrc."""
         config_manager = ConfigurationManager()
+        assert config_manager.config_path == Path.home() / ".dukrc"
 
-        # Set environment variable
-        with patch.dict(os.environ, {"FMP_API_KEY": "env_key"}):
-            # Create a temporary config file that should override the env var
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".toml", delete=False
-            ) as f:
-                f.write(
-                    """
-[api_keys]
-fmp_api_key = "file_key"
-"""
-                )
-                f.flush()
 
-                try:
-                    # Mock the config file paths to include our test file
-                    with patch.object(
-                        config_manager,
-                        "_get_config_file_paths",
-                        return_value=[Path(f.name)],
-                    ):
-                        config_manager.load_configuration()
+class TestConfigistateIntegration:
+    """Test integration with configistate features."""
 
-                    # File should override environment
-                    assert config_manager.get_api_key("fmp_api_key") == "file_key"
+    def setup_method(self):
+        """Reset global state before each test."""
+        import duk.config
 
-                finally:
-                    os.unlink(f.name)
+        duk.config._config_manager = None
+
+    def test_file_reference_support(self):
+        """Test that file:// references are automatically handled by configistate."""
+        # Create a secret file
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as secret_file:
+            secret_file.write("my_secret_key")
+            secret_path = secret_file.name
+
+        # Create a config file with file:// reference
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            f.write(f'[api_keys]\nfmp_api_key = "file://{secret_path}"\n')
+            temp_path = f.name
+
+        try:
+            config_manager = ConfigurationManager()
+            with patch.object(config_manager, "config_path", Path(temp_path)):
+                key = config_manager.get_api_key("fmp_api_key")
+                assert key == "my_secret_key"
+        finally:
+            os.unlink(temp_path)
+            os.unlink(secret_path)
+
+    def test_multiple_api_keys(self):
+        """Test reading multiple API keys from config."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            f.write("[api_keys]\n")
+            f.write('fmp_api_key = "fmp_key"\n')
+            f.write('another_key = "another_value"\n')
+            temp_path = f.name
+
+        try:
+            config_manager = ConfigurationManager()
+            with patch.object(config_manager, "config_path", Path(temp_path)):
+                fmp_key = config_manager.get_api_key("fmp_api_key")
+                another_key = config_manager.get_api_key("another_key")
+
+                assert fmp_key == "fmp_key"
+                assert another_key == "another_value"
+        finally:
+            os.unlink(temp_path)
+
+    def test_config_error_handling(self):
+        """Test that invalid TOML is handled gracefully."""
+        # Create a file with invalid TOML
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            f.write("this is not valid TOML [[[")
+            temp_path = f.name
+
+        try:
+            config_manager = ConfigurationManager()
+            with patch.object(config_manager, "config_path", Path(temp_path)):
+                # Should handle the error gracefully
+                config_manager.load_configuration()
+                # Should fall back to None
+                assert config_manager._config is None
+        finally:
+            os.unlink(temp_path)

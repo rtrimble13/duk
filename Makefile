@@ -29,12 +29,8 @@ install:
 	fi
 	@# Install to ~/.local
 	pip install --user dist/duk-0.1.0-py3-none-any.whl
-	@# Copy configuration file
-	@mkdir -p ~/.duk
-	@cp etc/duk.rc ~/.duk/duk.rc
 	@echo "Installation complete!"
 	@echo "- duk CLI installed to ~/.local/bin/duk"
-	@echo "- Configuration copied to ~/.duk/duk.rc"
 	@echo ""
 	@echo "Make sure ~/.local/bin is in your PATH to use the duk command."
 

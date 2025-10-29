@@ -1,22 +1,12 @@
 # Configuration Management (duk.rc)
 
-The `duk` CLI tool uses a flexible configuration system based on `duk.rc` files to manage API keys and other settings. This system supports multiple configuration file locations with a clear priority order to accommodate different deployment scenarios.
+The `duk` CLI tool uses a configuration system based on `configistate` to manage API keys and settings. Configuration is stored in a single user configuration file: `~/.dukrc`.
 
-## Configuration File Locations
+## Configuration File Location
 
-Configuration files are loaded in the following priority order (highest priority first):
+The configuration file is located at:
 
-1. **User Configuration**: `~/.duk/duk.rc` (medium priority)
-   - User-specific settings that apply to all duk usage for this user
-   - Located in the `.duk` directory in the user's home directory
-   - Takes precedence over project settings
-
-2. **Project Configuration**: `duk/etc/duk.rc` (highest priority)
-   - Project-specific settings that override user configurations
-   - Located in the `etc/` directory of your duk installation/project
-   - Best for project-specific API keys and settings
-
-If configuration files are not found in either location, the default is to use any options passed on the command line.
+**`~/.dukrc`** - User configuration file in your home directory
 
 ## Configuration File Format
 
@@ -31,7 +21,7 @@ Configuration files use the TOML format, which is modern, standardized, and easy
 fmp_api_key = "your_fmp_api_key_here"
 
 # API keys can also be read from files for better security
-# fmp_api_key = "/path/to/secret/fmp_key.txt"
+# fmp_api_key = "file:///path/to/secret/fmp_key.txt"
 
 # Add other API keys as needed
 # example_api_key = "your_example_key_here"
@@ -46,20 +36,20 @@ default_output_directory = "var"
 
 ### Financial Modeling Prep (FMP) API Key
 
-The `tr` and `ph` subcommands require a Financial Modeling Prep API key. Configure it in any of these ways:
+The `tr`, `ph`, and `ls` subcommands require a Financial Modeling Prep API key. Configure it in any of these ways:
 
 #### Method 1: Configuration File (Recommended)
-Add to any `duk.rc` file:
+Add to `~/.dukrc`:
 ```toml
 [api_keys]
 fmp_api_key = "your_actual_api_key_here"
 ```
 
 #### Method 2: File-based API Key (Most Secure)
-Store your API key in a separate file and reference it:
+Store your API key in a separate file and reference it using the `file://` prefix:
 ```toml
 [api_keys]
-fmp_api_key = "/path/to/your/secret/fmp_key.txt"
+fmp_api_key = "file:///path/to/your/secret/fmp_key.txt"
 ```
 
 The file should contain only the API key (whitespace will be automatically trimmed).
@@ -69,20 +59,19 @@ The file should contain only the API key (whitespace will be automatically trimm
 export FMP_API_KEY="your_actual_api_key_here"
 ```
 
-**Note**: Configuration files take precedence over environment variables when both are present.
+**Note**: Configuration file values take precedence over environment variables when both are present.
 
 ## Setup Instructions
 
 ### Quick Setup
-1. Create a user configuration directory and file:
+1. Create a user configuration file:
    ```bash
-   mkdir -p ~/.duk
-   touch ~/.duk/duk.rc
+   touch ~/.dukrc
    ```
 
 2. Add your API key:
    ```bash
-   cat >> ~/.duk/duk.rc << 'EOF'
+   cat >> ~/.dukrc << 'EOF'
    [api_keys]
    fmp_api_key = "your_actual_api_key_here"
    EOF
@@ -93,111 +82,75 @@ export FMP_API_KEY="your_actual_api_key_here"
    duk tr --help  # Should not show API key errors
    ```
 
-### Project-Specific Setup
-For project-specific configurations, edit the `etc/duk.rc` file in your duk installation:
-
-```bash
-# Navigate to your duk directory
-cd /path/to/duk
-
-# Edit the project configuration
-vi etc/duk.rc
-```
-
 ### File-based API Key Setup (Most Secure)
 1. Create a secure file for your API key:
    ```bash
-   echo "your_actual_api_key_here" > ~/.duk/fmp_key.txt
-   chmod 600 ~/.duk/fmp_key.txt
+   mkdir -p ~/.duk/secrets
+   echo "your_actual_api_key_here" > ~/.duk/secrets/fmp_key.txt
+   chmod 600 ~/.duk/secrets/fmp_key.txt
    ```
 
 2. Reference the file in your configuration:
    ```bash
-   cat >> ~/.duk/duk.rc << 'EOF'
+   cat >> ~/.dukrc << 'EOF'
    [api_keys]
-   fmp_api_key = "~/.duk/fmp_key.txt"
+   fmp_api_key = "file://~/.duk/secrets/fmp_key.txt"
    EOF
    ```
+
+   Note: The `file://` prefix tells configistate to read the key from the specified file. Both absolute paths and paths with `~` for home directory are supported.
 
 ## Configuration Validation
 
 The duk CLI automatically validates required API keys on startup. If a required key is missing, it will show helpful error messages indicating:
 
 - Which API keys are missing
-- All possible configuration file locations
+- The configuration file location
 - Alternative environment variable names
 
 Example error message:
 ```
 ERROR: Missing required API keys: ['fmp_api_key']
-Configure API keys in one of the following locations:
-  - ~/.duk/duk.rc
-  - duk/etc/duk.rc
+Configure API keys in:
+  - ~/.dukrc
 Or set environment variables (e.g., FMP_API_KEY)
 ```
 
-## Configuration Priority Examples
+## Configuration Features
 
-### Example 1: Multiple Configuration Files
-If you have:
-- User config: `~/.duk/duk.rc` with `fmp_api_key = "user_key"`
-- Project config: `duk/etc/duk.rc` with `fmp_api_key = "project_key"`
+### File References with configistate
 
-Result: `"project_key"` will be used (highest priority).
+The configuration system uses the `configistate` package, which provides powerful features:
 
-### Example 2: Mixed Configuration Sources
-If you have:
-- User config: `~/.duk/duk.rc` with `fmp_api_key = "file_key"`
-- Environment variable: `FMP_API_KEY="env_key"`
+- **Automatic File Reading**: Use `file://` prefix to read values from files
+- **Path Expansion**: Supports `~` expansion in file paths
+- **TOML Validation**: Full TOML format support with proper error messages
 
-Result: `"file_key"` will be used (file configs override environment variables).
+### Settings Configuration
 
-### Example 3: Partial Configuration Override
-User config:
+You can configure various application settings:
+
 ```toml
-[api_keys]
-fmp_api_key = "user_fmp_key"
-other_api_key = "user_other_key"
-
 [settings]
-log_level = "WARNING"
-```
-
-Project config:
-```toml
-[api_keys]
-fmp_api_key = "project_fmp_key"
-
-[settings]
+# Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 log_level = "INFO"
+
+# Default output directory for data files
+default_output_directory = "var"
 ```
 
-Result:
-- `fmp_api_key = "project_fmp_key"` (overridden)
-- `other_api_key = "user_other_key"` (inherited)
-- `log_level = "INFO"` (overridden)
-
-### Example 4: File-based API Key
-User config:
-```toml
-[api_keys]
-fmp_api_key = "~/.duk/secrets/fmp_key.txt"
-```
-
-If the file `~/.duk/secrets/fmp_key.txt` contains `abc123def456`, then `fmp_api_key` will have the value `"abc123def456"`.
+The `log_level` setting controls the verbosity of log messages written to `var/duk.log`.
 
 ## Security Best Practices
 
 1. **File Permissions**: Ensure configuration files containing API keys have appropriate permissions:
    ```bash
-   chmod 600 ~/.duk/duk.rc
+   chmod 600 ~/.dukrc
    ```
 
 2. **Version Control**: Never commit API keys to version control. Add configuration files to `.gitignore`:
    ```gitignore
-   duk.rc
-   etc/duk.rc
-   .duk/
+   .dukrc
    ```
 
 3. **Environment-Specific Keys**: Use different API keys for development, testing, and production environments.
@@ -210,12 +163,18 @@ If the file `~/.duk/secrets/fmp_key.txt` contains `abc123def456`, then `fmp_api_
    chmod 600 ~/.duk/secrets/fmp_key.txt
    ```
 
+   Then reference in `~/.dukrc`:
+   ```toml
+   [api_keys]
+   fmp_api_key = "file://~/.duk/secrets/fmp_key.txt"
+   ```
+
 ## Troubleshooting
 
 ### Common Issues
 
 1. **"FMP API key not found" error**
-   - Check that your configuration file exists and has the correct format
+   - Check that your configuration file exists at `~/.dukrc`
    - Verify the `[api_keys]` section exists
    - Ensure the key name is `fmp_api_key` (not `FMP_API_KEY`)
    - If using file-based keys, ensure the file exists and is readable
@@ -225,14 +184,11 @@ If the file `~/.duk/secrets/fmp_key.txt` contains `abc123def456`, then `fmp_api_
    - Check TOML syntax with a TOML validator
    - Ensure file encoding is UTF-8
 
-3. **Wrong API key being used**
-   - Check configuration priority order
-   - Use debug logging to see which files are loaded: `duk -v tr --help`
-
-4. **File-based API key not working**
+3. **File-based API key not working**
    - Ensure the file path is correct and the file exists
    - Check file permissions (must be readable)
    - Verify the file contains only the API key (no extra formatting)
+   - Make sure to use the `file://` prefix in the config file
 
 ### Debug Configuration Loading
 
@@ -244,31 +200,42 @@ duk -v tr --help 2>&1 | grep -E "(Loaded configuration|Found.*API)"
 
 This will show debug messages about configuration file loading and API key sources.
 
-## Migrating from Environment Variables
+## Migrating from Previous Versions
 
-If you're currently using environment variables, you can easily migrate to configuration files:
+If you're migrating from a previous version that used multiple config file locations:
 
-1. Check your current environment variable:
+1. Check for existing configuration files:
    ```bash
-   echo $FMP_API_KEY
+   # Old locations (no longer used)
+   cat ~/.duk/duk.rc 2>/dev/null
+   cat duk/etc/duk.rc 2>/dev/null
    ```
 
-2. Create a configuration file with the same value:
+2. Copy your configuration to the new location:
    ```bash
-   mkdir -p ~/.duk
-   cat > ~/.duk/duk.rc << EOF
+   # If you had a config at ~/.duk/duk.rc
+   cp ~/.duk/duk.rc ~/.dukrc
+   
+   # Or create from scratch
+   cat > ~/.dukrc << 'EOF'
    [api_keys]
-   fmp_api_key = "$FMP_API_KEY"
+   fmp_api_key = "your_actual_api_key_here"
    EOF
    ```
 
 3. Test that it works:
    ```bash
-   unset FMP_API_KEY  # Temporarily remove env var
-   duk tr --help      # Should still work
+   duk tr --help  # Should not show API key errors
    ```
 
-4. Remove the environment variable from your shell profile once confirmed.
+## Technical Details
+
+- **Configuration Package**: Uses `configistate` >= 1.0.0 from PyPI
+- **Format**: TOML (Tom's Obvious, Minimal Language)
+- **Python Support**: Uses built-in TOML parsing via configistate
+- **Encoding**: UTF-8
+- **File Reference**: Supports `file://` prefix for reading values from external files
+- **Validation**: Performed at application startup before API calls
 
 ## Future Extensions
 
@@ -278,12 +245,3 @@ The configuration system is designed to be extensible. Future versions may suppo
 - Output format preferences
 - Custom data source endpoints
 - Plugin configuration settings
-- Enhanced file-based secret management
-
-## Technical Details
-
-- **Format**: TOML (Tom's Obvious, Minimal Language)
-- **Python Support**: Uses `tomllib` (Python 3.11+) or `tomli` (older versions)
-- **Encoding**: UTF-8
-- **Merging Strategy**: Deep merge with higher priority configs overriding lower priority ones
-- **Validation**: Performed at application startup before API calls
