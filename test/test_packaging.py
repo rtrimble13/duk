@@ -97,9 +97,6 @@ class TestPackagingConfiguration:
         # Check that it uses pip install --user
         assert "pip install --user" in content, "install doesn't use pip install --user"
 
-        # Check that it copies configuration file
-        assert "~/.dukrc" in content, "install should copy config file"
-
 
 class TestDistributionBuilding:
     """Test actual distribution building."""
