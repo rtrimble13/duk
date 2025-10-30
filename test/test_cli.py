@@ -413,10 +413,10 @@ class TestPriceHistoryCLI:
         assert "date" in result.output
         assert "AAPL" in result.output
 
-    @patch("duk.commands.ph.PriceHistoryDownloader._make_request")
-    def test_ph_json_output(self, mock_request):
+    @patch("duk.commands.ph.PriceHistoryDownloader.download_price_data")
+    def test_ph_json_output(self, mock_download):
         """Test ph command with JSON output."""
-        mock_request.return_value = self.sample_price_data
+        mock_download.return_value = self.sample_price_data
 
         result = self.runner.invoke(
             main,
@@ -427,21 +427,18 @@ class TestPriceHistoryCLI:
                 "2023-11-01",
                 "--end-date",
                 "2023-12-01",
-                "--format",
-                "json",
+                "--no-cache",
             ],
         )
 
         assert result.exit_code == 0
-        data = json.loads(result.output)
-        assert isinstance(data, list)
-        assert len(data) == 2
-        assert data[0]["symbol"] == "AAPL"
+        # Output is CSV by default to stdout
+        assert "AAPL" in result.output
 
-    @patch("duk.commands.ph.PriceHistoryDownloader._make_request")
-    def test_ph_ohlcv_output(self, mock_request):
-        """Test ph command with OHLCV output."""
-        mock_request.return_value = self.sample_price_data
+    @patch("duk.commands.ph.PriceHistoryDownloader.download_price_data")
+    def test_ph_ohlcv_output(self, mock_download):
+        """Test ph command with OHLC and volume output."""
+        mock_download.return_value = self.sample_price_data
 
         result = self.runner.invoke(
             main,
@@ -452,25 +449,29 @@ class TestPriceHistoryCLI:
                 "2023-11-01",
                 "--end-date",
                 "2023-12-01",
-                "--ohlcv",
+                "--ohlc",
+                "--vol",
+                "--no-cache",
             ],
         )
 
         assert result.exit_code == 0
         assert "volume" in result.output
 
-    @patch("duk.commands.ph.PriceHistoryDownloader._make_request")
+    @patch("duk.commands.ph.PriceHistoryDownloader.download_price_data")
     @patch("duk.commands.ph.datetime")
-    def test_ph_with_days(self, mock_datetime, mock_request):
-        """Test ph command with days parameter."""
+    def test_ph_with_days(self, mock_datetime, mock_download):
+        """Test ph command with num-records parameter."""
         from datetime import datetime
 
-        mock_request.return_value = self.sample_price_data
+        mock_download.return_value = self.sample_price_data
         # Mock datetime.now to return a predictable date
         mock_datetime.now.return_value = datetime(2023, 12, 1)
         mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
 
-        result = self.runner.invoke(main, ["ph", "AAPL", "--days", "2"])
+        result = self.runner.invoke(
+            main, ["ph", "AAPL", "--num-records", "2", "--no-cache"]
+        )
 
         assert result.exit_code == 0
         assert "AAPL" in result.output
@@ -488,10 +489,10 @@ class TestPriceHistoryCLI:
         assert result.exit_code == 0
         assert "AAPL" in result.output
 
-    @patch("duk.commands.ph.PriceHistoryDownloader._make_request")
-    def test_ph_file_output(self, mock_request):
+    @patch("duk.commands.ph.PriceHistoryDownloader.download_price_data")
+    def test_ph_file_output(self, mock_download):
         """Test ph command with file output."""
-        mock_request.return_value = self.sample_price_data
+        mock_download.return_value = self.sample_price_data
 
         with tempfile.TemporaryDirectory() as tmpdir:
             result = self.runner.invoke(
@@ -503,42 +504,38 @@ class TestPriceHistoryCLI:
                     "2023-11-01",
                     "--end-date",
                     "2023-12-01",
-                    "--output",
+                    "--csv",
                     "--directory",
                     tmpdir,
+                    "--no-cache",
                 ],
             )
 
             assert result.exit_code == 0
             assert "Data saved to" in result.output
 
-    @patch("duk.commands.ph.PriceHistoryDownloader._make_request")
-    def test_ph_multiple_tickers_file(self, mock_request):
-        """Test ph command with multiple tickers from file."""
-        mock_request.return_value = self.sample_price_data
+    @patch("duk.commands.ph.PriceHistoryDownloader.download_price_data")
+    def test_ph_multiple_tickers_file(self, mock_download):
+        """Test ph command with multiple tickers."""
+        mock_download.return_value = self.sample_price_data
 
-        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
-            f.write("AAPL\nMSFT\n")
-            f.flush()
+        result = self.runner.invoke(
+            main,
+            [
+                "ph",
+                "AAPL",
+                "MSFT",
+                "--start-date",
+                "2023-11-01",
+                "--end-date",
+                "2023-12-01",
+                "--no-cache",
+            ],
+        )
 
-            try:
-                result = self.runner.invoke(
-                    main,
-                    [
-                        "ph",
-                        f.name,
-                        "--start-date",
-                        "2023-11-01",
-                        "--end-date",
-                        "2023-12-01",
-                    ],
-                )
-
-                assert result.exit_code == 0
-                assert "AAPL" in result.output
-                assert "MSFT" in result.output
-            finally:
-                os.unlink(f.name)
+        assert result.exit_code == 0
+        assert "AAPL" in result.output
+        assert "MSFT" in result.output
 
     @patch("duk.commands.ph.PriceHistoryDownloader._make_request")
     def test_ph_with_adjustments(self, mock_request):

@@ -522,26 +522,20 @@ def save_data(df: pd.DataFrame, filename: str, output_format: str, directory: st
 
 
 @click.command()
-@click.argument("ticker")
+@click.argument("tickers", nargs=-1, required=True)
 @click.option(
     "--start-date", "-s", help="Start date for date range (YYYY-MM-DD format)"
 )
 @click.option("--end-date", "-e", help="End date for date range (YYYY-MM-DD format)")
 @click.option(
-    "--days",
+    "--num-records",
     "-n",
     type=int,
-    help="Number of observations to return (default: 5)",
+    help="Number of records to return (default: 5)",
 )
-@click.option("--output", "-o", is_flag=True, help="Output to file instead of stdout")
-@click.option("--filename", "-f", help="Specify filename (overrides default naming)")
-@click.option(
-    "--format",
-    "output_format",
-    type=click.Choice(["csv", "json"]),
-    default="csv",
-    help="Output format (default: csv)",
-)
+@click.option("--filename", "-o", help="Specify filename (overrides default naming)")
+@click.option("--csv", is_flag=True, help="Write output to CSV file")
+@click.option("--json", is_flag=True, help="Write output to JSON file")
 @click.option(
     "--directory", "-D", default="var", help="Output directory (default: var)"
 )
@@ -554,12 +548,15 @@ def save_data(df: pd.DataFrame, filename: str, output_format: str, directory: st
     help="Data frequency (default: daily)",
 )
 @click.option("--ohlc", is_flag=True, help="Include Open, High, Low, Close prices")
-@click.option("--hlc", is_flag=True, help="Include High, Low, Close prices")
-@click.option("--ohlcv", is_flag=True, help="Include Open, High, Low, Close, Volume")
-@click.option("--vol", is_flag=True, help="Include Volume")
-@click.option("--adj", is_flag=True, help="Include adjusted close prices")
-@click.option("--div", is_flag=True, help="Include dividend data")
-@click.option("--split", is_flag=True, help="Include stock split data")
+@click.option("--no-close", is_flag=True, help="Remove close data from output")
+@click.option("--vol", is_flag=True, help="Append volume data")
+@click.option("--adj", is_flag=True, help="Append adjusted close prices")
+@click.option("--div", is_flag=True, help="Append dividend payments")
+@click.option("--split", is_flag=True, help="Append split ratio")
+@click.option(
+    "--combine", is_flag=True, help="Combine data from multiple tickers into one output"
+)
+@click.option("--verbose", is_flag=True, help="Output logging to stdout")
 @click.option(
     "--no-cache",
     is_flag=True,
@@ -568,137 +565,193 @@ def save_data(df: pd.DataFrame, filename: str, output_format: str, directory: st
 @click.pass_context
 def ph_command(
     ctx,
-    ticker,
+    tickers,
     start_date,
     end_date,
-    days,
-    output,
+    num_records,
     filename,
-    output_format,
+    csv,
+    json,
     directory,
     frequency,
     ohlc,
-    hlc,
-    ohlcv,
+    no_close,
     vol,
     adj,
     div,
     split,
+    combine,
+    verbose,
     no_cache,
 ):
     """Download historical security price data.
 
-    TICKER can be either a single ticker symbol or a path to a file containing
-    ticker symbols.
+    TICKERS can be one or more ticker symbols separated by spaces.
 
-    By default, returns the 5 most recent OHLC data points for the
+    By default, returns the 5 most recent close prices for the
     specified ticker(s).
 
     Examples:
-      duk ph AAPL                           # Latest 5 days OHLC for AAPL
-      duk ph AAPL --days 30                 # Last 30 days OHLC for AAPL
+      duk ph AAPL                           # Latest 5 days close for AAPL
+      duk ph AAPL -n 30                     # Last 30 days close for AAPL
       duk ph AAPL --start-date 2023-01-01 --end-date 2023-12-31  # Year 2023 data
-      duk ph AAPL --ohlcv --adj             # OHLCV with adjusted prices
+      duk ph AAPL --ohlc --vol              # OHLC with volume
+      duk ph AAPL --ohlc --adj              # OHLC with adjusted close
       duk ph AAPL --div --split             # Only dividend and split data
       duk ph AAPL --frequency monthly       # Monthly aggregated data
-      duk ph tickers.txt --output           # Process multiple tickers from file
+      duk ph AAPL MSFT GOOGL                # Multiple tickers (separate outputs)
+      duk ph AAPL MSFT --combine            # Multiple tickers (combined output)
+      duk ph AAPL --csv                     # Write to CSV file
+      duk ph AAPL --json                    # Write to JSON file
     """
+    # Setup verbose logging if requested
+    if verbose:
+        # Add console handler if verbose is requested
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+        logger.setLevel(logging.DEBUG)
+
+    logger.info(f"Starting ph command for tickers: {tickers}")
+
     downloader = PriceHistoryDownloader(use_cache=not no_cache)
 
-    # Handle default value for days if not provided
-    days_was_explicitly_set = days is not None
-    if days is None:
-        days = 5
+    # Handle default value for num_records if not provided
+    num_records_was_explicitly_set = num_records is not None
+    if num_records is None:
+        num_records = 5
+
+    logger.debug(f"Number of records requested: {num_records}")
 
     # Validate date arguments
-    if start_date and end_date and days_was_explicitly_set:
+    if start_date and end_date and num_records_was_explicitly_set:
         click.echo(
-            "Error: Cannot specify --days with both --start-date and --end-date",
+            "Error: Cannot specify --num-records with both --start-date and --end-date",
             err=True,
         )
         sys.exit(1)
 
     # Handle date parameter calculations and validation
-    # Calculate actual start/end dates based on days parameter
-    if days and not start_date and not end_date:
+    # Calculate actual start/end dates based on num_records parameter
+    if num_records and not start_date and not end_date:
         # Get last N days from today
         end_date = datetime.now().strftime("%Y-%m-%d")
-        start_date_obj = datetime.now() - timedelta(days=days - 1)
+        start_date_obj = datetime.now() - timedelta(days=num_records - 1)
         start_date = start_date_obj.strftime("%Y-%m-%d")
-    elif days and start_date and not end_date:
+        logger.debug(f"Calculated date range: {start_date} to {end_date}")
+    elif num_records and start_date and not end_date:
         # Get N days from start date
         start_date_obj = parse_date(start_date)
-        end_date_obj = start_date_obj + timedelta(days=days - 1)
+        end_date_obj = start_date_obj + timedelta(days=num_records - 1)
         end_date = end_date_obj.strftime("%Y-%m-%d")
-    elif days and end_date and not start_date:
+        logger.debug(f"Calculated end date: {end_date}")
+    elif num_records and end_date and not start_date:
         # Get N days before end date
         end_date_obj = parse_date(end_date)
-        start_date_obj = end_date_obj - timedelta(days=days - 1)
+        start_date_obj = end_date_obj - timedelta(days=num_records - 1)
         start_date = start_date_obj.strftime("%Y-%m-%d")
+        logger.debug(f"Calculated start date: {start_date}")
 
-    # Get list of tickers
-    try:
-        tickers = get_tickers_from_input(ticker)
-    except ValueError as e:
-        click.echo(f"Error: {e}", err=True)
-        sys.exit(1)
+    # Get list of tickers (now directly from arguments)
+    ticker_list = list(tickers)
+    logger.info(f"Processing {len(ticker_list)} ticker(s): {ticker_list}")
 
     # Determine which fields to include
     fields = []
-    if ohlc or (not any([hlc, ohlcv, vol, adj, div, split])):
-        # Default to OHLC if no other options specified
-        fields = ["open", "high", "low", "close"]
-    elif hlc:
-        fields = ["high", "low", "close"]
-    elif ohlcv:
-        fields = ["open", "high", "low", "close", "volume"]
+
+    # Default is close only
+    if not any([ohlc, vol, adj, div, split]):
+        fields = ["close"]
+        logger.debug("Using default field: close")
+    else:
+        # Build fields list based on flags
+        if ohlc:
+            fields = ["open", "high", "low", "close"]
+            logger.debug("Adding OHLC fields")
+        elif not no_close:
+            # If no ohlc but other flags, start with close
+            fields = ["close"]
+            logger.debug("Adding close field")
+
+    # Remove close if --no-close is specified
+    if no_close and "close" in fields:
+        fields.remove("close")
+        logger.debug("Removed close field due to --no-close flag")
 
     # Add individual field options
     if vol and "volume" not in fields:
         fields.append("volume")
+        logger.debug("Added volume field")
     if adj and "adjusted_close" not in fields:
         fields.append("adjusted_close")
+        logger.debug("Added adjusted_close field")
     if div and "dividend" not in fields:
         fields.append("dividend")
+        logger.debug("Added dividend field")
     if split and "split" not in fields:
         fields.append("split")
+        logger.debug("Added split field")
 
-    # If only special fields (adj, div, split) are requested, use only those
-    if adj and not any([ohlc, hlc, ohlcv, vol]) and not div and not split:
-        fields = ["adjusted_close"]
-    elif div and not any([ohlc, hlc, ohlcv, vol, adj]) and not split:
-        fields = ["dividend"]
-    elif split and not any([ohlc, hlc, ohlcv, vol, adj, div]):
-        fields = ["split"]
+    logger.info(f"Final fields to include: {fields}")
+
+    # Determine output format
+    output_to_file = csv or json
+    if csv and json:
+        click.echo("Error: Cannot specify both --csv and --json", err=True)
+        sys.exit(1)
+
+    output_format = None
+    if csv:
+        output_format = "csv"
+        logger.debug("Output format: CSV")
+    elif json:
+        output_format = "json"
+        logger.debug("Output format: JSON")
+    else:
+        output_format = "csv"  # Default for stdout
+        logger.debug("Output format: stdout (CSV)")
 
     # Process each ticker
     all_data = []
 
-    for symbol in tickers:
+    for symbol in ticker_list:
+        logger.info(f"Processing ticker: {symbol}")
+
         # Download price data
-        price_data = downloader.download_price_data(symbol, start_date, end_date, days)
+        price_data = downloader.download_price_data(
+            symbol, start_date, end_date, num_records
+        )
         if price_data is None:
+            logger.error(f"Failed to download price data for {symbol}")
             click.echo(f"Error: Failed to download price data for {symbol}", err=True)
             continue
 
         if not price_data:
+            logger.warning(f"No price data found for {symbol}")
             click.echo(f"Warning: No price data found for {symbol}", err=True)
             continue
 
-        # If --days was explicitly specified, ensure we return exactly that many days
-        if days_was_explicitly_set and price_data:
+        # If --num-records was explicitly specified, ensure we return exactly
+        # that many records
+        if num_records_was_explicitly_set and price_data:
             # Sort by date descending (most recent first) for proper limiting
             price_data_sorted = sorted(
                 price_data, key=lambda x: x.get("date", ""), reverse=True
             )
-            if len(price_data_sorted) > days:
-                price_data = price_data_sorted[:days]
+            if len(price_data_sorted) > num_records:
+                price_data = price_data_sorted[:num_records]
+                logger.debug(f"Limited to {num_records} records for {symbol}")
             else:
                 price_data = price_data_sorted
 
         # Download dividend data if needed
         dividends_data = None
         if div or adj:
+            logger.debug(f"Downloading dividend data for {symbol}")
             dividends_data = downloader.download_dividends_data(
                 symbol, start_date, end_date
             )
@@ -706,6 +759,7 @@ def ph_command(
         # Download split data if needed
         splits_data = None
         if split or adj:
+            logger.debug(f"Downloading split data for {symbol}")
             splits_data = downloader.download_splits_data(symbol, start_date, end_date)
 
         # Process the data
@@ -720,46 +774,93 @@ def ph_command(
         )
 
         if not df.empty:
+            logger.info(f"Processed {len(df)} records for {symbol}")
             all_data.append(df)
 
     if not all_data:
+        logger.error("No data found for any of the requested symbols")
         click.echo("Error: No data found for any of the requested symbols", err=True)
         sys.exit(1)
 
-    # Combine all data
-    combined_df = pd.concat(all_data, ignore_index=True)
+    # Handle output based on combine flag
+    if combine or len(ticker_list) == 1:
+        # Combine all data into one output
+        combined_df = pd.concat(all_data, ignore_index=True)
+        combined_df = combined_df.sort_values(["symbol", "date"])
+        logger.info(f"Combined data: {len(combined_df)} total records")
 
-    # Sort by symbol and date
-    combined_df = combined_df.sort_values(["symbol", "date"])
+        # Output data
+        if output_to_file:
+            # Determine filename
+            if not filename:
+                if len(ticker_list) == 1:
+                    symbol_part = ticker_list[0]
+                else:
+                    symbol_part = f"{len(ticker_list)}_symbols"
 
-    # Output data
-    if output or filename:
-        # Determine filename
-        if not filename:
-            if len(tickers) == 1:
-                symbol_part = tickers[0]
-            else:
-                symbol_part = f"{len(tickers)}_symbols"
+                date_part = datetime.now().strftime("%Y%m%d")
+                filename = f"price_history_{symbol_part}_{date_part}.{output_format}"
+            elif not filename.endswith(f".{output_format}"):
+                filename = f"{filename}.{output_format}"
 
-            date_part = datetime.now().strftime("%Y%m%d")
-            filename = f"price_history_{symbol_part}_{date_part}.{output_format}"
-        elif not filename.endswith(f".{output_format}"):
-            filename = f"{filename}.{output_format}"
-
-        save_data(combined_df, filename, output_format, directory)
-        click.echo(f"Data saved to {Path(directory) / filename}")
-    else:
-        # Output to stdout
-        if output_format == "json":
-            # Convert to JSON
-            data_dict = combined_df.to_dict(orient="records")
-            for record in data_dict:
-                for key, value in record.items():
-                    if pd.isna(value):
-                        record[key] = None
-                    elif isinstance(value, pd.Timestamp):
-                        record[key] = value.strftime("%Y-%m-%d")
-            click.echo(json.dumps(data_dict, indent=2, default=str))
+            save_data(combined_df, filename, output_format, directory)
+            logger.info(f"Data saved to {Path(directory) / filename}")
+            click.echo(f"Data saved to {Path(directory) / filename}")
         else:
-            # Output CSV to stdout
-            click.echo(combined_df.to_csv(index=False))
+            # Output to stdout
+            if output_format == "json":
+                # Convert to JSON
+                data_dict = combined_df.to_dict(orient="records")
+                for record in data_dict:
+                    for key, value in record.items():
+                        if pd.isna(value):
+                            record[key] = None
+                        elif isinstance(value, pd.Timestamp):
+                            record[key] = value.strftime("%Y-%m-%d")
+                click.echo(json.dumps(data_dict, indent=2, default=str))
+            else:
+                # Output CSV to stdout
+                click.echo(combined_df.to_csv(index=False))
+    else:
+        # Output each ticker separately
+        for i, df in enumerate(all_data):
+            symbol = ticker_list[i]
+            logger.info(f"Outputting data for {symbol}: {len(df)} records")
+
+            if output_to_file:
+                # Determine filename for this ticker
+                if not filename:
+                    date_part = datetime.now().strftime("%Y%m%d")
+                    ticker_filename = (
+                        f"price_history_{symbol}_{date_part}.{output_format}"
+                    )
+                else:
+                    # Use provided filename with ticker appended
+                    base_name = (
+                        filename.rsplit(".", 1)[0] if "." in filename else filename
+                    )
+                    ticker_filename = f"{base_name}_{symbol}.{output_format}"
+
+                save_data(df, ticker_filename, output_format, directory)
+                logger.info(f"Data saved to {Path(directory) / ticker_filename}")
+                click.echo(f"Data saved to {Path(directory) / ticker_filename}")
+            else:
+                # Output to stdout with separator for multiple tickers
+                if i > 0:
+                    click.echo("\n")  # Separator between tickers
+
+                if output_format == "json":
+                    # Convert to JSON
+                    data_dict = df.to_dict(orient="records")
+                    for record in data_dict:
+                        for key, value in record.items():
+                            if pd.isna(value):
+                                record[key] = None
+                            elif isinstance(value, pd.Timestamp):
+                                record[key] = value.strftime("%Y-%m-%d")
+                    click.echo(json.dumps(data_dict, indent=2, default=str))
+                else:
+                    # Output CSV to stdout
+                    click.echo(df.to_csv(index=False))
+
+    logger.info("ph command completed successfully")

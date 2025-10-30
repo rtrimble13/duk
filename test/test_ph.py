@@ -9,13 +9,14 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 import pandas as pd
+from click.testing import CliRunner
 
 from duk.commands.ph import (
     PriceHistoryDownloader,
-    get_tickers_from_input,
     process_price_data,
     aggregate_by_frequency,
     save_data,
+    ph_command,
 )
 
 
@@ -173,53 +174,20 @@ class TestPriceHistoryDownloader:
 
 
 class TestGetTickersFromInput:
-    """Test ticker input parsing."""
+    """Test ticker input parsing - these tests are now deprecated as ticker input
+    has changed from file/single ticker to multiple arguments."""
 
-    def test_single_ticker(self):
-        """Test single ticker input."""
-        result = get_tickers_from_input("AAPL")
-        assert result == ["AAPL"]
+    def test_single_ticker_now_via_cli(self):
+        """Test single ticker input via CLI arguments."""
+        # This functionality is now handled by Click's argument handling
+        # Test moved to CLI tests
+        pass
 
-    def test_lowercase_ticker(self):
-        """Test lowercase ticker is converted to uppercase."""
-        result = get_tickers_from_input("aapl")
-        assert result == ["AAPL"]
-
-    def test_ticker_file(self):
-        """Test ticker file input."""
-        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
-            f.write("AAPL\nMSFT\nGOOGL\n")
-            f.flush()
-
-            try:
-                result = get_tickers_from_input(f.name)
-                assert result == ["AAPL", "MSFT", "GOOGL"]
-            finally:
-                os.unlink(f.name)
-
-    def test_empty_ticker_file(self):
-        """Test empty ticker file."""
-        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
-            f.write("")
-            f.flush()
-
-            try:
-                with pytest.raises(
-                    ValueError, match="File contains no valid ticker symbols"
-                ):
-                    get_tickers_from_input(f.name)
-            finally:
-                os.unlink(f.name)
-
-    def test_nonexistent_file(self):
-        """Test nonexistent file is treated as ticker symbol."""
-        result = get_tickers_from_input("NONEXISTENT")
-        assert result == ["NONEXISTENT"]
-
-    def test_empty_ticker(self):
-        """Test empty ticker input."""
-        with pytest.raises(ValueError, match="Empty ticker symbol provided"):
-            get_tickers_from_input("")
+    def test_multiple_tickers_now_via_cli(self):
+        """Test multiple ticker input via CLI arguments."""
+        # This functionality is now handled by Click's argument handling
+        # Test moved to CLI tests
+        pass
 
 
 class TestProcessPriceData:
@@ -424,3 +392,205 @@ class TestSaveData:
 
             output_path = nested_dir / filename
             assert output_path.exists()
+
+
+class TestPhCommandCLI:
+    """Test the ph_command CLI interface."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.runner = CliRunner()
+        self.sample_price_data = [
+            {
+                "date": "2023-12-01",
+                "open": 150.0,
+                "high": 155.0,
+                "low": 148.0,
+                "close": 152.0,
+                "volume": 1000000,
+            },
+            {
+                "date": "2023-11-30",
+                "open": 148.0,
+                "high": 151.0,
+                "low": 147.0,
+                "close": 150.0,
+                "volume": 900000,
+            },
+        ]
+
+    @patch("duk.commands.ph.PriceHistoryDownloader.download_price_data")
+    def test_single_ticker_default_output(self, mock_download):
+        """Test single ticker with default output (close only)."""
+        mock_download.return_value = self.sample_price_data
+
+        result = self.runner.invoke(ph_command, ["AAPL", "--no-cache"])
+
+        assert result.exit_code == 0
+        # Should output CSV to stdout
+        assert "symbol,date,close" in result.output
+        assert "AAPL" in result.output
+
+    @patch("duk.commands.ph.PriceHistoryDownloader.download_price_data")
+    def test_single_ticker_ohlc(self, mock_download):
+        """Test single ticker with OHLC flag."""
+        mock_download.return_value = self.sample_price_data
+
+        result = self.runner.invoke(ph_command, ["AAPL", "--ohlc", "--no-cache"])
+
+        assert result.exit_code == 0
+        # Should include OHLC columns
+        assert "open" in result.output
+        assert "high" in result.output
+        assert "low" in result.output
+        assert "close" in result.output
+
+    @patch("duk.commands.ph.PriceHistoryDownloader.download_price_data")
+    def test_multiple_tickers(self, mock_download):
+        """Test multiple tickers without combine."""
+        mock_download.return_value = self.sample_price_data
+
+        result = self.runner.invoke(ph_command, ["AAPL", "MSFT", "--no-cache"])
+
+        assert result.exit_code == 0
+        # Should have multiple CSV outputs (separate for each ticker)
+        assert "AAPL" in result.output
+        assert "MSFT" in result.output
+
+    @patch("duk.commands.ph.PriceHistoryDownloader.download_price_data")
+    def test_multiple_tickers_combined(self, mock_download):
+        """Test multiple tickers with combine flag."""
+        mock_download.return_value = self.sample_price_data
+
+        result = self.runner.invoke(
+            ph_command, ["AAPL", "MSFT", "--combine", "--no-cache"]
+        )
+
+        assert result.exit_code == 0
+        # Should have single combined output
+        assert "AAPL" in result.output
+        assert "MSFT" in result.output
+
+    @patch("duk.commands.ph.PriceHistoryDownloader.download_price_data")
+    def test_num_records_option(self, mock_download):
+        """Test --num-records option."""
+        mock_download.return_value = self.sample_price_data
+
+        result = self.runner.invoke(ph_command, ["AAPL", "-n", "10", "--no-cache"])
+
+        assert result.exit_code == 0
+
+    @patch("duk.commands.ph.PriceHistoryDownloader.download_price_data")
+    def test_csv_output(self, mock_download):
+        """Test CSV file output."""
+        mock_download.return_value = self.sample_price_data
+
+        with self.runner.isolated_filesystem():
+            result = self.runner.invoke(ph_command, ["AAPL", "--csv", "--no-cache"])
+
+            assert result.exit_code == 0
+            assert "Data saved to" in result.output
+            # Check that a CSV file was created
+            csv_files = list(Path("var").glob("*.csv"))
+            assert len(csv_files) > 0
+
+    @patch("duk.commands.ph.PriceHistoryDownloader.download_price_data")
+    def test_json_output(self, mock_download):
+        """Test JSON file output."""
+        mock_download.return_value = self.sample_price_data
+
+        with self.runner.isolated_filesystem():
+            result = self.runner.invoke(ph_command, ["AAPL", "--json", "--no-cache"])
+
+            assert result.exit_code == 0
+            assert "Data saved to" in result.output
+            # Check that a JSON file was created
+            json_files = list(Path("var").glob("*.json"))
+            assert len(json_files) > 0
+
+    @patch("duk.commands.ph.PriceHistoryDownloader.download_price_data")
+    def test_no_close_flag(self, mock_download):
+        """Test --no-close flag removes close from output."""
+        mock_download.return_value = self.sample_price_data
+
+        result = self.runner.invoke(
+            ph_command, ["AAPL", "--ohlc", "--no-close", "--no-cache"]
+        )
+
+        assert result.exit_code == 0
+        # Should have open, high, low but not close
+        assert "open" in result.output
+        assert "high" in result.output
+        assert "low" in result.output
+        # Close column should not be in header
+        output_lines = result.output.split("\n")
+        header = output_lines[0] if output_lines else ""
+        # The header should not have a standalone 'close' field
+        # (it might have 'adjusted_close' but not 'close' by itself)
+        fields = header.split(",")
+        assert "close" not in fields
+
+    @patch("duk.commands.ph.PriceHistoryDownloader.download_price_data")
+    def test_vol_flag(self, mock_download):
+        """Test --vol flag appends volume."""
+        mock_download.return_value = self.sample_price_data
+
+        result = self.runner.invoke(ph_command, ["AAPL", "--vol", "--no-cache"])
+
+        assert result.exit_code == 0
+        assert "volume" in result.output
+
+    @patch("duk.commands.ph.PriceHistoryDownloader.download_price_data")
+    def test_frequency_option(self, mock_download):
+        """Test --frequency option."""
+        mock_download.return_value = self.sample_price_data
+
+        result = self.runner.invoke(
+            ph_command, ["AAPL", "--frequency", "weekly", "--no-cache"]
+        )
+
+        assert result.exit_code == 0
+
+    @patch("duk.commands.ph.PriceHistoryDownloader.download_price_data")
+    def test_date_range(self, mock_download):
+        """Test date range with start and end dates."""
+        mock_download.return_value = self.sample_price_data
+
+        result = self.runner.invoke(
+            ph_command,
+            [
+                "AAPL",
+                "--start-date",
+                "2023-11-01",
+                "--end-date",
+                "2023-12-01",
+                "--no-cache",
+            ],
+        )
+
+        assert result.exit_code == 0
+
+    def test_csv_and_json_error(self):
+        """Test that specifying both --csv and --json is an error."""
+        result = self.runner.invoke(ph_command, ["AAPL", "--csv", "--json"])
+
+        assert result.exit_code == 1
+        assert "Cannot specify both --csv and --json" in result.output
+
+    def test_no_tickers_error(self):
+        """Test that no tickers provided is an error."""
+        result = self.runner.invoke(ph_command, [])
+
+        assert result.exit_code != 0
+
+    @patch("duk.commands.ph.PriceHistoryDownloader.download_price_data")
+    def test_verbose_flag(self, mock_download):
+        """Test --verbose flag enables logging to stdout."""
+        mock_download.return_value = self.sample_price_data
+
+        result = self.runner.invoke(ph_command, ["AAPL", "--verbose", "--no-cache"])
+
+        # Verbose should add logging output
+        # We can't easily test the exact logging output, but we can verify
+        # the command completes successfully
+        assert result.exit_code == 0

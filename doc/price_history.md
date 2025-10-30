@@ -4,28 +4,29 @@ The `duk ph` subprogram downloads historical security price data using the Finan
 
 Note: An FMP API key is required. You can provide the key in one of two ways:
 1. Set the `FMP_API_KEY` environment variable (recommended for CI/automated environments)
-2. Place your key in `etc/.fmp_api.key` file
+2. Place your key in `~/.dukrc` configuration file
 
 ## Overview
 
-The price history downloader retrieves historical OHLCV (Open, High, Low, Close, Volume) data for securities, with support for:
+The price history downloader retrieves historical price data for securities, with support for:
 
-- Single ticker symbols or multiple tickers from a file
-- Various date range options and observation counts
-- Multiple output field combinations
+- Multiple ticker symbols as arguments
+- Various date range options and record counts
+- Flexible output field combinations (default: close only)
 - Dividend and stock split data integration
 - Adjusted price calculations
 - Frequency aggregation (daily, weekly, monthly, quarterly, semiannual, annual)
 - CSV and JSON output formats
+- Combined or separate output for multiple tickers
 
 ## Basic Usage
 
 ```bash
-# Get latest 5 days of OHLC data for AAPL
+# Get latest 5 days of close prices for AAPL
 duk ph AAPL
 
-# Get last 30 days of data
-duk ph AAPL --days 30
+# Get last 30 records
+duk ph AAPL -n 30
 
 # Get specific date range
 duk ph AAPL --start-date 2023-01-01 --end-date 2023-12-31
@@ -38,17 +39,17 @@ duk ph AAPL --start-date 2023-01-01 --end-date 2023-12-31
 # Download data for Apple Inc.
 duk ph AAPL
 
-# Ticker symbols are case-insensitive
+# Ticker symbols are case-insensitive (converted to uppercase internally)
 duk ph aapl
 ```
 
-### Multiple Tickers from File
+### Multiple Tickers
 ```bash
-# Create a file with ticker symbols (one per line)
-echo -e "AAPL\nMSFT\nGOOGL" > tickers.txt
+# Download data for multiple tickers (separate outputs)
+duk ph AAPL MSFT GOOGL
 
-# Download data for all tickers in the file
-duk ph tickers.txt
+# Download data for multiple tickers (combined into one output)
+duk ph AAPL MSFT GOOGL --combine
 ```
 
 ## Date Options
@@ -62,38 +63,51 @@ duk ph AAPL --start-date 2023-01-01 --end-date 2023-12-31
 duk ph AAPL -s 2023-01-01 -e 2023-12-31
 ```
 
-### Number of Observations
+### Number of Records
 ```bash
-# Download last 10 days of data
-duk ph AAPL --days 10
+# Download last 10 records
+duk ph AAPL --num-records 10
 duk ph AAPL -n 10
 
-# Download 30 days starting from a specific date
-duk ph AAPL --start-date 2023-01-01 --days 30
+# Download 30 records starting from a specific date
+duk ph AAPL --start-date 2023-01-01 -n 30
 
-# Download 30 days ending at a specific date
-duk ph AAPL --end-date 2023-12-31 --days 30
+# Download 30 records ending at a specific date
+duk ph AAPL --end-date 2023-12-31 -n 30
 ```
+
+**Note**: Using both `--start-date` and `--end-date` invalidates the `--num-records` parameter.
 
 ## Output Field Combinations
 
-### Default Output (OHLC)
+### Default Output (Close Only)
+```bash
+# Returns close prices only (default behavior)
+duk ph AAPL
+```
+
+### OHLC Output
 ```bash
 # Returns Open, High, Low, Close prices
-duk ph AAPL
 duk ph AAPL --ohlc
 ```
 
-### Alternative Field Combinations
+### Volume Data
 ```bash
-# High, Low, Close only
-duk ph AAPL --hlc
+# Add volume to close (default)
+duk ph AAPL --vol
 
-# Open, High, Low, Close, Volume
-duk ph AAPL --ohlcv
-
-# Add volume to any combination
+# Add volume to OHLC
 duk ph AAPL --ohlc --vol
+```
+
+### Remove Close from Output
+```bash
+# Get Open, High, Low (without close)
+duk ph AAPL --ohlc --no-close
+
+# Get adjusted close only (without regular close)
+duk ph AAPL --adj --no-close
 ```
 
 ### Special Data Fields
@@ -103,8 +117,8 @@ duk ph AAPL --ohlc --vol
 # Include adjusted close prices (factors in dividends and splits)
 duk ph AAPL --adj
 
-# Adjusted prices only
-duk ph AAPL --adj  # (without other field flags)
+# Adjusted prices only (no regular close)
+duk ph AAPL --adj --no-close
 
 # OHLC with adjusted close
 duk ph AAPL --ohlc --adj
@@ -115,8 +129,11 @@ duk ph AAPL --ohlc --adj
 # Include dividend payments
 duk ph AAPL --div
 
-# Dividends only
-duk ph AAPL --div  # (without other field flags)
+# Close and dividends
+duk ph AAPL --div
+
+# Dividends only (no close)
+duk ph AAPL --div --no-close
 
 # OHLC with dividends
 duk ph AAPL --ohlc --div
@@ -127,8 +144,11 @@ duk ph AAPL --ohlc --div
 # Include stock split ratios
 duk ph AAPL --split
 
-# Splits only
-duk ph AAPL --split  # (without other field flags)
+# Close and splits
+duk ph AAPL --split
+
+# Splits only (no close)
+duk ph AAPL --split --no-close
 
 # OHLC with splits
 duk ph AAPL --ohlc --split
@@ -138,6 +158,9 @@ duk ph AAPL --ohlc --split
 ```bash
 # Include adjusted prices with dividend and split data
 duk ph AAPL --adj --div --split
+
+# Only special fields, no price data
+duk ph AAPL --adj --div --split --no-close
 ```
 
 ## Frequency Aggregation
@@ -155,7 +178,7 @@ duk ph AAPL --adj --div --split
 duk ph AAPL --frequency weekly
 
 # Monthly data for the last year
-duk ph AAPL --days 365 --frequency monthly
+duk ph AAPL -n 365 --frequency monthly
 
 # Quarterly data with adjustments
 duk ph AAPL --frequency quarterly --adj
@@ -175,29 +198,45 @@ duk ph AAPL --frequency quarterly --adj
 
 ### Output to Console (Default)
 ```bash
-# CSV output to stdout
+# CSV output to stdout (default)
 duk ph AAPL
 
-# JSON output to stdout
-duk ph AAPL --format json
+# Output is always in CSV format to stdout
 ```
 
 ### Output to File
 ```bash
-# Save to file with default naming (price_history_AAPL_YYYYMMDD.csv)
-duk ph AAPL --output
-duk ph AAPL -o
+# Save to CSV file with default naming (price_history_AAPL_YYYYMMDD.csv)
+duk ph AAPL --csv
+
+# Save to JSON file with default naming
+duk ph AAPL --json
 
 # Save with custom filename
-duk ph AAPL --filename my_apple_data
-duk ph AAPL -f my_apple_data
+duk ph AAPL --csv --filename my_apple_data
+duk ph AAPL --csv -o my_apple_data
 
 # Specify output directory
-duk ph AAPL --output --directory ./data
-duk ph AAPL -o -D ./data
+duk ph AAPL --csv --directory ./data
+duk ph AAPL --csv -D ./data
 
 # JSON format to file
-duk ph AAPL --output --format json
+duk ph AAPL --json
+```
+
+**Note**: You cannot specify both `--csv` and `--json` at the same time.
+
+### Multiple Ticker Output
+```bash
+# Separate files for each ticker
+duk ph AAPL MSFT GOOGL --csv
+
+# Single combined file
+duk ph AAPL MSFT GOOGL --csv --combine
+
+# Custom filename with multiple tickers (ticker names will be appended)
+duk ph AAPL MSFT --csv -o tech_stocks
+# Creates: tech_stocks_AAPL.csv and tech_stocks_MSFT.csv
 ```
 
 ### Output Formats
@@ -217,9 +256,9 @@ duk ph AAPL --output --format json
 
 ### CSV Output Format
 ```csv
-symbol,date,open,high,low,close
-AAPL,2023-12-01,150.0,155.0,148.0,152.0
-AAPL,2023-11-30,148.0,151.0,147.0,150.0
+symbol,date,close
+AAPL,2023-11-30,150.0
+AAPL,2023-12-01,152.0
 ```
 
 ### JSON Output Format
@@ -227,19 +266,13 @@ AAPL,2023-11-30,148.0,151.0,147.0,150.0
 [
   {
     "symbol": "AAPL",
-    "date": "2023-12-01",
-    "open": 150.0,
-    "high": 155.0,
-    "low": 148.0,
-    "close": 152.0
+    "date": "2023-11-30",
+    "close": 150.0
   },
   {
     "symbol": "AAPL",
-    "date": "2023-11-30",
-    "open": 148.0,
-    "high": 151.0,
-    "low": 147.0,
-    "close": 150.0
+    "date": "2023-12-01",
+    "close": 152.0
   }
 ]
 ```
@@ -259,11 +292,14 @@ AAPL,2023-11-30,148.0,151.0,147.0,150.0
 
 ### Basic Usage Examples
 ```bash
-# Latest 5 days OHLC for Apple
+# Latest 5 days close for Apple
 duk ph AAPL
 
-# Last 30 days with volume
-duk ph AAPL --days 30 --ohlcv
+# Last 30 records with volume
+duk ph AAPL -n 30 --vol
+
+# Last 30 records with OHLC
+duk ph AAPL -n 30 --ohlc
 
 # Year 2023 data
 duk ph AAPL --start-date 2023-01-01 --end-date 2023-12-31
@@ -271,40 +307,76 @@ duk ph AAPL --start-date 2023-01-01 --end-date 2023-12-31
 
 ### File Output Examples
 ```bash
-# Save last 30 days to default file
-duk ph AAPL --days 30 --output
+# Save last 30 days to CSV file
+duk ph AAPL -n 30 --csv
 
 # Save custom data to JSON file
-duk ph AAPL --days 90 --ohlcv --adj --filename apple_q4 --format json --output
+duk ph AAPL -n 90 --ohlc --vol --adj --json -o apple_q4
 
 # Save to specific directory
-duk ph AAPL --output --directory ./market_data
+duk ph AAPL --csv --directory ./market_data
+```
+
+### Multiple Ticker Examples
+```bash
+# Multiple tickers, separate outputs to stdout
+duk ph AAPL MSFT GOOGL
+
+# Multiple tickers, combined output
+duk ph AAPL MSFT GOOGL --combine
+
+# Multiple tickers to separate CSV files
+duk ph AAPL MSFT GOOGL --csv
+
+# Multiple tickers to single combined CSV file
+duk ph AAPL MSFT GOOGL --csv --combine
 ```
 
 ### Advanced Examples
 ```bash
 # Multiple tickers with adjustments
-duk ph tickers.txt --adj --div --split --output
+duk ph AAPL MSFT GOOGL --adj --div --split --csv
 
 # Weekly aggregated data for analysis
-duk ph AAPL --days 365 --frequency weekly --ohlcv --output
+duk ph AAPL -n 365 --frequency weekly --ohlc --vol --csv
 
 # Monthly data with all adjustments in JSON format
-duk ph AAPL --start-date 2020-01-01 --frequency monthly --adj --div --split --format json --output
+duk ph AAPL --start-date 2020-01-01 --frequency monthly --adj --div --split --json
 ```
 
 ### Analysis Integration Examples
 ```bash
-# Data for technical analysis
-duk ph AAPL --days 200 --ohlcv --format json > aapl_data.json
+# Data for technical analysis (to stdout, redirect to file)
+duk ph AAPL -n 200 --ohlc --vol > aapl_data.csv
 
 # Dividend analysis
-duk ph "KO" --start-date 2020-01-01 --div --format json > coca_cola_dividends.json
+duk ph KO --start-date 2020-01-01 --div --json -o coca_cola_dividends
 
 # Multi-stock comparison
-echo -e "AAPL\nMSFT\nGOOGL\nAMZN" > tech_stocks.txt
-duk ph tech_stocks.txt --days 365 --frequency monthly --format json --output
+duk ph AAPL MSFT GOOGL AMZN -n 365 --frequency monthly --json --combine -o tech_stocks
 ```
+
+## Logging and Verbose Mode
+
+Use the `--verbose` flag to enable detailed logging output to stdout:
+
+```bash
+# Run with verbose logging
+duk ph AAPL --verbose
+
+# View detailed processing information
+duk ph AAPL MSFT GOOGL --verbose --combine --csv
+```
+
+Verbose mode displays:
+- Processing steps for each ticker
+- Number of records downloaded
+- Field selection logic
+- Data processing details
+- File save locations
+- Error details for troubleshooting
+
+Regular logging is always written to `var/duk.log`.
 
 ## Error Handling
 
@@ -313,18 +385,18 @@ The command provides clear error messages for common issues:
 - **Invalid ticker symbols**: "No price data found for symbol XYZ"
 - **Network connectivity issues**: "Failed to download price data"
 - **Invalid date formats**: Use YYYY-MM-DD format
-- **Empty ticker files**: "File contains no valid ticker symbols"
-- **Invalid date combinations**: Cannot specify conflicting date parameters
+- **No tickers provided**: "Missing argument 'TICKERS...'"
+- **Conflicting options**: "Cannot specify both --csv and --json"
+- **Invalid date combinations**: "Cannot specify --num-records with both --start-date and --end-date"
 
-## Logging
+## Caching
 
-When run with the `-v` flag, detailed logging information is written to `var/duk.log` and displayed on stderr, including:
+By default, the ph command caches API responses to improve performance and reduce API calls. To disable caching and always fetch fresh data:
 
-- API request details for each ticker
-- Number of records downloaded
-- Data processing steps
-- File save locations
-- Error details for troubleshooting
+```bash
+# Bypass cache and fetch fresh data
+duk ph AAPL --no-cache
+```
 
 ## Data Source
 
@@ -366,6 +438,38 @@ df['ma_50'] = df['close'].rolling(50).mean()
 df['adjustment_factor'] = df['adjusted_close'] / df['close']
 ```
 
+## Migration from Old Interface
+
+If you were using the old `ph` command interface, here are the key changes:
+
+### Changed Options
+- `--days` → `--num-records` (or `-n`)
+- `-f --filename` → `-o --filename`
+- `--output` flag → `--csv` or `--json` flags
+- `--format` option → use `--csv` or `--json` instead
+- File-based ticker input → multiple ticker arguments
+
+### Changed Defaults
+- Default output is now **close only** (was OHLC)
+- Use `--ohlc` flag to get OHLC data
+- `--hlc` and `--ohlcv` flags removed (use `--ohlc --vol` instead)
+
+### New Features
+- Multiple tickers as arguments: `duk ph AAPL MSFT GOOGL`
+- `--combine` flag for consolidated multi-ticker output
+- `--no-close` flag to remove close from output
+- `--verbose` flag for detailed logging to stdout
+
+### Migration Examples
+```bash
+# Old command → New command
+duk ph AAPL --days 30 → duk ph AAPL -n 30
+duk ph AAPL --output → duk ph AAPL --csv
+duk ph AAPL --format json --output → duk ph AAPL --json
+duk ph AAPL --ohlcv → duk ph AAPL --ohlc --vol
+duk ph tickers.txt → duk ph AAPL MSFT GOOGL (manual expansion)
+```
+
 ## Notes
 
 - Historical data availability depends on the security and FMP's data coverage
@@ -373,3 +477,4 @@ df['adjustment_factor'] = df['adjusted_close'] / df['close']
 - Frequency aggregation uses pandas resampling with appropriate aggregation rules
 - Multiple ticker processing continues even if some tickers fail to download
 - API rate limits may apply depending on your FMP subscription tier
+- All logging is written to `var/duk.log`, with optional verbose output to stdout
