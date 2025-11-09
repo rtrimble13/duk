@@ -618,45 +618,7 @@ def ph_command(
 
     logger.info(f"Starting ph command for tickers: {tickers}")
 
-    downloader = PriceHistoryDownloader(use_cache=not no_cache)
-
-    # Handle default value for num_records if not provided
-    num_records_was_explicitly_set = num_records is not None
-    if num_records is None:
-        num_records = 5
-
-    logger.debug(f"Number of records requested: {num_records}")
-
-    # Validate date arguments
-    if start_date and end_date and num_records_was_explicitly_set:
-        click.echo(
-            "Error: Cannot specify --num-records with both --start-date and --end-date",
-            err=True,
-        )
-        sys.exit(1)
-
-    # Handle date parameter calculations and validation
-    # Calculate actual start/end dates based on num_records parameter
-    if num_records and not start_date and not end_date:
-        # Get last N days from today
-        end_date = datetime.now().strftime("%Y-%m-%d")
-        start_date_obj = datetime.now() - timedelta(days=num_records - 1)
-        start_date = start_date_obj.strftime("%Y-%m-%d")
-        logger.debug(f"Calculated date range: {start_date} to {end_date}")
-    elif num_records and start_date and not end_date:
-        # Get N days from start date
-        start_date_obj = parse_date(start_date)
-        end_date_obj = start_date_obj + timedelta(days=num_records - 1)
-        end_date = end_date_obj.strftime("%Y-%m-%d")
-        logger.debug(f"Calculated end date: {end_date}")
-    elif num_records and end_date and not start_date:
-        # Get N days before end date
-        end_date_obj = parse_date(end_date)
-        start_date_obj = end_date_obj - timedelta(days=num_records - 1)
-        start_date = start_date_obj.strftime("%Y-%m-%d")
-        logger.debug(f"Calculated start date: {start_date}")
-
-    # Get list of tickers (now directly from arguments)
+    # Get list of tickers
     ticker_list = list(tickers)
     logger.info(f"Processing {len(ticker_list)} ticker(s): {ticker_list}")
 
@@ -715,78 +677,57 @@ def ph_command(
         output_format = "csv"  # Default for stdout
         logger.debug("Output format: stdout (CSV)")
 
-    # Process each ticker
-    all_data = []
+    # Use the API function to get the data
+    try:
+        # Import here to avoid circular dependency
+        from duk.api import ph as ph_api
 
-    for symbol in ticker_list:
-        logger.info(f"Processing ticker: {symbol}")
-
-        # Download price data
-        price_data = downloader.download_price_data(
-            symbol, start_date, end_date, num_records
-        )
-        if price_data is None:
-            logger.error(f"Failed to download price data for {symbol}")
-            click.echo(f"Error: Failed to download price data for {symbol}", err=True)
-            continue
-
-        if not price_data:
-            logger.warning(f"No price data found for {symbol}")
-            click.echo(f"Warning: No price data found for {symbol}", err=True)
-            continue
-
-        # If --num-records was explicitly specified, ensure we return exactly
-        # that many records
-        if num_records_was_explicitly_set and price_data:
-            # Sort by date descending (most recent first) for proper limiting
-            price_data_sorted = sorted(
-                price_data, key=lambda x: x.get("date", ""), reverse=True
-            )
-            if len(price_data_sorted) > num_records:
-                price_data = price_data_sorted[:num_records]
-                logger.debug(f"Limited to {num_records} records for {symbol}")
-            else:
-                price_data = price_data_sorted
-
-        # Download dividend data if needed
-        dividends_data = None
-        if div or adj:
-            logger.debug(f"Downloading dividend data for {symbol}")
-            dividends_data = downloader.download_dividends_data(
-                symbol, start_date, end_date
+        # Call the API function with appropriate parameters
+        if combine or len(ticker_list) == 1:
+            # Get combined data
+            combined_df = ph_api(
+                tickers=ticker_list,
+                start_date=start_date,
+                end_date=end_date,
+                num_records=num_records,
+                fields=fields if fields else None,
+                frequency=frequency,
+                include_dividends=div,
+                include_splits=split,
+                calculate_adjusted=adj,
+                use_cache=not no_cache,
             )
 
-        # Download split data if needed
-        splits_data = None
-        if split or adj:
-            logger.debug(f"Downloading split data for {symbol}")
-            splits_data = downloader.download_splits_data(symbol, start_date, end_date)
+            all_data = [combined_df]
+        else:
+            # Get data for each ticker separately
+            all_data = []
+            for symbol in ticker_list:
+                df = ph_api(
+                    tickers=[symbol],
+                    start_date=start_date,
+                    end_date=end_date,
+                    num_records=num_records,
+                    fields=fields if fields else None,
+                    frequency=frequency,
+                    include_dividends=div,
+                    include_splits=split,
+                    calculate_adjusted=adj,
+                    use_cache=not no_cache,
+                )
+                all_data.append(df)
 
-        # Process the data
-        df = process_price_data(
-            symbol=symbol,
-            price_data=price_data,
-            dividends_data=dividends_data,
-            splits_data=splits_data,
-            fields=fields,
-            frequency=frequency,
-            calculate_adjusted=adj,
-        )
-
-        if not df.empty:
-            logger.info(f"Processed {len(df)} records for {symbol}")
-            all_data.append(df)
-
-    if not all_data:
-        logger.error("No data found for any of the requested symbols")
-        click.echo("Error: No data found for any of the requested symbols", err=True)
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except RuntimeError as e:
+        click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
     # Handle output based on combine flag
     if combine or len(ticker_list) == 1:
-        # Combine all data into one output
-        combined_df = pd.concat(all_data, ignore_index=True)
-        combined_df = combined_df.sort_values(["symbol", "date"])
+        # Use combined data (already returned from API)
+        combined_df = all_data[0]
         logger.info(f"Combined data: {len(combined_df)} total records")
 
         # Output data

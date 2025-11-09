@@ -104,6 +104,8 @@ make test
 
 ## Usage
 
+### Command Line Interface (CLI)
+
 See the [documentation](doc/README.md) for detailed usage instructions.
 
 Quick example:
@@ -114,3 +116,25 @@ duk tr
 # Get help for specific commands
 duk tr --help
 ```
+
+### Python API
+
+`duk` can also be used as a Python module for programmatic access to financial data:
+
+```python
+import duk
+
+# Get latest 5 days of close prices for AAPL
+df = duk.ph('AAPL')
+
+# Get OHLC data for multiple tickers
+df = duk.ph(['AAPL', 'MSFT'], fields=['open', 'high', 'low', 'close'])
+
+# Get data for a specific date range
+df = duk.ph('AAPL', start_date='2023-01-01', end_date='2023-12-31')
+
+# Get weekly data with dividends
+df = duk.ph('AAPL', frequency='weekly', include_dividends=True)
+```
+
+The API functions use the same configuration system (`.dukrc`) as the CLI tool. See the [API documentation](doc/api.md) for more details.
