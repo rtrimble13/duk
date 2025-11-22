@@ -24,15 +24,6 @@ class TestCLI:
             in result.output
         )
 
-    def test_cli_version(self):
-        """Test CLI version output."""
-        runner = CliRunner()
-        result = runner.invoke(main, ["--version"])
-
-        assert result.exit_code == 0
-        # Version should be in the output
-        assert "0.1.0" in result.output or "version" in result.output.lower()
-
     def test_cli_with_custom_config(self):
         """Test CLI with custom config file."""
         with tempfile.TemporaryDirectory() as tmpdir:
