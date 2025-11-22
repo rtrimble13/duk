@@ -118,7 +118,15 @@ make build
 ### Run Tests
 
 ```bash
+# Run all tests
 make test
+
+# Run only unit tests (skip integration tests)
+pytest -m "not integration"
+
+# Run integration tests (requires FMP_API_KEY)
+export FMP_API_KEY=your_api_key_here
+pytest -m integration
 ```
 
 ### Linting

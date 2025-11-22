@@ -53,9 +53,13 @@ def get_price_history(
     symbol = symbol.upper().strip()
     logger.debug(f"Normalized symbol: {symbol}")
 
+    # Get config once if needed
+    config = None
+    if api_key is None or limit is None:
+        config = get_config()
+
     # Get API key
     if api_key is None:
-        config = get_config()
         api_key = config.get_fmp_api_key()
 
     if not api_key:
@@ -70,7 +74,6 @@ def get_price_history(
 
     # Get limit from config if not specified
     if limit is None:
-        config = get_config()
         limit = config.get_default_limit()
 
     logger.debug(f"Limit: {limit}")

@@ -84,12 +84,9 @@ class TestGetConfig:
 
     def test_singleton_behavior(self):
         """Test that get_config returns the same instance."""
-        # Reset global config
-        import duk.config
-
-        duk.config._global_config = None
-
+        # Get two instances
         config1 = get_config()
         config2 = get_config()
 
+        # They should be the same instance (singleton pattern)
         assert config1 is config2

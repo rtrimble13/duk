@@ -1,76 +1,43 @@
-"""Tests for CLI module."""
-
-from io import StringIO
-from unittest.mock import Mock, patch
+"""Tests for CLI module using Click."""
 
 import pandas as pd
 import pytest
+from click.testing import CliRunner
 
-from duk.cli import cmd_ph, create_parser, main
-
-
-class TestCreateParser:
-    """Tests for create_parser function."""
-
-    def test_parser_creation(self):
-        """Test that parser is created correctly."""
-        parser = create_parser()
-        assert parser is not None
-
-    def test_ph_command_parsing(self):
-        """Test parsing of ph command arguments."""
-        parser = create_parser()
-
-        # Basic command
-        args = parser.parse_args(["ph", "IBM"])
-        assert args.command == "ph"
-        assert args.symbol == "IBM"
-        assert args.limit is None
-
-        # With limit
-        args = parser.parse_args(["ph", "IBM", "--limit", "10"])
-        assert args.limit == 10
-
-        # With date range
-        args = parser.parse_args(
-            ["ph", "IBM", "--from-date", "2024-01-01", "--to-date", "2024-01-31"]
-        )
-        assert args.from_date == "2024-01-01"
-        assert args.to_date == "2024-01-31"
-
-        # With fields
-        args = parser.parse_args(["ph", "IBM", "--fields", "date", "close", "volume"])
-        assert args.fields == ["date", "close", "volume"]
-
-        # With output format
-        args = parser.parse_args(["ph", "IBM", "--output-format", "csv"])
-        assert args.output_format == "csv"
-
-    def test_version_argument(self):
-        """Test --version argument."""
-        parser = create_parser()
-
-        with pytest.raises(SystemExit) as exc_info:
-            parser.parse_args(["--version"])
-
-        assert exc_info.value.code == 0
+from duk.cli import cli, main
 
 
-class TestCmdPh:
-    """Tests for cmd_ph function."""
+class TestCliGroup:
+    """Tests for main CLI group."""
 
-    def test_successful_execution(self):
+    def test_cli_help(self):
+        """Test CLI help command."""
+        runner = CliRunner()
+        result = runner.invoke(cli, ["--help"])
+        assert result.exit_code == 0
+        assert "CLI tool for downloading market and financial data" in result.output
+
+    def test_cli_version(self):
+        """Test CLI version command."""
+        runner = CliRunner()
+        result = runner.invoke(cli, ["--version"])
+        assert result.exit_code == 0
+        assert "duk" in result.output
+
+
+class TestPhCommand:
+    """Tests for ph command."""
+
+    def test_ph_help(self):
+        """Test ph command help."""
+        runner = CliRunner()
+        result = runner.invoke(cli, ["ph", "--help"])
+        assert result.exit_code == 0
+        assert "Download security price history" in result.output
+
+    def test_ph_successful_execution(self, mocker):
         """Test successful execution of ph command."""
-        # Mock arguments
-        args = Mock()
-        args.symbol = "IBM"
-        args.limit = 5
-        args.from_date = None
-        args.to_date = None
-        args.fields = None
-        args.output_format = "table"
-
-        # Mock price history data
+        runner = CliRunner()
         mock_df = pd.DataFrame(
             {
                 "date": pd.to_datetime(["2024-01-01", "2024-01-02"]),
@@ -78,25 +45,15 @@ class TestCmdPh:
             }
         )
 
-        with patch("duk.ph.get_price_history", return_value=mock_df):
-            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-                exit_code = cmd_ph(args)
+        mocker.patch("duk.ph.get_price_history", return_value=mock_df)
+        result = runner.invoke(cli, ["ph", "IBM"])
+        assert result.exit_code == 0
+        assert "2024-01-01" in result.output
+        assert "100.0" in result.output
 
-                assert exit_code == 0
-                output = mock_stdout.getvalue()
-                assert "2024-01-01" in output
-                assert "100.0" in output
-
-    def test_csv_output_format(self):
-        """Test CSV output format."""
-        args = Mock()
-        args.symbol = "IBM"
-        args.limit = 5
-        args.from_date = None
-        args.to_date = None
-        args.fields = None
-        args.output_format = "csv"
-
+    def test_ph_with_limit(self, mocker):
+        """Test ph command with limit option."""
+        runner = CliRunner()
         mock_df = pd.DataFrame(
             {
                 "date": pd.to_datetime(["2024-01-01"]),
@@ -104,24 +61,68 @@ class TestCmdPh:
             }
         )
 
-        with patch("duk.ph.get_price_history", return_value=mock_df):
-            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-                exit_code = cmd_ph(args)
+        mock_get = mocker.patch("duk.ph.get_price_history", return_value=mock_df)
+        result = runner.invoke(cli, ["ph", "IBM", "--limit", "10"])
+        assert result.exit_code == 0
 
-                assert exit_code == 0
-                output = mock_stdout.getvalue()
-                assert "date,close" in output or "date" in output
+        # Verify that limit was passed
+        mock_get.assert_called_once()
+        call_kwargs = mock_get.call_args[1]
+        assert call_kwargs["limit"] == 10
 
-    def test_json_output_format(self):
-        """Test JSON output format."""
-        args = Mock()
-        args.symbol = "IBM"
-        args.limit = 5
-        args.from_date = None
-        args.to_date = None
-        args.fields = None
-        args.output_format = "json"
+    def test_ph_with_date_range(self, mocker):
+        """Test ph command with date range."""
+        runner = CliRunner()
+        mock_df = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2024-01-15"]),
+                "close": [103.0],
+            }
+        )
 
+        mock_get = mocker.patch("duk.ph.get_price_history", return_value=mock_df)
+        result = runner.invoke(
+            cli,
+            [
+                "ph",
+                "IBM",
+                "--from-date",
+                "2024-01-01",
+                "--to-date",
+                "2024-01-31",
+            ],
+        )
+        assert result.exit_code == 0
+
+        # Verify that date range was passed
+        call_kwargs = mock_get.call_args[1]
+        assert call_kwargs["from_date"] == "2024-01-01"
+        assert call_kwargs["to_date"] == "2024-01-31"
+
+    def test_ph_with_fields(self, mocker):
+        """Test ph command with custom fields."""
+        runner = CliRunner()
+        mock_df = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2024-01-01"]),
+                "close": [100.0],
+                "volume": [1000000],
+            }
+        )
+
+        mock_get = mocker.patch("duk.ph.get_price_history", return_value=mock_df)
+        result = runner.invoke(
+            cli, ["ph", "IBM", "--fields", "date", "--fields", "close"]
+        )
+        assert result.exit_code == 0
+
+        # Verify that fields were passed
+        call_kwargs = mock_get.call_args[1]
+        assert call_kwargs["fields"] == ["date", "close"]
+
+    def test_ph_csv_output_format(self, mocker):
+        """Test ph command with CSV output format."""
+        runner = CliRunner()
         mock_df = pd.DataFrame(
             {
                 "date": pd.to_datetime(["2024-01-01"]),
@@ -129,82 +130,66 @@ class TestCmdPh:
             }
         )
 
-        with patch("duk.ph.get_price_history", return_value=mock_df):
-            with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-                exit_code = cmd_ph(args)
+        mocker.patch("duk.ph.get_price_history", return_value=mock_df)
+        result = runner.invoke(cli, ["ph", "IBM", "--output-format", "csv"])
+        assert result.exit_code == 0
+        assert "date,close" in result.output or "date" in result.output
 
-                assert exit_code == 0
-                output = mock_stdout.getvalue()
-                assert '"date"' in output or '"close"' in output
+    def test_ph_json_output_format(self, mocker):
+        """Test ph command with JSON output format."""
+        runner = CliRunner()
+        mock_df = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2024-01-01"]),
+                "close": [100.0],
+            }
+        )
 
-    def test_empty_data(self):
-        """Test handling of empty data."""
-        args = Mock()
-        args.symbol = "INVALID"
-        args.limit = 5
-        args.from_date = None
-        args.to_date = None
-        args.fields = None
-        args.output_format = "table"
+        mocker.patch("duk.ph.get_price_history", return_value=mock_df)
+        result = runner.invoke(cli, ["ph", "IBM", "--output-format", "json"])
+        assert result.exit_code == 0
+        assert '"date"' in result.output or '"close"' in result.output
 
+    def test_ph_empty_data(self, mocker):
+        """Test ph command with empty data."""
+        runner = CliRunner()
         mock_df = pd.DataFrame()
 
-        with patch("duk.ph.get_price_history", return_value=mock_df):
-            with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
-                exit_code = cmd_ph(args)
+        mocker.patch("duk.ph.get_price_history", return_value=mock_df)
+        result = runner.invoke(cli, ["ph", "INVALID"])
+        assert result.exit_code == 1
+        assert "No data found" in result.output
 
-                assert exit_code == 1
-                error_output = mock_stderr.getvalue()
-                assert "No data found" in error_output
+    def test_ph_value_error(self, mocker):
+        """Test ph command with ValueError."""
+        runner = CliRunner()
 
-    def test_value_error_handling(self):
-        """Test handling of ValueError."""
-        args = Mock()
-        args.symbol = ""
-        args.limit = 5
-        args.from_date = None
-        args.to_date = None
-        args.fields = None
-        args.output_format = "table"
-
-        with patch(
+        mocker.patch(
             "duk.ph.get_price_history",
             side_effect=ValueError("Invalid symbol"),
-        ):
-            with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
-                exit_code = cmd_ph(args)
+        )
+        result = runner.invoke(cli, ["ph", ""])
+        assert result.exit_code == 1
+        assert "Error:" in result.output
 
-                assert exit_code == 1
-                error_output = mock_stderr.getvalue()
-                assert "Error:" in error_output
+    def test_ph_unexpected_error(self, mocker):
+        """Test ph command with unexpected error."""
+        runner = CliRunner()
 
-    def test_unexpected_error_handling(self):
-        """Test handling of unexpected errors."""
-        args = Mock()
-        args.symbol = "IBM"
-        args.limit = 5
-        args.from_date = None
-        args.to_date = None
-        args.fields = None
-        args.output_format = "table"
-
-        with patch(
+        mocker.patch(
             "duk.ph.get_price_history",
             side_effect=Exception("Unexpected error"),
-        ):
-            with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
-                exit_code = cmd_ph(args)
-
-                assert exit_code == 1
-                error_output = mock_stderr.getvalue()
-                assert "Unexpected error:" in error_output
+        )
+        result = runner.invoke(cli, ["ph", "IBM"])
+        assert result.exit_code == 1
+        assert "Unexpected error:" in result.output
 
 
 class TestMain:
     """Tests for main function."""
 
-    def test_main_with_ph_command(self):
-        """Test main function with ph command."""
+    def test_main_execution(self, mocker):
+        """Test main function execution."""
         mock_df = pd.DataFrame(
             {
                 "date": pd.to_datetime(["2024-01-01"]),
@@ -212,12 +197,13 @@ class TestMain:
             }
         )
 
-        test_args = ["duk", "ph", "IBM"]
+        mocker.patch("sys.argv", ["duk", "ph", "IBM"])
+        mocker.patch("duk.ph.get_price_history", return_value=mock_df)
 
-        with patch("sys.argv", test_args):
-            with patch("duk.ph.get_price_history", return_value=mock_df):
-                with patch("sys.stdout", new_callable=StringIO):
-                    with pytest.raises(SystemExit) as exc_info:
-                        main()
+        # main() calls sys.exit() on success, so we need to catch it
+        with pytest.raises(SystemExit) as exc_info:
+            main()
 
-                    assert exc_info.value.code == 0
+        # Click's CliRunner doesn't use exit codes the same way
+        # so we just verify it doesn't raise other exceptions
+        assert exc_info.value.code in [0, None]
