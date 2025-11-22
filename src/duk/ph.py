@@ -66,9 +66,7 @@ def get_price_history(
     base_url = "https://financialmodelingprep.com/api/v3"
     if frequency == "daily":
         endpoint = f"historical-price-full/{symbol_upper}"
-    elif frequency == "weekly":
-        endpoint = f"historical-price-full/{symbol_upper}?serietype=line"
-    elif frequency == "monthly":
+    elif frequency in ["weekly", "monthly"]:
         endpoint = f"historical-price-full/{symbol_upper}?serietype=line"
 
     # Build URL with parameters
@@ -122,7 +120,8 @@ def get_price_history(
         df = df.sort_values("date", ascending=True)
         logger.debug("Data sorted by date (ascending)")
 
-        # Apply limit (take last N rows after sorting)
+        # Apply limit - take the most recent N data points (last N rows in
+        # ascending date order)
         if limit > 0:
             df = df.tail(limit)
             logger.debug(f"Limited to {limit} most recent data points")
