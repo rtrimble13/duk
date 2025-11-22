@@ -91,3 +91,18 @@ class TestDukConfig:
         assert os.path.isfile(
             template_path
         ), f"Config template is not a file: {template_path}"
+
+    def test_user_dukrc_exists(self):
+        """Test that ~/.dukrc exists (if user has set it up)."""
+        user_config_path = os.path.expanduser("~/.dukrc")
+        # This test checks if the user config file exists
+        # Note: This may not exist in CI/test environments, which is okay
+        if os.path.exists(user_config_path):
+            # If it exists, verify it's a file
+            assert os.path.isfile(
+                user_config_path
+            ), f"~/.dukrc exists but is not a file: {user_config_path}"
+            # Verify it can be loaded as a config
+            config = DukConfig(user_config_path)
+            assert config.is_loaded() is True, "~/.dukrc exists but failed to load"
+        # If file doesn't exist, test passes (user hasn't set up config yet)
