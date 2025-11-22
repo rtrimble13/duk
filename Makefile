@@ -37,7 +37,7 @@ test:
 fmt:
 	python -m black src/ test/
 	python -m isort src/ test/
-	python -m flake8 src/ test/ --max-line-length=80
+	python -m flake8 src/ test/ --max-line-length=88
 
 # Build conda distribution
 dist:
