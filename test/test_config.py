@@ -79,3 +79,15 @@ class TestDukConfig:
         config = DukConfig()
         expected_path = os.path.expanduser("~/.dukrc")
         assert config.config_path == expected_path
+
+    def test_config_template_exists(self):
+        """Test that the config template file exists in etc/dukrc."""
+        # Get the repository root (parent of src/)
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        template_path = os.path.join(repo_root, "etc", "dukrc")
+        assert os.path.exists(
+            template_path
+        ), f"Config template not found at {template_path}"
+        assert os.path.isfile(
+            template_path
+        ), f"Config template is not a file: {template_path}"
