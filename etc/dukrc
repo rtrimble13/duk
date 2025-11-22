@@ -1,0 +1,25 @@
+# duk configuration file (TOML format)
+# This file should be copied to ~/.dukrc and customized
+
+[api]
+# FMP API key for Financial Modeling Prep
+# Get your API key from https://financialmodelingprep.com/developer/docs/
+fmp_api_key = "YOUR_FMP_API_KEY_HERE"
+
+[logging]
+# Logging configuration
+# Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+log_level = "INFO"
+
+# Log file location (defaults to ~/.local/share/duk/duk.log)
+log_file = "~/.local/share/duk/duk.log"
+
+# Enable console logging (true/false)
+console_logging = "true"
+
+[output]
+# Default output directory for downloaded data
+output_dir = "./var"
+
+# Default number of records to display
+default_limit = "5"
