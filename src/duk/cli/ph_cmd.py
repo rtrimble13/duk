@@ -68,8 +68,7 @@ def ph(ctx, symbol, limit, from_date, to_date, output, fields, output_format):
         logger.error("FMP API key not configured")
         click.echo("Error: FMP API key not configured", err=True)
         click.echo(
-            "Please set your API key in ~/.dukrc or provide it "
-            "via environment variable",
+            "Please set your API key in ~/.dukrc",
             err=True,
         )
         sys.exit(1)
