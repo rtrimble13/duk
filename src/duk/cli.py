@@ -6,12 +6,13 @@ This module provides the main command-line interface using Click.
 
 import click
 
+from duk import __version__
 from duk.config import get_config
 from duk.logging_config import setup_logging
 
 
 @click.group()
-@click.version_option(message="%(version)s")
+@click.version_option(version=__version__, message="%(version)s")
 @click.option(
     "--config",
     "-c",
