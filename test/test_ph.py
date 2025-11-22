@@ -300,10 +300,6 @@ class TestFMPAPIIntegration:
             # Verify price values are reasonable (positive)
             assert (df["close"] > 0).all(), "Found non-positive price values"
 
-            print(f"\n✓ Successfully retrieved {len(df)} records from FMP API")
-            print(f"  Latest date: {df.iloc[-1]['date']}")
-            print(f"  Latest close: ${df.iloc[-1]['close']:.2f}")
-
         except requests.RequestException as e:
             pytest.fail(f"API request failed: {e}")
         except Exception as e:
