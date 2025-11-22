@@ -78,9 +78,20 @@ duk ph IBM --fields date close volume
 # Output format
 duk ph IBM --output-format csv
 duk ph IBM --output-format json
+
+# Write to file (uses default directory from config)
+duk ph IBM -o
+
+# Write to file with custom path
+duk ph IBM -o /path/to/output
+
+# Combine options
+duk ph IBM --limit 10 --output-format csv -o ./data
 ```
 
 The symbol is case-insensitive, so `duk ph ibm`, `duk ph IBM`, and `duk ph IbM` all work.
+
+**Note:** By default, output is sent to stdout. Use `-o` or `--out` to write to a file. If `-o` is used without a path, the output will be written to the default directory specified in `~/.dukrc` (default: `./var`).
 
 ### Library API
 

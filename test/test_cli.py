@@ -184,6 +184,115 @@ class TestPhCommand:
         assert result.exit_code == 1
         assert "Unexpected error:" in result.output
 
+    def test_ph_with_file_output_default_dir(self, mocker, tmp_path):
+        """Test ph command with -o flag using default directory."""
+        # Reset the global config to avoid caching issues
+        import duk.config
+
+        duk.config._global_config = None
+
+        runner = CliRunner()
+        mock_df = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2024-01-01"]),
+                "close": [100.0],
+            }
+        )
+
+        mocker.patch("duk.ph.get_price_history", return_value=mock_df)
+
+        # Create a temporary config file with custom output dir
+        config_file = tmp_path / "test_dukrc"
+        config_file.write_text(
+            f"""
+[api]
+fmp_api_key = "test_key"
+
+[output]
+output_dir = "{tmp_path}"
+"""
+        )
+
+        result = runner.invoke(cli, ["--config", str(config_file), "ph", "IBM", "-o"])
+
+        # Reset global config after test
+        duk.config._global_config = None
+
+        assert result.exit_code == 0
+        assert "Output written to:" in result.output
+        assert "IBM_table.txt" in result.output
+
+        # Verify file was created
+        output_file = tmp_path / "IBM_table.txt"
+        assert output_file.exists()
+
+    def test_ph_with_file_output_custom_path(self, mocker, tmp_path):
+        """Test ph command with -o flag and custom path."""
+        runner = CliRunner()
+        mock_df = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2024-01-01"]),
+                "close": [100.0],
+            }
+        )
+
+        mocker.patch("duk.ph.get_price_history", return_value=mock_df)
+
+        custom_dir = tmp_path / "custom_output"
+        result = runner.invoke(cli, ["ph", "IBM", "-o", str(custom_dir)])
+
+        assert result.exit_code == 0
+        assert "Output written to:" in result.output
+
+        # Verify file was created in custom directory
+        output_file = custom_dir / "IBM_table.txt"
+        assert output_file.exists()
+
+    def test_ph_with_file_output_csv_format(self, mocker, tmp_path):
+        """Test ph command with file output in CSV format."""
+        runner = CliRunner()
+        mock_df = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2024-01-01"]),
+                "close": [100.0],
+            }
+        )
+
+        mocker.patch("duk.ph.get_price_history", return_value=mock_df)
+
+        result = runner.invoke(
+            cli,
+            ["ph", "IBM", "-o", str(tmp_path), "--output-format", "csv"],
+        )
+
+        assert result.exit_code == 0
+        assert "IBM_csv.csv" in result.output
+
+        # Verify CSV file was created
+        output_file = tmp_path / "IBM_csv.csv"
+        assert output_file.exists()
+
+        # Verify it's valid CSV
+        content = output_file.read_text()
+        assert "date,close" in content or "date" in content
+
+    def test_ph_without_file_output(self, mocker):
+        """Test ph command without -o flag outputs to stdout only."""
+        runner = CliRunner()
+        mock_df = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2024-01-01"]),
+                "close": [100.0],
+            }
+        )
+
+        mocker.patch("duk.ph.get_price_history", return_value=mock_df)
+        result = runner.invoke(cli, ["ph", "IBM"])
+
+        assert result.exit_code == 0
+        assert "Output written to:" not in result.output
+        assert "2024-01-01" in result.output
+
 
 class TestMain:
     """Tests for main function."""

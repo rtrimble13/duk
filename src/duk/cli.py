@@ -4,7 +4,9 @@ Command-line interface for duk.
 This module provides the main CLI entry point and command handlers using Click.
 """
 
+import os
 import sys
+from pathlib import Path
 
 import click
 
@@ -64,13 +66,23 @@ def cli(ctx, config):
 )
 @click.option(
     "-o",
+    "--out",
+    is_flag=False,
+    flag_value="",
+    default=None,
+    help=(
+        "Write output to file. If no path specified, "
+        "uses default output directory from config."
+    ),
+)
+@click.option(
     "--output-format",
     type=click.Choice(["table", "csv", "json"], case_sensitive=False),
     default="table",
     help="Output format (default: table)",
 )
 @click.pass_context
-def ph(ctx, symbol, limit, from_date, to_date, fields, output_format):
+def ph(ctx, symbol, limit, from_date, to_date, fields, out, output_format):
     """Download security price history from FMP API."""
     logger = get_logger("cli.ph")
     logger.info(f"Executing ph command for symbol: {symbol}")
@@ -95,13 +107,44 @@ def ph(ctx, symbol, limit, from_date, to_date, fields, output_format):
             logger.warning(f"No data found for symbol: {symbol}")
             sys.exit(1)
 
-        # Output format
+        # Format output based on output_format
         if output_format == "csv":
-            click.echo(df.to_csv(index=False))
+            output_data = df.to_csv(index=False)
         elif output_format == "json":
-            click.echo(df.to_json(orient="records", date_format="iso", indent=2))
+            output_data = df.to_json(orient="records", date_format="iso", indent=2)
         else:  # table
-            click.echo(df.to_string(index=False))
+            output_data = df.to_string(index=False)
+
+        # Determine output destination
+        if out is not None:
+            # User wants to write to file
+            config = ctx.obj["config"]
+
+            if out == "":
+                # No path specified, use default from config
+                output_dir = config.get_output_dir()
+                output_dir = os.path.expanduser(output_dir)
+            else:
+                # Specific path provided
+                output_dir = os.path.expanduser(out)
+
+            # Create output directory if it doesn't exist
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+            # Generate filename based on symbol and format
+            file_extension = output_format if output_format != "table" else "txt"
+            filename = f"{symbol.upper()}_{output_format}.{file_extension}"
+            output_path = Path(output_dir) / filename
+
+            # Write to file
+            with open(output_path, "w") as f:
+                f.write(output_data)
+
+            click.echo(f"Output written to: {output_path}")
+            logger.info(f"Output written to: {output_path}")
+        else:
+            # No -o/--out option, output to stdout
+            click.echo(output_data)
 
         logger.info(f"Successfully output {len(df)} records")
 
