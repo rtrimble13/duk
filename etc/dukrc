@@ -1,0 +1,20 @@
+# duk configuration file
+# This file should be copied to ~/.dukrc and customized for your environment
+# Format: TOML (https://toml.io/)
+
+[api]
+# API key for Financial Modeling Prep (FMP)
+fmp_key = ""
+
+[general]
+# Default output directory for saved files
+default_output_dir = "var/duk"
+
+# Default output file type (csv or json)
+default_output_type = "csv"
+
+# Logging level (debug, info, warning, error, critical)
+log_level = "info"
+
+# Directory for log files
+log_dir = "var/duk/log"
