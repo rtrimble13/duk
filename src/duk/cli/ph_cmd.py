@@ -4,131 +4,103 @@ CLI handler for price history (ph) command
 
 import sys
 
+import click
+
 from duk.api.ph import get_price_history
-from duk.config import get_config
 from duk.logger import get_logger
 
 logger = get_logger("cli.ph")
 
 
-def add_ph_parser(subparsers):
+@click.command()
+@click.argument("symbol")
+@click.option(
+    "-l",
+    "--limit",
+    type=int,
+    default=5,
+    help="Number of most recent data points to return (default: 5)",
+)
+@click.option(
+    "-f",
+    "--from-date",
+    "from_date",
+    help="Start date in YYYY-MM-DD format",
+)
+@click.option(
+    "-t",
+    "--to-date",
+    "to_date",
+    help="End date in YYYY-MM-DD format",
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(),
+    help="Output file path (default: stdout)",
+)
+@click.option(
+    "--fields",
+    help="Comma-separated list of fields to display (default: date,close,volume)",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["csv", "json", "table"], case_sensitive=False),
+    default="table",
+    help="Output format (default: table)",
+)
+@click.pass_context
+def ph(ctx, symbol, limit, from_date, to_date, output, fields, output_format):
     """
-    Add ph subcommand parser
+    Download security price history from FMP.
 
-    Args:
-        subparsers: argparse subparsers object
+    SYMBOL: Security symbol (e.g., IBM, AAPL)
     """
-    parser = subparsers.add_parser(
-        "ph",
-        help="Download security price history from FMP",
-        description=(
-            "Download security price history from " "Financial Modeling Prep API"
-        ),
-    )
+    logger.info(f"Executing ph command for symbol: {symbol}")
 
-    # Positional argument
-    parser.add_argument("symbol", help="Security symbol (e.g., IBM, AAPL)")
-
-    # Optional arguments
-    parser.add_argument(
-        "-l",
-        "--limit",
-        type=int,
-        default=5,
-        help="Number of most recent data points to return (default: 5)",
-    )
-
-    parser.add_argument(
-        "-f",
-        "--from-date",
-        dest="from_date",
-        help="Start date in YYYY-MM-DD format",
-    )
-
-    parser.add_argument(
-        "-t",
-        "--to-date",
-        dest="to_date",
-        help="End date in YYYY-MM-DD format",
-    )
-
-    parser.add_argument(
-        "-o",
-        "--output",
-        help="Output file path (default: stdout)",
-    )
-
-    parser.add_argument(
-        "--fields",
-        help=(
-            "Comma-separated list of fields to display " "(default: date,close,volume)"
-        ),
-    )
-
-    parser.add_argument(
-        "--format",
-        choices=["csv", "json", "table"],
-        default="table",
-        help="Output format (default: table)",
-    )
-
-    parser.set_defaults(func=handle_ph_command)
-
-
-def handle_ph_command(args):
-    """
-    Handle ph command execution
-
-    Args:
-        args: Parsed command line arguments
-
-    Returns:
-        Exit code (0 for success, non-zero for error)
-    """
-    logger.info(f"Executing ph command for symbol: {args.symbol}")
-
-    # Get configuration
-    config = get_config()
+    # Get configuration from context
+    config = ctx.obj["config"]
 
     # Get API key
     api_key = config.get_fmp_api_key()
     if not api_key or api_key == "YOUR_FMP_API_KEY_HERE":
         logger.error("FMP API key not configured")
-        print("Error: FMP API key not configured", file=sys.stderr)
-        print(
+        click.echo("Error: FMP API key not configured", err=True)
+        click.echo(
             "Please set your API key in ~/.dukrc or provide it "
             "via environment variable",
-            file=sys.stderr,
+            err=True,
         )
-        return 1
+        sys.exit(1)
 
     try:
         # Get price history
         df = get_price_history(
-            symbol=args.symbol,
+            symbol=symbol,
             api_key=api_key,
-            limit=args.limit,
-            from_date=args.from_date,
-            to_date=args.to_date,
+            limit=limit,
+            from_date=from_date,
+            to_date=to_date,
         )
 
         if df.empty:
-            logger.warning(f"No data found for symbol: {args.symbol}")
-            print(f"No data found for symbol: {args.symbol}", file=sys.stderr)
-            return 1
+            logger.warning(f"No data found for symbol: {symbol}")
+            click.echo(f"No data found for symbol: {symbol}", err=True)
+            sys.exit(1)
 
         # Select fields to display
-        if args.fields:
-            fields = [f.strip() for f in args.fields.split(",")]
+        if fields:
+            field_list = [f.strip() for f in fields.split(",")]
             # Filter to only include fields that exist in the dataframe
-            available_fields = [f for f in fields if f in df.columns]
+            available_fields = [f for f in field_list if f in df.columns]
             if not available_fields:
                 logger.error("None of the specified fields exist in the data")
-                print(
+                click.echo(
                     "Error: None of the specified fields exist in the data",
-                    file=sys.stderr,
+                    err=True,
                 )
-                return 1
+                sys.exit(1)
             df = df[available_fields]
         else:
             # Default fields
@@ -138,34 +110,33 @@ def handle_ph_command(args):
                 df = df[available_fields]
 
         # Format and output
-        if args.output:
+        if output:
             # Write to file
-            logger.info(f"Writing output to file: {args.output}")
-            if args.format == "csv":
-                df.to_csv(args.output, index=False)
-            elif args.format == "json":
-                df.to_json(args.output, orient="records", indent=2)
+            logger.info(f"Writing output to file: {output}")
+            if output_format == "csv":
+                df.to_csv(output, index=False)
+            elif output_format == "json":
+                df.to_json(output, orient="records", indent=2)
             else:
-                with open(args.output, "w") as f:
+                with open(output, "w") as f:
                     f.write(df.to_string(index=False))
-            logger.info(f"Output written to {args.output}")
+            logger.info(f"Output written to {output}")
         else:
             # Write to stdout
-            if args.format == "csv":
-                print(df.to_csv(index=False), end="")
-            elif args.format == "json":
-                print(df.to_json(orient="records", indent=2))
+            if output_format == "csv":
+                click.echo(df.to_csv(index=False), nl=False)
+            elif output_format == "json":
+                click.echo(df.to_json(orient="records", indent=2))
             else:
-                print(df.to_string(index=False))
+                click.echo(df.to_string(index=False))
 
         logger.info("ph command completed successfully")
-        return 0
 
     except ValueError as e:
         logger.error(f"Validation error: {e}")
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)

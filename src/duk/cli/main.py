@@ -2,70 +2,53 @@
 Main CLI entry point for duk
 """
 
-import argparse
 import sys
 
+import click
+
 from duk import __version__
-from duk.cli.ph_cmd import add_ph_parser
+from duk.cli.ph_cmd import ph
 from duk.config import get_config
 from duk.logger import setup_logging
+
+
+@click.group()
+@click.version_option(version=__version__)
+@click.option(
+    "-c",
+    "--config",
+    "config_path",
+    type=click.Path(),
+    help="Path to configuration file (default: ~/.dukrc)",
+)
+@click.pass_context
+def cli(ctx, config_path):
+    """
+    A CLI tool for downloading financial market data and performing data
+    preprocessing.
+
+    For more information, see: https://github.com/rtrimble13/duk
+    """
+    # Ensure that ctx.obj exists and is a dict
+    ctx.ensure_object(dict)
+
+    # Initialize configuration
+    config = get_config(config_path)
+    ctx.obj["config"] = config
+
+    # Setup logging
+    setup_logging(config)
+
+
+# Add subcommands
+cli.add_command(ph)
 
 
 def main():
     """
     Main entry point for duk CLI
     """
-    # Create main parser
-    parser = argparse.ArgumentParser(
-        prog="duk",
-        description=(
-            "A CLI tool for downloading financial market data and "
-            "performing data preprocessing"
-        ),
-        epilog="For more information, see: https://github.com/rtrimble13/duk",
-    )
-
-    parser.add_argument(
-        "-v",
-        "--version",
-        action="version",
-        version=f"%(prog)s {__version__}",
-    )
-
-    parser.add_argument(
-        "-c",
-        "--config",
-        dest="config_path",
-        help="Path to configuration file (default: ~/.dukrc)",
-    )
-
-    # Create subparsers for subcommands
-    subparsers = parser.add_subparsers(
-        title="subcommands",
-        description="Available subcommands",
-        dest="subcommand",
-        help="Subcommand help",
-    )
-
-    # Add ph subcommand
-    add_ph_parser(subparsers)
-
-    # Parse arguments
-    args = parser.parse_args()
-
-    # Initialize configuration
-    config_path = args.config_path if hasattr(args, "config_path") else None
-    config = get_config(config_path)
-
-    # Setup logging
-    setup_logging(config)
-
-    # Handle subcommand
-    if hasattr(args, "func"):
-        return args.func(args)
-    else:
-        parser.print_help()
-        return 1
+    return cli(obj={})
 
 
 if __name__ == "__main__":

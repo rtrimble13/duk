@@ -1,0 +1,158 @@
+.TH DUK 1 "November 2025" "duk 0.1.0" "User Commands"
+.SH NAME
+duk \- CLI tool for downloading financial market data
+.SH SYNOPSIS
+.B duk
+[\fB\-h\fR]
+[\fB\-v\fR]
+[\fB\-c\fR \fICONFIG_PATH\fR]
+.I subcommand
+[\fIoptions\fR]
+.SH DESCRIPTION
+.B duk
+is a command-line tool and library for downloading financial market data and
+performing data preprocessing. It provides access to various financial APIs
+and supports data transformation and analysis.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Show help message and exit.
+.TP
+.BR \-v ", " \-\-version
+Show program's version number and exit.
+.TP
+.BR \-c " " \fICONFIG_PATH\fR ", " \-\-config " " \fICONFIG_PATH\fR
+Path to configuration file (default: ~/.dukrc).
+.SH SUBCOMMANDS
+.TP
+.B ph
+Download security price history from Financial Modeling Prep API.
+.SH CONFIGURATION
+.B duk
+reads configuration from
+.I ~/.dukrc
+by default. The configuration file uses TOML format.
+.PP
+Example configuration:
+.PP
+.nf
+.RS
+[api]
+fmp_api_key = "YOUR_API_KEY"
+
+[output]
+output_dir = "./var"
+
+[logging]
+log_dir = "./var/logs"
+log_level = "INFO"
+log_to_file = true
+log_to_stdout = true
+.RE
+.fi
+.PP
+To get an API key, visit:
+.I https://financialmodelingprep.com/developer/docs/
+.SH SUBCOMMAND: ph
+Download security price history from Financial Modeling Prep API.
+.SS Synopsis
+.B duk ph
+[\fB\-h\fR]
+[\fB\-l\fR \fILIMIT\fR]
+[\fB\-f\fR \fIFROM_DATE\fR]
+[\fB\-t\fR \fITO_DATE\fR]
+[\fB\-o\fR \fIOUTPUT\fR]
+[\fB\-\-fields\fR \fIFIELDS\fR]
+[\fB\-\-format\fR \fIFORMAT\fR]
+.I symbol
+.SS Description
+Downloads historical price data for a given security symbol. The symbol is
+case-insensitive and will be converted to uppercase for the API call.
+.SS Options
+.TP
+.I symbol
+Security symbol (e.g., IBM, AAPL). Required positional argument.
+.TP
+.BR \-h ", " \-\-help
+Show help message and exit.
+.TP
+.BR \-l " " \fILIMIT\fR ", " \-\-limit " " \fILIMIT\fR
+Number of most recent data points to return (default: 5).
+.TP
+.BR \-f " " \fIFROM_DATE\fR ", " \-\-from\-date " " \fIFROM_DATE\fR
+Start date in YYYY-MM-DD format.
+.TP
+.BR \-t " " \fITO_DATE\fR ", " \-\-to\-date " " \fITO_DATE\fR
+End date in YYYY-MM-DD format.
+.TP
+.BR \-o " " \fIOUTPUT\fR ", " \-\-output " " \fIOUTPUT\fR
+Output file path (default: stdout).
+.TP
+.BR \-\-fields " " \fIFIELDS\fR
+Comma-separated list of fields to display (default: date,close,volume).
+Available fields include: date, open, high, low, close, volume, and others
+depending on the data source.
+.TP
+.BR \-\-format " " \fIFORMAT\fR
+Output format: csv, json, or table (default: table).
+.SS Examples
+.PP
+Get 5 most recent data points for IBM:
+.RS
+.B duk ph IBM
+.RE
+.PP
+Get 10 most recent data points for Apple:
+.RS
+.B duk ph AAPL \-l 10
+.RE
+.PP
+Get data for a specific date range:
+.RS
+.B duk ph MSFT \-f 2023-01-01 \-t 2023-12-31
+.RE
+.PP
+Save output to CSV file:
+.RS
+.B duk ph IBM \-o ibm_history.csv \-\-format csv
+.RE
+.PP
+Display specific fields:
+.RS
+.B duk ph IBM \-\-fields date,close,open,high,low,volume
+.RE
+.SH FILES
+.TP
+.I ~/.dukrc
+User configuration file (TOML format).
+.TP
+.I ./var/logs/duk.log
+Default log file location.
+.SH ENVIRONMENT
+No environment variables are currently used.
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+Error (e.g., API error, configuration error, invalid input)
+.SH EXAMPLES
+.PP
+Download 5 most recent price points for IBM:
+.RS
+.B duk ph IBM
+.RE
+.PP
+Download price history for a date range and save as JSON:
+.RS
+.B duk ph AAPL \-f 2024-01-01 \-t 2024-12-31 \-o apple.json \-\-format json
+.RE
+.SH AUTHOR
+Written by duk contributors.
+.SH REPORTING BUGS
+Report bugs to: https://github.com/rtrimble13/duk/issues
+.SH COPYRIGHT
+Copyright \(co 2025 duk contributors. License MIT.
+.SH SEE ALSO
+Full documentation at: https://github.com/rtrimble13/duk
