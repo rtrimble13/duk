@@ -1,51 +1,48 @@
-.PHONY: build install test dist doc format clean
+.PHONY: build install test fmt dist doc clean
+
+# Default target
+help:
+	@echo "Available targets:"
+	@echo "  build    - Build the project using miniconda with 'duk' environment"
+	@echo "  install  - Build and install duk as a standalone application to ~/.local"
+	@echo "  test     - Run unit tests using pytest framework"
+	@echo "  dist     - Build conda distribution package"
+	@echo "  doc	  - Install man pages"
+	@echo "  clean    - Clean build artifacts and remove local installation"
 
 # Build the project using miniconda framework with 'duk' environment
 build:
-	@echo "Building duk project using miniconda framework..."
-	@if ! command -v conda >/dev/null 2>&1; then \
-		echo "Error: conda not found. Please install miniconda3 or anaconda first."; \
-		exit 1; \
-	fi
-	@if conda env list | grep -q "^duk "; then \
-		echo "Environment 'duk' exists. Updating..."; \
-		conda env update -f environment.yml; \
+	@echo "Creating/using conda env 'duk' and installing dependencies"
+	@if command -v conda >/dev/null 2>&1; then \
+		if ! conda >/dev/null 2>&1; then \
+			echo "Creating conda env 'duk'..."; \
+		else \
+			echo "Conda env 'duk' already exists."; \
+		fi; \
+		echo "Installing package info 'duk'..."; \
+		conda run -n duk python -m pip install -e .[dev]; \
 	else \
-		echo "Creating new environment 'duk'..."; \
-		conda env create -f environment.yml; \
+		echo "conda not found, falling back to system pip"; \
+		python -m pip install -e .[dev]; \
 	fi
-	@echo ""
-	@echo "Build complete! To use duk:"
-	@echo "  conda activate duk"
-	@echo "  pip install -e ."
 
 # Build standalone application and install to ~/.local
 install:
-	@echo "Building and installing duk as a standalone application..."
-	@# Build the package if not already built
-	@if [ ! -f dist/duk-0.1.0-py3-none-any.whl ]; then \
-		echo "Building package first..."; \
-		python -m build 2>/dev/null || python scripts/build.py; \
-	fi
-	@# Install to ~/.local
-	pip install --user dist/duk-0.1.0-py3-none-any.whl
-	@echo "Installation complete!"
-	@echo "- duk CLI installed to ~/.local/bin/duk"
-	@echo ""
-	@echo "Make sure ~/.local/bin is in your PATH to use the duk command."
+	python -m pip install .
 
 # Run the test suite
 test:
 	python -m pytest test/ -v
 
+fmt:
+	python -m black src/ test/
+	python -m isort src/ test/
+	python -m flake8 src/ test/ --max-line-length=80
+
 # Build conda distribution
 dist:
-	@echo "Building conda distribution package..."
-	@if ! command -v conda-build >/dev/null 2>&1; then \
-		echo "Error: conda-build not found. Install with: conda install conda-build"; \
-		exit 1; \
-	fi
-	conda-build conda-recipe/
+	python -m pip install --upgrade build
+	python -m build
 
 # Install man pages
 doc:
@@ -58,15 +55,6 @@ doc:
 	@echo "Man page installed to ~/.local/share/man/man1/duk.1"
 	@echo "You can now use 'man duk' to view the documentation"
 
-# Run black and flake8 checks
-format:
-	black src/ test/
-	flake8 src/ test/
-
-# Run linting checks (alias for format)
-lint:
-	flake8 src/ test/
-
 # Clean build artifacts and remove local installation
 clean:
 	@echo "Cleaning build artifacts..."
@@ -75,16 +63,3 @@ clean:
 	rm -rf *.egg-info/
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete
-	@echo "Removing local installation..."
-	@if command -v pip >/dev/null 2>&1; then \
-		pip uninstall -y duk 2>/dev/null || true; \
-	fi
-	@if [ -f ~/.local/bin/duk ]; then \
-		rm -f ~/.local/bin/duk; \
-		echo "Removed ~/.local/bin/duk"; \
-	fi
-	@if [ -f ~/.local/share/man/man1/duk.1 ]; then \
-		rm -f ~/.local/share/man/man1/duk.1; \
-		echo "Removed ~/.local/share/man/man1/duk.1"; \
-	fi
-	@echo "Clean complete!"

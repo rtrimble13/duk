@@ -21,10 +21,12 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Python Debugger: Python File",
+            "name": "Python Debugger: duk ph",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}"
+            "program": "${workspaceFolder}/src/duk/main.py",
+            "args": ["ph", "ibm"],
+            "console": "integratedTerminal"
         }
     ]
 }
