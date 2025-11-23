@@ -5,14 +5,10 @@ Tests for the configuration management system using configistate.
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from duk.config import (
-    ConfigurationManager,
-    get_config_manager,
-    get_api_key,
-    validate_required_keys,
-)
+from duk.config import (ConfigurationManager, get_api_key, get_config_manager,
+                        validate_required_keys)
 
 
 class TestConfigurationManager:
@@ -106,8 +102,8 @@ class TestConfigurationManager:
                 key = self.config_manager.get_api_key("nonexistent_key")
                 assert key is None
 
-    def test_get_api_key_config_overrides_env(self):
-        """Test that config file values override environment variables."""
+    def test_get_api_key_env_overrides_config(self):
+        """Test that environment variables override config file values."""
         # Create a temporary config file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
             f.write('[api_keys]\nfmp_api_key = "config_key"\n')
@@ -117,8 +113,8 @@ class TestConfigurationManager:
             with patch.object(self.config_manager, "config_path", Path(temp_path)):
                 with patch.dict(os.environ, {"FMP_API_KEY": "env_key"}):
                     key = self.config_manager.get_api_key("fmp_api_key")
-                    # Config should override environment
-                    assert key == "config_key"
+                    # Environment should override config
+                    assert key == "env_key"
         finally:
             os.unlink(temp_path)
 

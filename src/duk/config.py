@@ -47,14 +47,23 @@ class ConfigurationManager:
     def get_api_key(self, key_name: str) -> Optional[str]:
         """Get API key by name from configuration.
 
-        First tries to get from config file, then falls back to environment variables.
+        First tries to get from environment variables, then falls back to config file.
         Supports file:// references in config values.
         """
         # Ensure config is loaded
         if not self._loaded:
             self.load_configuration()
 
-        # Try config file first
+        # Try environment variables first
+        env_vars = {"FMP_API_KEY": "fmp_api_key"}
+        for env_var, config_key in env_vars.items():
+            if config_key == key_name:
+                value = os.environ.get(env_var)
+                if value:
+                    logger.debug(f"Found {key_name} in environment variable {env_var}")
+                    return value
+
+        # Fall back to config file
         if self._config:
             try:
                 # configistate uses dot notation, e.g., "api_keys.fmp_api_key"
@@ -64,15 +73,6 @@ class ConfigurationManager:
                     return key_value
             except Exception as e:
                 logger.debug(f"Could not get {key_name} from config: {e}")
-
-        # Fall back to environment variables
-        env_vars = {"FMP_API_KEY": "fmp_api_key"}
-        for env_var, config_key in env_vars.items():
-            if config_key == key_name:
-                value = os.environ.get(env_var)
-                if value:
-                    logger.debug(f"Found {key_name} in environment variable {env_var}")
-                    return value
 
         return None
 
