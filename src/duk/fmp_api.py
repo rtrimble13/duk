@@ -242,17 +242,6 @@ def get_price_history(
     # Set date as index
     df = df.set_index("date")
 
-    # Apply limit if specified
-    if limit is not None and limit > 0:
-        # Case: limit with start_date and no end_date - keep first `limit` records
-        if start_date_obj is not None and end_date_obj is None:
-            df = df.head(limit)
-            logger.debug(f"Keeping first {limit} records")
-        # Case: limit with end_date and no start_date - keep last `limit` records
-        elif start_date_obj is None and end_date_obj is not None:
-            df = df.tail(limit)
-            logger.debug(f"Keeping last {limit} records")
-
     # Resample if frequency is not 'day'
     if frequency != "day":
         logger.info(f"Resampling data to {frequency} frequency")
@@ -290,6 +279,17 @@ def get_price_history(
             logger.debug(
                 f"Resampled to {frequency} frequency, {len(df)} records remaining"
             )
+
+    # Apply limit if specified (after resampling)
+    if limit is not None and limit > 0:
+        # Case: limit with start_date and no end_date - keep first `limit` records
+        if start_date_obj is not None and end_date_obj is None:
+            df = df.head(limit)
+            logger.debug(f"Keeping first {limit} records")
+        # Case: limit with end_date and no start_date - keep last `limit` records
+        elif start_date_obj is None and end_date_obj is not None:
+            df = df.tail(limit)
+            logger.debug(f"Keeping last {limit} records")
 
     # Filter columns if fields parameter is specified
     if fields is not None:

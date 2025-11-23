@@ -678,3 +678,44 @@ class TestGetPriceHistory:
             assert len(result) == 1
             assert len(result.columns) == 0
             assert result.index.name == "date"
+
+    def test_get_price_history_limit_applied_after_resampling(self):
+        """Test that limit is applied after resampling."""
+        from duk.fmp_api import get_price_history
+
+        # Create 14 days of daily data (2 full weeks)
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {
+                    "date": f"2023-01-{i:02d}",
+                    "open": 100.0 + i,
+                    "high": 105.0 + i,
+                    "low": 99.0 + i,
+                    "close": 103.0 + i,
+                    "volume": 1000 + i * 10,
+                }
+                for i in range(1, 15)
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            # Request weekly data with limit=2 and start_date (no end_date)
+            # Should fetch data from start_date, resample to weekly, then limit to 2
+            result = get_price_history(
+                "test_api_key",
+                "AAPL",
+                start_date="2023-01-01",
+                frequency="week",
+                limit=2,
+            )
+
+            # Should have exactly 2 weekly records (limit applied after resampling)
+            assert len(result) == 2
+            # Verify it's resampled (should have aggregated data)
+            assert "close" in result.columns
+            assert "volume" in result.columns
