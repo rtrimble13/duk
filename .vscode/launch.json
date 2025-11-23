@@ -24,8 +24,8 @@
             "name": "Python Debugger: duk ph",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/duk/main.py",
-            "args": ["ph", "ibm"],
+            "program": "${workspaceFolder}/src/duk/cli.py",
+            "args": ["ph", "ibm", "-n", "5", "--hlc"],
             "console": "integratedTerminal"
         }
     ]

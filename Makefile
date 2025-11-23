@@ -14,8 +14,9 @@ help:
 build:
 	@echo "Creating/using conda env 'duk' and installing dependencies"
 	@if command -v conda >/dev/null 2>&1; then \
-		if ! conda >/dev/null 2>&1; then \
+		if ! conda env list | awk '{print $$1}' | grep -qx duk; then \
 			echo "Creating conda env 'duk'..."; \
+			conda create -n duk python=3.13 -y; \
 		else \
 			echo "Conda env 'duk' already exists."; \
 		fi; \
@@ -32,7 +33,13 @@ install:
 
 # Run the test suite
 test:
-	python -m pytest test/ -v
+	@echo "Running tests in 'duk' conda environment"
+	@if command -v conda >/dev/null 2>&1; then \
+		conda run -n duk python -m pytest test/ -v; \
+	else \
+		echo "conda not found, using system python"; \
+		python -m pytest test/ -v; \
+	fi
 
 fmt:
 	python -m black src/ test/

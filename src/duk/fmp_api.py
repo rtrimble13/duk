@@ -61,10 +61,10 @@ def price_history_api(
         raise ValueError("API key cannot be empty")
 
     # Construct the base URL
-    base_url = "https://financialmodelingprep.com/api/v3"
-    endpoint = f"{base_url}/historical-price-full/{symbol}"
+    base_url = "https://financialmodelingprep.com/stable"
+    endpoint = f"{base_url}/historical-price-eod/full?symbol={symbol}"
 
-    # Build query parameters
+#    # Build query parameters
     params = {"apikey": api_key}
     if from_date:
         params["from"] = from_date
@@ -187,12 +187,9 @@ def get_price_history(
     # Validate fields parameter
     valid_fields = ["open", "high", "low", "close", "volume"]
     if fields is not None:
-        invalid_fields = [f for f in fields if f not in valid_fields]
-        if invalid_fields:
-            raise ValueError(
-                f"Invalid fields: {invalid_fields}. "
-                f"Valid fields are: {valid_fields}"
-            )
+        fields = [f for f in fields if f in valid_fields]
+    else:
+        fields = valid_fields  # Default to all fields
 
     # Convert string dates to date objects
     start_date_obj = None
@@ -230,6 +227,13 @@ def get_price_history(
         return pd.DataFrame()
 
     df = pd.DataFrame(data)
+
+    # Convert df columns to lower case for consistency
+    df.columns = [col.lower() for col in df.columns]
+
+    # Keep only the relevant columns
+    expected_columns = ["date"] + fields
+    df = df.loc[:, [col for col in expected_columns if col in df.columns]]
 
     # Ensure date column exists and convert to datetime
     if "date" not in df.columns:
@@ -287,24 +291,9 @@ def get_price_history(
             df = df.head(limit)
             logger.debug(f"Keeping first {limit} records")
         # Case: limit with end_date and no start_date - keep last `limit` records
-        elif start_date_obj is None and end_date_obj is not None:
+        else:
             df = df.tail(limit)
             logger.debug(f"Keeping last {limit} records")
-
-    # Filter columns if fields parameter is specified
-    if fields is not None:
-        # Only keep columns that are in the fields list and exist in the DataFrame
-        available_fields = [f for f in fields if f in df.columns]
-        if available_fields:
-            df = df[available_fields]
-            logger.debug(f"Filtered to fields: {available_fields}")
-        else:
-            # No requested fields found - return empty DataFrame with proper index
-            logger.warning(
-                f"None of the requested fields {fields} found in DataFrame. "
-                f"Available fields: {list(df.columns)}"
-            )
-            df = pd.DataFrame(index=df.index)
 
     logger.info(f"Returning {len(df)} records for {symbol}")
     return df

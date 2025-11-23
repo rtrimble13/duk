@@ -47,7 +47,7 @@ class DukConfig:
         # Fall back to config file
         if self._config is None:
             return ""
-        return self._config.get("api.fmp_key", default="")
+        return self._config.get("api.fmp_key", default="").strip()
 
     @property
     def default_output_dir(self) -> str:

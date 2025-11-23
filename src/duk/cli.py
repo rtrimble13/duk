@@ -117,7 +117,7 @@ def ph(
 
     # Adjust logging based on verbose flag
     if verbose:
-        logger.setLevel(logging.DEBUG)
+        logger.setLevel(logging.INFO)
         # Enable console output for all handlers
         for handler in logger.handlers:
             if isinstance(handler, logging.StreamHandler) and not isinstance(
@@ -204,10 +204,6 @@ def ph(
     # Prepare output
     # Reset index to include date as a column in output
     output_df = df.reset_index()
-    output_df.rename(columns={"date": "Date"}, inplace=True)
-
-    # Capitalize column names for output
-    output_df.columns = [col.capitalize() for col in output_df.columns]
 
     # Handle output to file
     if output:
