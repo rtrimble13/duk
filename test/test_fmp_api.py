@@ -649,3 +649,32 @@ class TestGetPriceHistory:
             assert "low" in result.columns
             assert "close" in result.columns
             assert "volume" in result.columns
+
+    def test_get_price_history_fields_not_in_response(self):
+        """Test that requesting fields not in response returns empty DataFrame."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {
+                    "date": "2023-01-02",
+                    "close": 150.0,
+                },
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            # Request fields that don't exist in response
+            result = get_price_history(
+                "test_api_key", "AAPL", fields=["open", "high", "low"]
+            )
+
+            # Should return DataFrame with index but no columns
+            assert len(result) == 1
+            assert len(result.columns) == 0
+            assert result.index.name == "date"

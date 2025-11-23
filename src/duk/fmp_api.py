@@ -299,7 +299,12 @@ def get_price_history(
             df = df[available_fields]
             logger.debug(f"Filtered to fields: {available_fields}")
         else:
-            logger.warning(f"None of the requested fields {fields} found in DataFrame")
+            # No requested fields found - return empty DataFrame with proper index
+            logger.warning(
+                f"None of the requested fields {fields} found in DataFrame. "
+                f"Available fields: {list(df.columns)}"
+            )
+            df = pd.DataFrame(index=df.index)
 
     logger.info(f"Returning {len(df)} records for {symbol}")
     return df
