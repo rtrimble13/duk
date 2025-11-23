@@ -1048,3 +1048,39 @@ class TestGetPriceHistory:
             for col in result.columns:
                 assert not col.startswith("adj")
                 assert col == col.strip()  # No leading or trailing whitespace
+
+    def test_get_price_history_adjusted_only_strips_prefix(self):
+        """Test that stripping 'adj' only removes prefix, not from other parts."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {
+                    "date": "2023-01-02",
+                    "adjClose": 150.0,
+                    "adjOpen": 149.0,
+                    "adjHigh": 151.0,
+                    "adjLow": 148.0,
+                    "adjVolume": 900000,
+                },
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_price_history("test_api_key", "AAPL", adjusted=True)
+
+            # Verify the prefix was stripped correctly using slicing
+            assert len(result) == 1
+            assert "close" in result.columns
+            assert "open" in result.columns
+            assert "high" in result.columns
+            assert "low" in result.columns
+            assert "volume" in result.columns
+            # Verify values are correct after column rename
+            assert result.iloc[0]["close"] == 150.0
+            assert result.iloc[0]["open"] == 149.0

@@ -335,8 +335,7 @@ def get_price_history(
     # Strip "adj" prefix from column names if adjusted data is used
     if adjusted:
         df.columns = [
-            col.replace("adj", "", 1).strip() if col.startswith("adj") else col
-            for col in df.columns
+            col[3:].strip() if col.startswith("adj") else col for col in df.columns
         ]
 
     # Keep only the relevant columns
