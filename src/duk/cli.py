@@ -234,13 +234,13 @@ def ph(
 
         if not quiet:
             click.echo(f"Data written to {output_path}")
-    else:
-        # Print to stdout unless quiet flag is set
-        if not quiet:
-            if output_format == "json":
-                click.echo(output_df.to_json(orient="records", date_format="iso"))
-            else:
-                click.echo(output_df.to_csv(index=False))
+
+    # Print to stdout unless quiet flag is set
+    if not quiet:
+        if output_format == "json":
+            click.echo(output_df.to_json(orient="records", date_format="iso"))
+        else:
+            click.echo(output_df.to_csv(index=False))
 
 
 if __name__ == "__main__":
