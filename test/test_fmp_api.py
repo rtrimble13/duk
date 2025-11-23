@@ -185,3 +185,316 @@ class TestPriceHistoryAPI:
             assert "historical-price-full/AAPL" in call_args[0][0]
             assert call_args[1]["params"]["apikey"] == "test_api_key"
             assert call_args[1]["timeout"] == 30
+
+
+class TestGetPriceHistory:
+    """Tests for get_price_history function."""
+
+    def test_get_price_history_basic(self):
+        """Test basic usage without date range or limit."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {
+                    "date": "2023-01-02",
+                    "open": 149.0,
+                    "high": 151.0,
+                    "low": 148.0,
+                    "close": 150.0,
+                    "volume": 900000,
+                },
+                {
+                    "date": "2023-01-03",
+                    "open": 150.0,
+                    "high": 155.0,
+                    "low": 149.0,
+                    "close": 154.0,
+                    "volume": 1000000,
+                },
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_price_history("test_api_key", "AAPL")
+
+            assert len(result) == 2
+            assert result.index.name == "date"
+            # Check that data is sorted ascending
+            assert result.index[0].strftime("%Y-%m-%d") == "2023-01-02"
+            assert result.index[1].strftime("%Y-%m-%d") == "2023-01-03"
+            assert result.iloc[0]["close"] == 150.0
+            assert result.iloc[1]["close"] == 154.0
+
+    def test_get_price_history_with_date_range(self):
+        """Test with start_date and end_date."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {"date": "2023-06-01", "close": 160.0},
+                {"date": "2023-06-02", "close": 162.0},
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_price_history(
+                "test_api_key",
+                "AAPL",
+                start_date="2023-06-01",
+                end_date="2023-06-30",
+            )
+
+            assert len(result) == 2
+            # Verify dates were passed to API
+            call_args = mock_get.call_args
+            assert "from" in call_args[1]["params"]
+            assert "to" in call_args[1]["params"]
+
+    def test_get_price_history_with_start_date_and_limit(self):
+        """Test with start_date and limit - should keep first N records."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {"date": "2023-01-01", "close": 150.0},
+                {"date": "2023-01-02", "close": 151.0},
+                {"date": "2023-01-03", "close": 152.0},
+                {"date": "2023-01-04", "close": 153.0},
+                {"date": "2023-01-05", "close": 154.0},
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_price_history(
+                "test_api_key", "AAPL", start_date="2023-01-01", limit=3
+            )
+
+            # Should keep first 3 records
+            assert len(result) == 3
+            assert result.index[0].strftime("%Y-%m-%d") == "2023-01-01"
+            assert result.index[-1].strftime("%Y-%m-%d") == "2023-01-03"
+
+    def test_get_price_history_with_end_date_and_limit(self):
+        """Test with end_date and limit - should keep last N records."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {"date": "2023-01-01", "close": 150.0},
+                {"date": "2023-01-02", "close": 151.0},
+                {"date": "2023-01-03", "close": 152.0},
+                {"date": "2023-01-04", "close": 153.0},
+                {"date": "2023-01-05", "close": 154.0},
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_price_history(
+                "test_api_key", "AAPL", end_date="2023-01-05", limit=3
+            )
+
+            # Should keep last 3 records
+            assert len(result) == 3
+            assert result.index[0].strftime("%Y-%m-%d") == "2023-01-03"
+            assert result.index[-1].strftime("%Y-%m-%d") == "2023-01-05"
+
+    def test_get_price_history_weekly_resampling(self):
+        """Test resampling to weekly frequency."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {
+                    "date": "2023-01-02",
+                    "open": 100.0,
+                    "high": 105.0,
+                    "low": 99.0,
+                    "close": 103.0,
+                    "volume": 1000,
+                },
+                {
+                    "date": "2023-01-03",
+                    "open": 103.0,
+                    "high": 107.0,
+                    "low": 102.0,
+                    "close": 106.0,
+                    "volume": 1100,
+                },
+                {
+                    "date": "2023-01-09",
+                    "open": 106.0,
+                    "high": 110.0,
+                    "low": 105.0,
+                    "close": 109.0,
+                    "volume": 1200,
+                },
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_price_history(
+                "test_api_key",
+                "AAPL",
+                start_date="2023-01-01",
+                end_date="2023-01-31",
+                frequency="week",
+            )
+
+            # Should have resampled data
+            assert len(result) >= 1
+            assert "close" in result.columns
+
+    def test_get_price_history_monthly_resampling(self):
+        """Test resampling to monthly frequency."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {
+                    "date": "2023-01-02",
+                    "open": 100.0,
+                    "high": 105.0,
+                    "low": 99.0,
+                    "close": 103.0,
+                    "volume": 1000,
+                },
+                {
+                    "date": "2023-01-15",
+                    "open": 103.0,
+                    "high": 107.0,
+                    "low": 102.0,
+                    "close": 106.0,
+                    "volume": 1100,
+                },
+                {
+                    "date": "2023-02-05",
+                    "open": 106.0,
+                    "high": 110.0,
+                    "low": 105.0,
+                    "close": 109.0,
+                    "volume": 1200,
+                },
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_price_history(
+                "test_api_key",
+                "AAPL",
+                start_date="2023-01-01",
+                end_date="2023-02-28",
+                frequency="month",
+            )
+
+            # Should have resampled data with monthly frequency
+            assert len(result) >= 1
+
+    def test_get_price_history_empty_response(self):
+        """Test handling of empty API response."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {"symbol": "AAPL", "historical": []}
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_price_history("test_api_key", "AAPL")
+
+            assert len(result) == 0
+            assert isinstance(result, __import__("pandas").DataFrame)
+
+    def test_get_price_history_invalid_date_format(self):
+        """Test handling of invalid date format."""
+        from duk.fmp_api import get_price_history
+
+        with pytest.raises(ValueError):
+            get_price_history("test_api_key", "AAPL", start_date="invalid-date")
+
+    def test_get_price_history_quarterly_resampling(self):
+        """Test resampling to quarterly frequency."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {"date": "2023-01-02", "open": 100.0, "close": 103.0, "volume": 1000},
+                {"date": "2023-02-15", "open": 103.0, "close": 106.0, "volume": 1100},
+                {"date": "2023-04-05", "open": 106.0, "close": 109.0, "volume": 1200},
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_price_history(
+                "test_api_key",
+                "AAPL",
+                start_date="2023-01-01",
+                end_date="2023-06-30",
+                frequency="quarter",
+            )
+
+            assert len(result) >= 1
+
+    def test_get_price_history_annual_resampling(self):
+        """Test resampling to annual frequency."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {"date": "2022-01-02", "open": 100.0, "close": 103.0, "volume": 1000},
+                {"date": "2022-06-15", "open": 103.0, "close": 106.0, "volume": 1100},
+                {"date": "2023-01-05", "open": 106.0, "close": 109.0, "volume": 1200},
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_price_history(
+                "test_api_key",
+                "AAPL",
+                start_date="2022-01-01",
+                end_date="2023-12-31",
+                frequency="annual",
+            )
+
+            assert len(result) >= 1
