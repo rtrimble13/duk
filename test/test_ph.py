@@ -184,6 +184,22 @@ class TestGetPriceHistory:
                 limit=5,
             )
 
+    def test_get_price_history_invalid_limit(self):
+        """Test error handling for invalid limit."""
+        with pytest.raises(ValueError, match="Limit must be a positive integer"):
+            get_price_history(
+                symbol=self.symbol,
+                api_key=self.api_key,
+                limit=0,
+            )
+
+        with pytest.raises(ValueError, match="Limit must be a positive integer"):
+            get_price_history(
+                symbol=self.symbol,
+                api_key=self.api_key,
+                limit=-5,
+            )
+
     def test_get_price_history_quarterly_frequency(self):
         """Test price history with quarterly frequency."""
         with patch("duk.ph.requests.get") as mock_get:

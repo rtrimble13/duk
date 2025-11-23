@@ -5,7 +5,7 @@ This module provides functionality to download security price history from
 Financial Modeling Prep (FMP) API.
 """
 
-from typing import Optional
+from typing import List, Optional
 
 import pandas as pd
 import requests
@@ -22,7 +22,7 @@ def get_price_history(
     end_date: Optional[str] = None,
     frequency: str = "daily",
     limit: int = 5,
-    fields: Optional[list] = None,
+    fields: Optional[List[str]] = None,
 ) -> pd.DataFrame:
     """
     Get price history for a security from Financial Modeling Prep API.
@@ -50,6 +50,11 @@ def get_price_history(
     if not api_key:
         logger.error("FMP API key is required")
         raise ValueError("FMP API key is required. Set it in ~/.dukrc")
+
+    # Validate limit
+    if limit <= 0:
+        logger.error(f"Invalid limit: {limit}")
+        raise ValueError(f"Limit must be a positive integer, got: {limit}")
 
     # Normalize symbol to uppercase for API call
     symbol_upper = symbol.upper()
@@ -131,9 +136,8 @@ def get_price_history(
 
         # Apply limit - take the most recent N data points (last N rows in
         # ascending date order)
-        if limit > 0:
-            df = df.tail(limit)
-            logger.debug(f"Limited to {limit} most recent data points")
+        df = df.tail(limit)
+        logger.debug(f"Limited to {limit} most recent data points")
 
         # Select fields if specified
         if fields:

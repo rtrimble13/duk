@@ -231,8 +231,12 @@ def ph(
                 output_dir = Path(config.default_output_dir)
                 output_dir.mkdir(parents=True, exist_ok=True)
                 ext = "csv" if output_format == "csv" else "json"
+                # Sanitize symbol for use in filename (remove invalid chars)
+                safe_symbol = "".join(
+                    c for c in symbol.lower() if c.isalnum() or c in "-_"
+                )
                 output_file = (
-                    output_dir / f"{symbol.lower()}_price_history_{frequency}.{ext}"
+                    output_dir / f"{safe_symbol}_price_history_{frequency}.{ext}"
                 )
             else:
                 # Use provided path
