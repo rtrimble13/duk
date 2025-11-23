@@ -33,6 +33,7 @@ cp etc/dukrc ~/.dukrc
 
 - **[api] section**
   - `fmp_key`: API key for Financial Modeling Prep
+    - Can also be set via the `FMP_API_KEY` environment variable (takes precedence over config file)
 
 - **[general] section**
   - `default_output_dir`: Default directory for output files (default: `var/duk`)

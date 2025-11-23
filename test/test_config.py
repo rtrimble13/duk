@@ -104,5 +104,114 @@ class TestDukConfig:
             ), f"~/.dukrc exists but is not a file: {user_config_path}"
             # Verify it can be loaded as a config
             config = DukConfig(user_config_path)
-            assert config.is_loaded() is True, "~/.dukrc exists but failed to load"
+            # fmt: off
+            assert config.is_loaded() is True, "~/.dukrc exists but failed to load"  # noqa: E501
+            # fmt: on
         # If file doesn't exist, test passes (user hasn't set up config yet)
+
+    def test_fmp_key_from_environment_variable(self):
+        """Test that FMP_API_KEY environment variable takes precedence."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "test.toml")
+
+            # Create a config file with a key
+            with open(config_path, "w") as f:
+                f.write("[api]\n")
+                f.write('fmp_key = "config_file_key"\n')
+
+            # Set environment variable
+            os.environ["FMP_API_KEY"] = "env_var_key"
+            try:
+                config = DukConfig(config_path)
+                # Environment variable should take precedence
+                assert config.fmp_key == "env_var_key"
+            finally:
+                # Clean up environment variable
+                del os.environ["FMP_API_KEY"]
+
+    def test_fmp_key_from_config_when_no_env_var(self):
+        """Test config file used when environment variable not set."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "test.toml")
+
+            # Create a config file with a key
+            with open(config_path, "w") as f:
+                f.write("[api]\n")
+                f.write('fmp_key = "config_file_key"\n')
+
+            # Ensure environment variable is not set
+            if "FMP_API_KEY" in os.environ:
+                del os.environ["FMP_API_KEY"]
+
+            config = DukConfig(config_path)
+            # Config file should be used
+            assert config.fmp_key == "config_file_key"
+
+    def test_fmp_key_empty_when_no_env_var_and_no_config(self):
+        """Test fmp_key returns empty when neither source has value."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "nonexistent.conf")
+
+            # Ensure environment variable is not set
+            if "FMP_API_KEY" in os.environ:
+                del os.environ["FMP_API_KEY"]
+
+            config = DukConfig(config_path)
+            # Should return empty string
+            assert config.fmp_key == ""
+
+    def test_fmp_key_from_env_var_when_config_missing(self):
+        """Test environment variable works when config missing."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "nonexistent.conf")
+
+            # Set environment variable
+            os.environ["FMP_API_KEY"] = "env_only_key"
+            try:
+                config = DukConfig(config_path)
+                # Environment variable should be used
+                assert config.fmp_key == "env_only_key"
+                assert config.is_loaded() is False
+            finally:
+                # Clean up environment variable
+                del os.environ["FMP_API_KEY"]
+
+    def test_fmp_key_empty_env_var_falls_back_to_config(self):
+        """Test empty environment variable falls back to config file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "test.toml")
+
+            # Create a config file with a key
+            with open(config_path, "w") as f:
+                f.write("[api]\n")
+                f.write('fmp_key = "config_file_key"\n')
+
+            # Set environment variable to empty string
+            os.environ["FMP_API_KEY"] = ""
+            try:
+                config = DukConfig(config_path)
+                # Empty env var should be ignored, config file used
+                assert config.fmp_key == "config_file_key"
+            finally:
+                # Clean up environment variable
+                del os.environ["FMP_API_KEY"]
+
+    def test_fmp_key_whitespace_env_var_falls_back_to_config(self):
+        """Test whitespace-only env variable falls back to config."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "test.toml")
+
+            # Create a config file with a key
+            with open(config_path, "w") as f:
+                f.write("[api]\n")
+                f.write('fmp_key = "config_file_key"\n')
+
+            # Set environment variable to whitespace-only string
+            os.environ["FMP_API_KEY"] = "   "
+            try:
+                config = DukConfig(config_path)
+                # Whitespace-only should be ignored, config file used
+                assert config.fmp_key == "config_file_key"
+            finally:
+                # Clean up environment variable
+                del os.environ["FMP_API_KEY"]

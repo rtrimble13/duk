@@ -33,7 +33,18 @@ class DukConfig:
 
     @property
     def fmp_key(self) -> str:
-        """Get FMP API key from [api] section."""
+        """
+        Get FMP API key from environment variable or config file.
+
+        First checks for FMP_API_KEY environment variable.
+        If not set, retrieves from [api] section in config file.
+        """
+        # Check environment variable first
+        env_key = os.environ.get("FMP_API_KEY", "").strip()
+        if env_key:
+            return env_key
+
+        # Fall back to config file
         if self._config is None:
             return ""
         return self._config.get("api.fmp_key", default="")

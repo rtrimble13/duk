@@ -4,6 +4,7 @@
 
 [api]
 # API key for Financial Modeling Prep (FMP)
+# Can also be set via FMP_API_KEY environment variable (takes precedence)
 fmp_key = ""
 
 [general]
