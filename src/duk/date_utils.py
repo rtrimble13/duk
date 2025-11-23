@@ -145,7 +145,9 @@ def get_api_date_range(
 
     # Case: only limit is provided
     if start_date is None and end_date is None and limit is not None:
-        calculated_start = current_date - timedelta(days=limit * frequency_multiplier * 2)
+        calculated_start = current_date - timedelta(
+            days=limit * frequency_multiplier * 2
+        )
         logger.debug(
             f"Calculated range from {calculated_start} to {current_date} "
             f"using limit {limit} and frequency {frequency}"
