@@ -121,6 +121,13 @@ def get_api_date_range(
     # Case: only start_date and limit are provided
     if start_date is not None and end_date is None and limit is not None:
         calculated_end = start_date + timedelta(days=limit * frequency_multiplier)
+        # Cap the end date at current_date to avoid requesting future data
+        if calculated_end > current_date:
+            calculated_end = current_date
+            logger.debug(
+                f"Capped end date to current date {current_date} "
+                f"(original calculation would exceed current date)"
+            )
         logger.debug(
             f"Calculated end date {calculated_end} from start {start_date} "
             f"+ {limit} * {frequency_multiplier} days"

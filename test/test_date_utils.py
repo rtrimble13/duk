@@ -257,3 +257,34 @@ class TestGetApiDateRange:
         expected_start = date(2023, 6, 30) - timedelta(days=180)
         assert result_start == expected_start
         assert result_end == end
+
+    def test_start_date_and_limit_capped_at_current_date(self):
+        """Test case: calculated end date is capped at current date."""
+        # Use a start date in the recent past
+        start = date.today() - timedelta(days=5)
+        # Request a large limit that would exceed current date
+        limit = 100
+        result_start, result_end = get_api_date_range(
+            start_date=start, limit=limit, frequency="day"
+        )
+
+        assert result_start == start
+        # End date should be capped at current date
+        assert result_end == date.today()
+        # Verify it doesn't exceed current date
+        assert result_end <= date.today()
+
+    def test_start_date_and_limit_not_capped_when_within_range(self):
+        """Test case: calculated end date is not capped when within valid range."""
+        # Use a start date far in the past
+        start = date(2020, 1, 1)
+        limit = 10
+        result_start, result_end = get_api_date_range(
+            start_date=start, limit=limit, frequency="day"
+        )
+
+        assert result_start == start
+        # End date should be the calculated value, not capped
+        assert result_end == date(2020, 1, 11)
+        # Verify it doesn't exceed current date
+        assert result_end <= date.today()
