@@ -1,147 +1,95 @@
 """
-Configuration management for duk CLI tool using configistate.
+Configuration management for duk.
 
-Reads configuration from a single user config file: ~/.dukrc
-Configuration files use TOML format.
+This module handles loading and accessing configuration from ~/.dukrc
+using the configistate library.
 """
 
-import logging
 import os
-from pathlib import Path
 from typing import Optional
 
 from configistate import Config
 
-logger = logging.getLogger(__name__)
 
+class DukConfig:
+    """Configuration manager for duk application."""
 
-class ConfigurationManager:
-    """Manages configuration loading using configistate."""
-
-    def __init__(self):
-        self.config_path = Path.home() / ".dukrc"
-        self._config = None
-        self._loaded = False
-
-    def load_configuration(self):
-        """Load configuration from ~/.dukrc."""
-        if self._loaded:
-            return
-
-        # Create config file if it doesn't exist
-        if not self.config_path.exists():
-            logger.debug(f"Config file {self.config_path} does not exist")
-            self._config = None
-        else:
-            try:
-                self._config = Config(str(self.config_path))
-                logger.debug(f"Loaded configuration from {self.config_path}")
-            except Exception as e:
-                logger.warning(
-                    f"Failed to load configuration from {self.config_path}: {e}"
-                )
-                self._config = None
-
-        self._loaded = True
-
-    def get_api_key(self, key_name: str) -> Optional[str]:
-        """Get API key by name from configuration.
-
-        First tries to get from config file, then falls back to environment variables.
-        Supports file:// references in config values.
+    def __init__(self, config_path: Optional[str] = None):
         """
-        # Ensure config is loaded
-        if not self._loaded:
-            self.load_configuration()
-
-        # Try config file first
-        if self._config:
-            try:
-                # configistate uses dot notation, e.g., "api_keys.fmp_api_key"
-                key_value = self._config.get(f"api_keys.{key_name}")
-                if key_value:
-                    logger.debug(f"Found {key_name} in config file")
-                    return key_value
-            except Exception as e:
-                logger.debug(f"Could not get {key_name} from config: {e}")
-
-        # Fall back to environment variables
-        env_vars = {"FMP_API_KEY": "fmp_api_key"}
-        for env_var, config_key in env_vars.items():
-            if config_key == key_name:
-                value = os.environ.get(env_var)
-                if value:
-                    logger.debug(f"Found {key_name} in environment variable {env_var}")
-                    return value
-
-        return None
-
-    def get(self, key_path: str, default=None):
-        """Get a configuration value by key path.
+        Initialize configuration manager.
 
         Args:
-            key_path: Dot-separated path to the config value
-                (e.g., "settings.log_level")
-            default: Default value to return if key is not found
-
-        Returns:
-            The configuration value or default if not found
+            config_path: Path to configuration file. If None, uses ~/.dukrc
         """
-        # Ensure config is loaded
-        if not self._loaded:
-            self.load_configuration()
+        if config_path is None:
+            config_path = os.path.expanduser("~/.dukrc")
 
-        if self._config:
-            try:
-                value = self._config.get(key_path)
-                return value if value is not None else default
-            except Exception as e:
-                logger.debug(f"Could not get {key_path} from config: {e}")
+        self.config_path = config_path
+        self._config = None
 
-        return default
+        # Load configuration if file exists
+        if os.path.exists(self.config_path):
+            self._config = Config(self.config_path)
 
-    def validate_required_keys(self, required_keys: list[str]) -> bool:
-        """Validate that all required API keys are present."""
-        missing_keys = []
+    @property
+    def fmp_key(self) -> str:
+        """
+        Get FMP API key from environment variable or config file.
 
-        for key_name in required_keys:
-            if not self.get_api_key(key_name):
-                missing_keys.append(key_name)
+        First checks for FMP_API_KEY environment variable.
+        If not set, retrieves from [api] section in config file.
+        """
+        # Check environment variable first
+        env_key = os.environ.get("FMP_API_KEY", "").strip()
+        if env_key:
+            return env_key
 
-        if missing_keys:
-            logger.error(f"Missing required API keys: {missing_keys}")
-            logger.error("Configure API keys in:")
-            logger.error(f"  - {self.config_path}")
-            logger.error("Or set environment variables (e.g., FMP_API_KEY)")
-            return False
+        # Fall back to config file
+        if self._config is None:
+            return ""
+        return self._config.get("api.fmp_key", default="")
 
-        return True
+    @property
+    def default_output_dir(self) -> str:
+        """Get default output directory from [general] section."""
+        if self._config is None:
+            return "var/duk"
+        return self._config.get("general.default_output_dir", default="var/duk")
 
-    def get_loaded_files(self) -> list[str]:
-        """Get list of configuration files that were successfully loaded."""
-        if self._config and self.config_path.exists():
-            return [str(self.config_path)]
-        return []
+    @property
+    def default_output_type(self) -> str:
+        """Get default output type from [general] section."""
+        if self._config is None:
+            return "csv"
+        return self._config.get("general.default_output_type", default="csv")
+
+    @property
+    def log_level(self) -> str:
+        """Get log level from [general] section."""
+        if self._config is None:
+            return "info"
+        return self._config.get("general.log_level", default="info")
+
+    @property
+    def log_dir(self) -> str:
+        """Get log directory from [general] section."""
+        if self._config is None:
+            return "var/duk/log"
+        return self._config.get("general.log_dir", default="var/duk/log")
+
+    def is_loaded(self) -> bool:
+        """Check if configuration file was successfully loaded."""
+        return self._config is not None
 
 
-# Global configuration manager instance
-_config_manager = None
+def get_config(config_path: Optional[str] = None) -> DukConfig:
+    """
+    Get configuration instance.
 
+    Args:
+        config_path: Optional path to configuration file
 
-def get_config_manager() -> ConfigurationManager:
-    """Get the global configuration manager instance."""
-    global _config_manager
-    if _config_manager is None:
-        _config_manager = ConfigurationManager()
-        _config_manager.load_configuration()
-    return _config_manager
-
-
-def get_api_key(key_name: str) -> Optional[str]:
-    """Convenience function to get an API key."""
-    return get_config_manager().get_api_key(key_name)
-
-
-def validate_required_keys(required_keys: list[str]) -> bool:
-    """Convenience function to validate required API keys."""
-    return get_config_manager().validate_required_keys(required_keys)
+    Returns:
+        DukConfig instance
+    """
+    return DukConfig(config_path)

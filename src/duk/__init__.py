@@ -1,17 +1,17 @@
 """
-duk - TurningBull Data Utility Knife
-
-A CLI tool for downloading financial market data and performing data
-preprocessing.
-
-Can also be used as a Python module:
-    import duk
-    df = duk.ph('AAPL')  # Get price history for Apple stock
+duk - A CLI tool and library for downloading markets and financial data.
 """
 
-__version__ = "0.1.0"
+from duk.date_utils import DateRangeError, get_api_date_range
+from duk.fmp_api import FMPAPIError, get_price_history, price_history_api
 
-# Import API functions for programmatic use
-from duk.api import ph
+__version__ = "0.2.0"
 
-__all__ = ["ph", "__version__"]
+__all__ = [
+    "__version__",
+    "get_api_date_range",
+    "DateRangeError",
+    "FMPAPIError",
+    "price_history_api",
+    "get_price_history",
+]

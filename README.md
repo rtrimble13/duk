@@ -1,140 +1,129 @@
 # duk
-TurningBull Data Utility Knife
 
-A Python CLI tool for downloading financial market data and performing data preprocessing.
+A CLI tool and library for downloading markets and financial data through various APIs.
 
 ## Installation
 
-### From Source (Development)
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/rtrimble13/duk.git
-   cd duk
-   ```
-
-2. Install in development mode:
-   ```bash
-   make install
-   ```
-
-3. Verify installation:
-   ```bash
-   duk --help
-   ```
-
-### From PyPI (Coming Soon)
+### Using pip
 
 ```bash
 pip install duk
 ```
 
-## Development
-
-### Conda Environment Setup (Recommended)
-
-For local development using miniconda3/anaconda:
-
-1. Set up the development environment:
-   ```bash
-   make dev
-   ```
-
-2. Activate the environment:
-   ```bash
-   conda activate duk
-   ```
-
-3. Install duk in development mode:
-   ```bash
-   pip install -e .
-   ```
-
-4. Run tests:
-   ```bash
-   make test
-   ```
-
-### Alternative Setup (pip)
-
-Alternatively, you can use pip directly:
-
-1. Install in development mode:
-   ```bash
-   make install
-   ```
-
-### Available Commands
-
-- `make dev` - Create/update conda development environment
-- `make install` - Install the package in development mode
-- `make test` - Run unit tests
-- `make clean` - Clean build artifacts
-- `make lint` - Run linting checks
-- `make format` - Format code with black
-- `make build` - Build distribution packages
-- `make publish` - Publish to PyPI (requires credentials)
-
-### Conda Environment Management
-
-Additional conda-specific commands:
-
-- `make env-create` - Create conda environment from environment.yml
-- `make env-update` - Update existing conda environment
-- `make env-export` - Export current environment to environment.yml
-- `make env-remove` - Remove the conda development environment
-
-### Building Distribution Packages
-
-To create distributable packages:
+### From source
 
 ```bash
-make build
+git clone https://github.com/rtrimble13/duk.git
+cd duk
+make install
 ```
 
-This creates both wheel and source distributions in the `dist/` directory.
+## Configuration
 
-### Testing
+duk uses a configuration file located at `~/.dukrc`. A template configuration file is provided in `etc/dukrc`.
 
-Run the complete test suite:
+To set up your configuration:
+
+```bash
+cp etc/dukrc ~/.dukrc
+# Edit ~/.dukrc with your preferred settings
+```
+
+### Configuration Options
+
+- **[api] section**
+  - `fmp_key`: API key for Financial Modeling Prep
+    - Can also be set via the `FMP_API_KEY` environment variable (takes precedence over config file)
+
+- **[general] section**
+  - `default_output_dir`: Default directory for output files (default: `var/duk`)
+  - `default_output_type`: Default output format, either `csv` or `json` (default: `csv`)
+  - `log_level`: Logging level - `debug`, `info`, `warning`, `error`, or `critical` (default: `info`)
+  - `log_dir`: Directory for log files (default: `var/duk/log`)
+
+## Usage
+
+### CLI Usage
+
+```bash
+# Display help
+duk --help
+
+# Use with custom config file
+duk --config /path/to/config --help
+```
+
+### Library Usage
+
+duk can be used as a Python library to fetch financial data programmatically.
+
+#### Get Historical Price Data
+
+```python
+from duk import get_price_history
+
+# Get daily price data for a date range
+df = get_price_history(
+    api_key="your_api_key",
+    symbol="AAPL",
+    start_date="2023-01-01",
+    end_date="2023-12-31"
+)
+
+print(df.head())
+```
+
+For more examples and detailed documentation, see [doc/get_price_history.md](doc/get_price_history.md).
+
+## Development
+
+### Prerequisites
+
+- Python 3.9 or higher
+- conda (optional, for environment management)
+
+### Setup Development Environment
+
+```bash
+# Using make (recommended)
+make build
+
+# Or using pip directly
+pip install -e .[dev]
+```
+
+### Running Tests
 
 ```bash
 make test
 ```
 
-## Usage
+### Linting
 
-### Command Line Interface (CLI)
-
-See the [documentation](doc/README.md) for detailed usage instructions.
-
-Quick example:
 ```bash
-# Download latest Treasury rates
-duk tr
-
-# Get help for specific commands
-duk tr --help
+make fmt
 ```
 
-### Python API
+### Building Documentation
 
-`duk` can also be used as a Python module for programmatic access to financial data:
-
-```python
-import duk
-
-# Get latest 5 days of close prices for AAPL
-df = duk.ph('AAPL')
-
-# Get OHLC data for multiple tickers
-df = duk.ph(['AAPL', 'MSFT'], fields=['open', 'high', 'low', 'close'])
-
-# Get data for a specific date range
-df = duk.ph('AAPL', start_date='2023-01-01', end_date='2023-12-31')
-
-# Get weekly data with dividends
-df = duk.ph('AAPL', frequency='weekly', include_dividends=True)
+```bash
+make doc
 ```
 
-The API functions use the same configuration system (`.dukrc`) as the CLI tool. See the [API documentation](doc/api.md) for more details.
+### Creating Distribution
+
+```bash
+make dist
+```
+
+## Project Structure
+
+- `src/duk/`: Source code
+- `test/`: Unit tests
+- `doc/`: Documentation
+- `etc/`: Configuration templates
+- `var/`: Default output and log directory
+
+## License
+
+MIT License - see LICENSE file for details.
