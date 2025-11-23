@@ -770,3 +770,65 @@ class TestPhCommand:
                 # Default should be CSV format
                 assert "Date,Close" in result.output
                 assert "2023-01-02" in result.output
+
+    def test_ph_with_adj_flag(self):
+        """Test ph command with --adj flag for adjusted price history."""
+        mock_df = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2023-01-02", "2023-01-03"]),
+                "open": [149.0, 150.0],
+                "high": [151.0, 155.0],
+                "low": [148.0, 149.0],
+                "close": [150.0, 154.0],
+                "volume": [900000, 1000000],
+            }
+        )
+        mock_df = mock_df.set_index("date")
+
+        with mock.patch("duk.cli.get_price_history") as mock_get:
+            mock_get.return_value = mock_df
+
+            runner = CliRunner()
+            with tempfile.TemporaryDirectory() as tmpdir:
+                config_path = os.path.join(tmpdir, "test.toml")
+                with open(config_path, "w") as f:
+                    f.write("[api]\n")
+                    f.write('fmp_key = "test_key"\n')
+
+                result = runner.invoke(
+                    main, ["--config", config_path, "ph", "AAPL", "--adj"]
+                )
+
+                assert result.exit_code == 0
+                # Verify get_price_history was called with adjusted=True
+                mock_get.assert_called_once()
+                call_kwargs = mock_get.call_args[1]
+                assert call_kwargs["adjusted"] is True
+
+    def test_ph_without_adj_flag(self):
+        """Test ph command without --adj flag defaults to non-adjusted prices."""
+        mock_df = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2023-01-02"]),
+                "close": [150.0],
+            }
+        )
+        mock_df = mock_df.set_index("date")
+
+        with mock.patch("duk.cli.get_price_history") as mock_get:
+            mock_get.return_value = mock_df
+
+            runner = CliRunner()
+            with tempfile.TemporaryDirectory() as tmpdir:
+                config_path = os.path.join(tmpdir, "test.toml")
+                with open(config_path, "w") as f:
+                    f.write("[api]\n")
+                    f.write('fmp_key = "test_key"\n')
+
+                result = runner.invoke(main, ["--config", config_path, "ph", "AAPL"])
+
+                assert result.exit_code == 0
+                # Verify get_price_history was called with adjusted=False (default)
+                mock_get.assert_called_once()
+                call_kwargs = mock_get.call_args[1]
+                assert call_kwargs["adjusted"] is False

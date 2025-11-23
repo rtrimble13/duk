@@ -927,3 +927,124 @@ class TestGetPriceHistory:
             # Verify it's resampled (should have aggregated data)
             assert "close" in result.columns
             assert "volume" in result.columns
+
+    def test_get_price_history_with_adjusted_true(self):
+        """Test that adjusted=True uses adjusted_price_history_api."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {
+                    "date": "2023-01-02",
+                    "adjOpen": 149.0,
+                    "adjHigh": 151.0,
+                    "adjLow": 148.0,
+                    "adjClose": 150.0,
+                    "adjVolume": 900000,
+                },
+                {
+                    "date": "2023-01-03",
+                    "adjOpen": 150.0,
+                    "adjHigh": 155.0,
+                    "adjLow": 149.0,
+                    "adjClose": 154.0,
+                    "adjVolume": 1000000,
+                },
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_price_history("test_api_key", "AAPL", adjusted=True)
+
+            # Verify the correct API endpoint was called (dividend-adjusted)
+            call_args = mock_get.call_args
+            assert "dividend-adjusted" in call_args[0][0]
+
+            # Verify column names have "adj" prefix stripped
+            assert len(result) == 2
+            assert "open" in result.columns
+            assert "high" in result.columns
+            assert "low" in result.columns
+            assert "close" in result.columns
+            assert "volume" in result.columns
+            # Verify no "adj" prefix remains
+            assert "adjopen" not in result.columns
+            assert "adjclose" not in result.columns
+
+    def test_get_price_history_with_adjusted_false(self):
+        """Test that adjusted=False uses regular price_history_api."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {
+                    "date": "2023-01-02",
+                    "open": 149.0,
+                    "high": 151.0,
+                    "low": 148.0,
+                    "close": 150.0,
+                    "volume": 900000,
+                },
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_price_history("test_api_key", "AAPL", adjusted=False)
+
+            # Verify the correct API endpoint was called (regular price history)
+            call_args = mock_get.call_args
+            assert "historical-price-eod/full" in call_args[0][0]
+            assert "dividend-adjusted" not in call_args[0][0]
+
+            # Verify regular column names
+            assert len(result) == 1
+            assert "open" in result.columns
+            assert "close" in result.columns
+
+    def test_get_price_history_adjusted_strips_whitespace(self):
+        """Test that adjusted=True strips 'adj' prefix and any whitespace."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {
+                    "date": "2023-01-02",
+                    "adj Open": 149.0,
+                    "adj High": 151.0,
+                    "adj Low": 148.0,
+                    "adj Close": 150.0,
+                    "adj Volume": 900000,
+                },
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_price_history("test_api_key", "AAPL", adjusted=True)
+
+            # Verify column names have "adj" prefix and whitespace stripped
+            assert len(result) == 1
+            # Check for properly cleaned column names (no "adj " prefix or extra spaces)
+            assert "open" in result.columns
+            assert "high" in result.columns
+            assert "low" in result.columns
+            assert "close" in result.columns
+            assert "volume" in result.columns
+            # Verify no whitespace or prefix remains
+            for col in result.columns:
+                assert not col.startswith("adj")
+                assert col == col.strip()  # No leading or trailing whitespace
