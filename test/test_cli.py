@@ -137,8 +137,7 @@ class TestCLI:
                         "10",
                         "--fields",
                         "date,close",
-                        "--output",
-                        "json",
+                        "--json",
                     ],
                 )
 
@@ -151,3 +150,166 @@ class TestCLI:
                 assert call_args[1]["symbol"] == "IBM"
                 assert call_args[1]["limit"] == 10
                 assert call_args[1]["fields"] == ["date", "close"]
+
+    def test_ph_command_ohlc_option(self):
+        """Test ph command with --ohlc option."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "test.toml")
+
+            # Create a test config file with API key
+            with open(config_path, "w") as f:
+                f.write("[api]\n")
+                f.write('fmp_key = "test_api_key"\n')
+
+            # Mock the get_price_history function
+            with patch("duk.cli.get_price_history") as mock_get:
+                # Create mock DataFrame
+                mock_df = pd.DataFrame(
+                    {
+                        "date": pd.to_datetime(["2024-01-01"]),
+                        "open": [149.0],
+                        "high": [152.0],
+                        "low": [148.0],
+                        "close": [150.0],
+                    }
+                )
+                mock_get.return_value = mock_df
+
+                runner = CliRunner()
+                result = runner.invoke(
+                    main, ["--config", config_path, "ph", "IBM", "--ohlc"]
+                )
+
+                # Should succeed
+                assert result.exit_code == 0
+
+                # Verify OHLC fields were requested
+                call_args = mock_get.call_args
+                assert call_args[1]["fields"] == [
+                    "date",
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                ]
+
+    def test_ph_command_hlc_option(self):
+        """Test ph command with --hlc option."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "test.toml")
+
+            # Create a test config file with API key
+            with open(config_path, "w") as f:
+                f.write("[api]\n")
+                f.write('fmp_key = "test_api_key"\n')
+
+            # Mock the get_price_history function
+            with patch("duk.cli.get_price_history") as mock_get:
+                # Create mock DataFrame
+                mock_df = pd.DataFrame(
+                    {
+                        "date": pd.to_datetime(["2024-01-01"]),
+                        "high": [152.0],
+                        "low": [148.0],
+                        "close": [150.0],
+                    }
+                )
+                mock_get.return_value = mock_df
+
+                runner = CliRunner()
+                result = runner.invoke(
+                    main, ["--config", config_path, "ph", "IBM", "--hlc"]
+                )
+
+                # Should succeed
+                assert result.exit_code == 0
+
+                # Verify HLC fields were requested
+                call_args = mock_get.call_args
+                assert call_args[1]["fields"] == ["date", "high", "low", "close"]
+
+    def test_ph_command_output_to_file(self):
+        """Test ph command with output to file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "test.toml")
+
+            # Create a test config file with API key
+            with open(config_path, "w") as f:
+                f.write("[api]\n")
+                f.write('fmp_key = "test_api_key"\n')
+                f.write("[general]\n")
+                f.write(f'default_output_dir = "{tmpdir}"\n')
+
+            # Mock the get_price_history function
+            with patch("duk.cli.get_price_history") as mock_get:
+                # Create mock DataFrame
+                mock_df = pd.DataFrame(
+                    {
+                        "date": pd.to_datetime(["2024-01-01"]),
+                        "close": [150.0],
+                    }
+                )
+                mock_get.return_value = mock_df
+
+                runner = CliRunner()
+                result = runner.invoke(
+                    main, ["--config", config_path, "ph", "IBM", "-o"]
+                )
+
+                # Should succeed
+                assert result.exit_code == 0
+                assert "Output written to" in result.output
+
+    def test_ph_command_mutually_exclusive_fields(self):
+        """Test that --fields, --ohlc, and --hlc are mutually exclusive."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "test.toml")
+
+            # Create a test config file with API key
+            with open(config_path, "w") as f:
+                f.write("[api]\n")
+                f.write('fmp_key = "test_api_key"\n')
+
+            runner = CliRunner()
+            result = runner.invoke(
+                main,
+                [
+                    "--config",
+                    config_path,
+                    "ph",
+                    "IBM",
+                    "--ohlc",
+                    "--hlc",
+                ],
+            )
+
+            # Should fail
+            assert result.exit_code == 1
+            assert "Only one of --fields, --ohlc, or --hlc" in result.output
+
+    def test_ph_command_mutually_exclusive_format(self):
+        """Test that --csv and --json are mutually exclusive."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "test.toml")
+
+            # Create a test config file with API key
+            with open(config_path, "w") as f:
+                f.write("[api]\n")
+                f.write('fmp_key = "test_api_key"\n')
+
+            runner = CliRunner()
+            result = runner.invoke(
+                main,
+                [
+                    "--config",
+                    config_path,
+                    "ph",
+                    "IBM",
+                    "--csv",
+                    "--json",
+                ],
+            )
+
+            # Should fail
+            assert result.exit_code == 1
+            assert "Only one of --csv or --json" in result.output

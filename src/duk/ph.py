@@ -32,7 +32,8 @@ def get_price_history(
         api_key: FMP API key
         start_date: Start date in YYYY-MM-DD format (optional)
         end_date: End date in YYYY-MM-DD format (optional)
-        frequency: Data frequency ('daily', 'weekly', 'monthly'). Default: 'daily'
+        frequency: Data frequency ('daily', 'weekly', 'monthly', 'quarterly',
+                   'semi-annual', 'annual'). Default: 'daily'
         limit: Number of data points to return. Default: 5
         fields: List of fields to return. If None, returns default fields.
 
@@ -55,7 +56,14 @@ def get_price_history(
     logger.debug(f"Normalized symbol: {symbol_upper}")
 
     # Validate frequency
-    valid_frequencies = ["daily", "weekly", "monthly"]
+    valid_frequencies = [
+        "daily",
+        "weekly",
+        "monthly",
+        "quarterly",
+        "semi-annual",
+        "annual",
+    ]
     if frequency not in valid_frequencies:
         logger.error(f"Invalid frequency: {frequency}")
         raise ValueError(
@@ -66,7 +74,8 @@ def get_price_history(
     base_url = "https://financialmodelingprep.com/api/v3"
     if frequency == "daily":
         endpoint = f"historical-price-full/{symbol_upper}"
-    elif frequency in ["weekly", "monthly"]:
+    else:
+        # All non-daily frequencies use line series
         endpoint = f"historical-price-full/{symbol_upper}?serietype=line"
 
     # Build URL with parameters

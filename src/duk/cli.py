@@ -65,7 +65,10 @@ def main(ctx, config):
     "--frequency",
     "-f",
     default="daily",
-    type=click.Choice(["daily", "weekly", "monthly"], case_sensitive=False),
+    type=click.Choice(
+        ["daily", "weekly", "monthly", "quarterly", "semi-annual", "annual"],
+        case_sensitive=False,
+    ),
     help="Data frequency (default: daily)",
 )
 @click.option(
@@ -80,13 +83,50 @@ def main(ctx, config):
     help="Comma-separated list of fields to return " "(e.g., 'date,close,volume')",
 )
 @click.option(
+    "--ohlc",
+    is_flag=True,
+    help="Return OHLC data (date, open, high, low, close)",
+)
+@click.option(
+    "--hlc",
+    is_flag=True,
+    help="Return HLC data (date, high, low, close)",
+)
+@click.option(
+    "--csv",
+    is_flag=True,
+    help="Output in CSV format",
+)
+@click.option(
+    "--json",
+    is_flag=True,
+    help="Output in JSON format",
+)
+@click.option(
     "--output",
     "-o",
-    type=click.Choice(["csv", "json"], case_sensitive=False),
-    help="Output format (default: uses config default_output_type)",
+    "output",
+    default=None,
+    is_flag=False,
+    flag_value="",
+    help="Write output to file. If specified without a path, uses default "
+    "output directory. If a path is provided, writes to that location.",
 )
 @click.pass_context
-def ph(ctx, symbol, start_date, end_date, frequency, limit, fields, output):
+def ph(
+    ctx,
+    symbol,
+    start_date,
+    end_date,
+    frequency,
+    limit,
+    fields,
+    ohlc,
+    hlc,
+    csv,
+    json,
+    output,
+):
     """
     Download security price history from Financial Modeling Prep.
 
@@ -97,15 +137,20 @@ def ph(ctx, symbol, start_date, end_date, frequency, limit, fields, output):
         # Get last 5 days of IBM price data
         duk ph ibm
 
-        # Get last 10 days with specific fields
-        duk ph IBM --limit 10 --fields date,close,volume
+        # Get OHLC data in CSV format
+        duk ph IBM --ohlc --csv
 
-        # Get data for a date range
-        duk ph aapl --start-date 2024-01-01 --end-date 2024-01-31
+        # Get HLC data and save to file
+        duk ph IBM --hlc -o
 
-        # Get weekly data in JSON format
-        duk ph msft --frequency weekly --output json
+        # Get data for a date range in JSON format
+        duk ph aapl --start-date 2024-01-01 --end-date 2024-01-31 --json
+
+        # Save weekly data to custom path
+        duk ph msft --frequency weekly -o /path/to/output.csv
     """
+    from pathlib import Path
+
     logger = ctx.obj["logger"]
     config = ctx.obj["config"]
 
@@ -121,14 +166,41 @@ def ph(ctx, symbol, start_date, end_date, frequency, limit, fields, output):
         )
         sys.exit(1)
 
-    # Parse fields if provided
+    # Validate mutually exclusive field options
+    field_option_count = sum([bool(fields), ohlc, hlc])
+    if field_option_count > 1:
+        logger.error("Multiple field options specified")
+        click.echo(
+            "Error: Only one of --fields, --ohlc, or --hlc can be specified",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Determine fields based on options
     fields_list = None
-    if fields:
+    if ohlc:
+        fields_list = ["date", "open", "high", "low", "close"]
+        logger.debug("Using OHLC fields")
+    elif hlc:
+        fields_list = ["date", "high", "low", "close"]
+        logger.debug("Using HLC fields")
+    elif fields:
         fields_list = [f.strip() for f in fields.split(",")]
         logger.debug(f"Requested fields: {fields_list}")
 
     # Determine output format
-    output_format = output if output else config.default_output_type
+    if csv and json:
+        logger.error("Both --csv and --json specified")
+        click.echo("Error: Only one of --csv or --json can be specified", err=True)
+        sys.exit(1)
+
+    if csv:
+        output_format = "csv"
+    elif json:
+        output_format = "json"
+    else:
+        output_format = config.default_output_type
+
     logger.debug(f"Output format: {output_format}")
 
     try:
@@ -148,9 +220,34 @@ def ph(ctx, symbol, start_date, end_date, frequency, limit, fields, output):
             click.echo(f"No data found for {symbol}", err=True)
             sys.exit(1)
 
-        # Format and output
+        # Format output
         output_str = format_output(df, output_format)
-        click.echo(output_str)
+
+        # Handle output destination
+        if output is not None:
+            # Determine output file path
+            if output == "":
+                # Use default output directory
+                output_dir = Path(config.default_output_dir)
+                output_dir.mkdir(parents=True, exist_ok=True)
+                ext = "csv" if output_format == "csv" else "json"
+                output_file = (
+                    output_dir / f"{symbol.lower()}_price_history_{frequency}.{ext}"
+                )
+            else:
+                # Use provided path
+                output_file = Path(output)
+                output_file.parent.mkdir(parents=True, exist_ok=True)
+
+            # Write to file
+            with open(output_file, "w") as f:
+                f.write(output_str)
+
+            logger.info(f"Output written to {output_file}")
+            click.echo(f"Output written to {output_file}")
+        else:
+            # Output to stdout
+            click.echo(output_str)
 
         logger.info(f"Price history successfully retrieved and displayed for {symbol}")
 

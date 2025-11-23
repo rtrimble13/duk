@@ -184,6 +184,63 @@ class TestGetPriceHistory:
                 limit=5,
             )
 
+    def test_get_price_history_quarterly_frequency(self):
+        """Test price history with quarterly frequency."""
+        with patch("duk.ph.requests.get") as mock_get:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = self.mock_response_data
+            mock_get.return_value = mock_response
+
+            get_price_history(
+                symbol=self.symbol,
+                api_key=self.api_key,
+                frequency="quarterly",
+                limit=5,
+            )
+
+            # Check that API was called with line series for quarterly
+            call_args = mock_get.call_args
+            assert "serietype=line" in call_args[0][0]
+
+    def test_get_price_history_semi_annual_frequency(self):
+        """Test price history with semi-annual frequency."""
+        with patch("duk.ph.requests.get") as mock_get:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = self.mock_response_data
+            mock_get.return_value = mock_response
+
+            get_price_history(
+                symbol=self.symbol,
+                api_key=self.api_key,
+                frequency="semi-annual",
+                limit=5,
+            )
+
+            # Check that API was called with line series for semi-annual
+            call_args = mock_get.call_args
+            assert "serietype=line" in call_args[0][0]
+
+    def test_get_price_history_annual_frequency(self):
+        """Test price history with annual frequency."""
+        with patch("duk.ph.requests.get") as mock_get:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = self.mock_response_data
+            mock_get.return_value = mock_response
+
+            get_price_history(
+                symbol=self.symbol,
+                api_key=self.api_key,
+                frequency="annual",
+                limit=5,
+            )
+
+            # Check that API was called with line series for annual
+            call_args = mock_get.call_args
+            assert "serietype=line" in call_args[0][0]
+
     def test_get_price_history_api_error(self):
         """Test handling of API error response."""
         with patch("duk.ph.requests.get") as mock_get:
