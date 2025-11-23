@@ -64,7 +64,7 @@ def price_history_api(
     base_url = "https://financialmodelingprep.com/stable"
     endpoint = f"{base_url}/historical-price-eod/full?symbol={symbol}"
 
-    #    # Build query parameters
+    # Build query parameters
     params = {"apikey": api_key}
     if from_date:
         params["from"] = from_date
