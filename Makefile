@@ -21,7 +21,8 @@ build:
 			echo "Conda env 'duk' already exists."; \
 		fi; \
 		echo "Installing package info 'duk'..."; \
-		conda run -n duk python -m pip install -e .[dev]; \
+		conda activate duk; \
+		python -m pip install -e .[dev]; \
 	else \
 		echo "conda not found, falling back to system pip"; \
 		python -m pip install -e .[dev]; \
