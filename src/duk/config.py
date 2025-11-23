@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 class ConfigurationManager:
     """Manages configuration loading using configistate."""
 
+    # Mapping of environment variables to config key names
+    ENV_VAR_MAPPING = {"FMP_API_KEY": "fmp_api_key"}
+
     def __init__(self):
         self.config_path = Path.home() / ".dukrc"
         self._config = None
@@ -55,8 +58,7 @@ class ConfigurationManager:
             self.load_configuration()
 
         # Try environment variables first
-        env_vars = {"FMP_API_KEY": "fmp_api_key"}
-        for env_var, config_key in env_vars.items():
+        for env_var, config_key in self.ENV_VAR_MAPPING.items():
             if config_key == key_name:
                 value = os.environ.get(env_var)
                 if value:
