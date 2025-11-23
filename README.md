@@ -43,6 +43,8 @@ cp etc/dukrc ~/.dukrc
 
 ## Usage
 
+### CLI Usage
+
 ```bash
 # Display help
 duk --help
@@ -50,6 +52,28 @@ duk --help
 # Use with custom config file
 duk --config /path/to/config --help
 ```
+
+### Library Usage
+
+duk can be used as a Python library to fetch financial data programmatically.
+
+#### Get Historical Price Data
+
+```python
+from duk import get_price_history
+
+# Get daily price data for a date range
+df = get_price_history(
+    api_key="your_api_key",
+    symbol="AAPL",
+    start_date="2023-01-01",
+    end_date="2023-12-31"
+)
+
+print(df.head())
+```
+
+For more examples and detailed documentation, see [doc/get_price_history.md](doc/get_price_history.md).
 
 ## Development
 
