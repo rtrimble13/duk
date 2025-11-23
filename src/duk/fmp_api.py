@@ -113,6 +113,7 @@ def get_price_history(
     end_date: Optional[str] = None,
     frequency: str = "day",
     limit: Optional[int] = None,
+    fields: Optional[List[str]] = None,
 ) -> pd.DataFrame:
     """
     Get historical price data as a pandas DataFrame.
@@ -133,13 +134,15 @@ def get_price_history(
         limit: Optional number of records to return. When combined with:
             - start_date (no end_date): returns first `limit` records
             - end_date (no start_date): returns last `limit` records
+        fields: Optional list of columns to return. Valid fields are:
+            'open', 'high', 'low', 'close', 'volume'. Default is all fields.
 
     Returns:
         pandas DataFrame with historical price data, indexed on Date (ascending).
-        Columns typically include: open, high, low, close, volume, etc.
+        Columns include the specified fields (or all fields if not specified).
 
     Raises:
-        ValueError: If parameters are invalid
+        ValueError: If parameters are invalid or if invalid fields are specified
         FMPAPIError: If the API request fails
 
     Examples:
@@ -168,7 +171,29 @@ def get_price_history(
         ...                        start_date="2023-01-01",
         ...                        end_date="2023-12-31",
         ...                        frequency="month")
+
+        >>> # Get only close prices
+        >>> df = get_price_history("your_api_key", "AAPL",
+        ...                        start_date="2023-01-01",
+        ...                        end_date="2023-12-31",
+        ...                        fields=["close"])
+
+        >>> # Get OHLC data without volume
+        >>> df = get_price_history("your_api_key", "AAPL",
+        ...                        start_date="2023-01-01",
+        ...                        end_date="2023-12-31",
+        ...                        fields=["open", "high", "low", "close"])
     """
+    # Validate fields parameter
+    valid_fields = ["open", "high", "low", "close", "volume"]
+    if fields is not None:
+        invalid_fields = [f for f in fields if f not in valid_fields]
+        if invalid_fields:
+            raise ValueError(
+                f"Invalid fields: {invalid_fields}. "
+                f"Valid fields are: {valid_fields}"
+            )
+
     # Convert string dates to date objects
     start_date_obj = None
     end_date_obj = None
@@ -265,6 +290,16 @@ def get_price_history(
             logger.debug(
                 f"Resampled to {frequency} frequency, {len(df)} records remaining"
             )
+
+    # Filter columns if fields parameter is specified
+    if fields is not None:
+        # Only keep columns that are in the fields list and exist in the DataFrame
+        available_fields = [f for f in fields if f in df.columns]
+        if available_fields:
+            df = df[available_fields]
+            logger.debug(f"Filtered to fields: {available_fields}")
+        else:
+            logger.warning(f"None of the requested fields {fields} found in DataFrame")
 
     logger.info(f"Returning {len(df)} records for {symbol}")
     return df

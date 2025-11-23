@@ -498,3 +498,154 @@ class TestGetPriceHistory:
             )
 
             assert len(result) >= 1
+
+    def test_get_price_history_with_fields_parameter(self):
+        """Test filtering columns with fields parameter."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {
+                    "date": "2023-01-02",
+                    "open": 149.0,
+                    "high": 151.0,
+                    "low": 148.0,
+                    "close": 150.0,
+                    "volume": 900000,
+                },
+                {
+                    "date": "2023-01-03",
+                    "open": 150.0,
+                    "high": 155.0,
+                    "low": 149.0,
+                    "close": 154.0,
+                    "volume": 1000000,
+                },
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            # Test with only close field
+            result = get_price_history("test_api_key", "AAPL", fields=["close"])
+
+            assert len(result) == 2
+            assert list(result.columns) == ["close"]
+            assert "open" not in result.columns
+            assert "high" not in result.columns
+
+    def test_get_price_history_with_multiple_fields(self):
+        """Test filtering with multiple fields."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {
+                    "date": "2023-01-02",
+                    "open": 149.0,
+                    "high": 151.0,
+                    "low": 148.0,
+                    "close": 150.0,
+                    "volume": 900000,
+                },
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            # Test with OHLC fields only (no volume)
+            result = get_price_history(
+                "test_api_key",
+                "AAPL",
+                fields=["open", "high", "low", "close"],
+            )
+
+            assert len(result) == 1
+            assert set(result.columns) == {"open", "high", "low", "close"}
+            assert "volume" not in result.columns
+
+    def test_get_price_history_with_invalid_fields(self):
+        """Test that invalid fields raise ValueError."""
+        from duk.fmp_api import get_price_history
+
+        with pytest.raises(ValueError, match="Invalid fields"):
+            get_price_history(
+                "test_api_key",
+                "AAPL",
+                fields=["close", "invalid_field"],
+            )
+
+    def test_get_price_history_with_all_valid_fields(self):
+        """Test with all valid fields specified."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {
+                    "date": "2023-01-02",
+                    "open": 149.0,
+                    "high": 151.0,
+                    "low": 148.0,
+                    "close": 150.0,
+                    "volume": 900000,
+                },
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            # Test with all valid fields
+            result = get_price_history(
+                "test_api_key",
+                "AAPL",
+                fields=["open", "high", "low", "close", "volume"],
+            )
+
+            assert len(result) == 1
+            assert set(result.columns) == {"open", "high", "low", "close", "volume"}
+
+    def test_get_price_history_fields_none_returns_all(self):
+        """Test that fields=None returns all columns."""
+        from duk.fmp_api import get_price_history
+
+        mock_response = {
+            "symbol": "AAPL",
+            "historical": [
+                {
+                    "date": "2023-01-02",
+                    "open": 149.0,
+                    "high": 151.0,
+                    "low": 148.0,
+                    "close": 150.0,
+                    "volume": 900000,
+                },
+            ],
+        }
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            # Test with fields=None (default)
+            result = get_price_history("test_api_key", "AAPL")
+
+            assert len(result) == 1
+            # Should have all columns
+            assert "open" in result.columns
+            assert "high" in result.columns
+            assert "low" in result.columns
+            assert "close" in result.columns
+            assert "volume" in result.columns

@@ -14,6 +14,7 @@ def get_price_history(
     end_date: Optional[str] = None,
     frequency: str = "day",
     limit: Optional[int] = None,
+    fields: Optional[List[str]] = None,
 ) -> pd.DataFrame
 ```
 
@@ -31,18 +32,19 @@ def get_price_history(
   - `"semi-annual"`: Semi-annual data
   - `"annual"`: Annual data
 - **limit** (Optional[int]): Maximum number of records to return
+- **fields** (Optional[List[str]]): List of columns to return. Valid fields are:
+  - `"open"`: Opening price
+  - `"high"`: Highest price
+  - `"low"`: Lowest price
+  - `"close"`: Closing price
+  - `"volume"`: Trading volume
+  - Default: All fields
 
 ## Returns
 
 A pandas DataFrame with historical price data, indexed on Date (ascending order).
 
-Columns typically include:
-- `open`: Opening price
-- `high`: Highest price
-- `low`: Lowest price
-- `close`: Closing price
-- `volume`: Trading volume
-- Additional fields depending on the API response
+When `fields` is specified, only the requested columns are returned. Otherwise, all available columns are included.
 
 ## Limit Behavior
 
@@ -263,6 +265,66 @@ print(f"Average closing price: ${df['close'].mean():.2f}")
 print(f"Max closing price: ${df['close'].max():.2f}")
 print(f"Min closing price: ${df['close'].min():.2f}")
 print(f"Average daily return: {df['returns'].mean():.4%}")
+```
+
+### Example 11: Get Only Closing Prices
+
+```python
+from duk import get_price_history
+
+# Get only close prices for analysis
+df = get_price_history(
+    api_key="your_api_key",
+    symbol="AAPL",
+    start_date="2023-01-01",
+    end_date="2023-12-31",
+    fields=["close"]
+)
+
+print(df.head())
+# DataFrame will only have the 'close' column
+```
+
+### Example 12: Get OHLC Data Without Volume
+
+```python
+from duk import get_price_history
+
+# Get OHLC data excluding volume for charting
+df = get_price_history(
+    api_key="your_api_key",
+    symbol="AAPL",
+    start_date="2023-01-01",
+    end_date="2023-12-31",
+    fields=["open", "high", "low", "close"]
+)
+
+print(df.columns)  # ['open', 'high', 'low', 'close']
+```
+
+### Example 13: Compare Multiple Stocks - Close Prices Only
+
+```python
+from duk import get_price_history
+import pandas as pd
+
+# Get close prices for multiple stocks
+symbols = ["AAPL", "MSFT", "GOOGL"]
+data = {}
+
+for symbol in symbols:
+    df = get_price_history(
+        api_key="your_api_key",
+        symbol=symbol,
+        start_date="2023-01-01",
+        end_date="2023-12-31",
+        fields=["close"]
+    )
+    data[symbol] = df["close"]
+
+# Combine into single DataFrame
+comparison = pd.DataFrame(data)
+print(comparison.head())
 ```
 
 ## Data Resampling
