@@ -571,3 +571,202 @@ class TestPhCommand:
             mock_get.assert_called_once()
             call_kwargs = mock_get.call_args[1]
             assert call_kwargs["api_key"] == "env_test_key"
+
+    def test_ph_csv_output_format(self):
+        """Test ph command with --csv flag for CSV output."""
+        mock_df = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2023-01-02", "2023-01-03"]),
+                "close": [150.0, 154.0],
+            }
+        )
+        mock_df = mock_df.set_index("date")
+
+        with mock.patch("duk.cli.get_price_history") as mock_get:
+            mock_get.return_value = mock_df
+
+            runner = CliRunner()
+            with tempfile.TemporaryDirectory() as tmpdir:
+                config_path = os.path.join(tmpdir, "test.toml")
+                with open(config_path, "w") as f:
+                    f.write("[api]\n")
+                    f.write('fmp_key = "test_key"\n')
+
+                result = runner.invoke(
+                    main, ["--config", config_path, "ph", "AAPL", "--csv"]
+                )
+
+                assert result.exit_code == 0
+                # Check for CSV format in output
+                assert "Date" in result.output
+                assert "Close" in result.output
+                assert "2023-01-02" in result.output
+                assert "2023-01-03" in result.output
+
+    def test_ph_json_output_format(self):
+        """Test ph command with --json flag for JSON output."""
+        mock_df = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2023-01-02", "2023-01-03"]),
+                "close": [150.0, 154.0],
+            }
+        )
+        mock_df = mock_df.set_index("date")
+
+        with mock.patch("duk.cli.get_price_history") as mock_get:
+            mock_get.return_value = mock_df
+
+            runner = CliRunner()
+            with tempfile.TemporaryDirectory() as tmpdir:
+                config_path = os.path.join(tmpdir, "test.toml")
+                with open(config_path, "w") as f:
+                    f.write("[api]\n")
+                    f.write('fmp_key = "test_key"\n')
+
+                result = runner.invoke(
+                    main, ["--config", config_path, "ph", "AAPL", "--json"]
+                )
+
+                assert result.exit_code == 0
+                # Check for JSON format in output
+                assert "[" in result.output
+                assert "{" in result.output
+                assert "Date" in result.output
+                assert "Close" in result.output
+
+    def test_ph_csv_and_json_mutually_exclusive(self):
+        """Test that --csv and --json cannot be used together."""
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "test.toml")
+            with open(config_path, "w") as f:
+                f.write("[api]\n")
+                f.write('fmp_key = "test_key"\n')
+
+            result = runner.invoke(
+                main, ["--config", config_path, "ph", "AAPL", "--csv", "--json"]
+            )
+
+            assert result.exit_code == 1
+            assert "Only one of --csv or --json can be specified" in result.output
+
+    def test_ph_json_output_to_file(self):
+        """Test ph command with --json and --output to write JSON to file."""
+        mock_df = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2023-01-02", "2023-01-03"]),
+                "close": [150.0, 154.0],
+            }
+        )
+        mock_df = mock_df.set_index("date")
+
+        with mock.patch("duk.cli.get_price_history") as mock_get:
+            mock_get.return_value = mock_df
+
+            runner = CliRunner()
+            with tempfile.TemporaryDirectory() as tmpdir:
+                config_path = os.path.join(tmpdir, "test.toml")
+                with open(config_path, "w") as f:
+                    f.write("[api]\n")
+                    f.write('fmp_key = "test_key"\n')
+
+                output_file = os.path.join(tmpdir, "output.json")
+                result = runner.invoke(
+                    main,
+                    [
+                        "--config",
+                        config_path,
+                        "ph",
+                        "AAPL",
+                        "--json",
+                        "-o",
+                        output_file,
+                    ],
+                )
+
+                assert result.exit_code == 0
+                assert os.path.exists(output_file)
+                assert f"Data written to {output_file}" in result.output
+
+                # Verify file contents
+                with open(output_file, "r") as f:
+                    import json
+
+                    data = json.load(f)
+                    assert isinstance(data, list)
+                    assert len(data) == 2
+                    assert "Date" in data[0]
+                    assert "Close" in data[0]
+
+    def test_ph_json_output_to_directory(self):
+        """Test ph command with --json writing to directory."""
+        mock_df = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2023-01-02"]),
+                "close": [150.0],
+            }
+        )
+        mock_df = mock_df.set_index("date")
+
+        with mock.patch("duk.cli.get_price_history") as mock_get:
+            mock_get.return_value = mock_df
+
+            runner = CliRunner()
+            with tempfile.TemporaryDirectory() as tmpdir:
+                config_path = os.path.join(tmpdir, "test.toml")
+                with open(config_path, "w") as f:
+                    f.write("[api]\n")
+                    f.write('fmp_key = "test_key"\n')
+
+                output_dir = os.path.join(tmpdir, "output_dir")
+                os.makedirs(output_dir)
+
+                result = runner.invoke(
+                    main,
+                    [
+                        "--config",
+                        config_path,
+                        "ph",
+                        "AAPL",
+                        "--json",
+                        "-s",
+                        "2023-01-01",
+                        "-e",
+                        "2023-12-31",
+                        "-o",
+                        output_dir,
+                    ],
+                )
+
+                assert result.exit_code == 0
+                expected_file = os.path.join(
+                    output_dir, "AAPL_2023-01-01_2023-12-31.json"
+                )
+                assert os.path.exists(expected_file)
+
+    def test_ph_default_csv_output(self):
+        """Test that CSV is the default output format."""
+        mock_df = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2023-01-02"]),
+                "close": [150.0],
+            }
+        )
+        mock_df = mock_df.set_index("date")
+
+        with mock.patch("duk.cli.get_price_history") as mock_get:
+            mock_get.return_value = mock_df
+
+            runner = CliRunner()
+            with tempfile.TemporaryDirectory() as tmpdir:
+                config_path = os.path.join(tmpdir, "test.toml")
+                with open(config_path, "w") as f:
+                    f.write("[api]\n")
+                    f.write('fmp_key = "test_key"\n')
+
+                result = runner.invoke(main, ["--config", config_path, "ph", "AAPL"])
+
+                assert result.exit_code == 0
+                # Default should be CSV format
+                assert "Date,Close" in result.output
+                assert "2023-01-02" in result.output

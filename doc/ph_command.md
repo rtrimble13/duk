@@ -43,11 +43,15 @@ If no field filter is specified, all available fields are returned (Date, Open, 
 
 ### Output Options
 
+- `--csv`: Output data as CSV format (default)
+- `--json`: Output data as JSON format
 - `-o, --output PATH`: Write data to file instead of stdout
-  - If PATH is a file, data is written to that file
-  - If PATH is a directory, filename is formatted as `<symbol>_<start>_<end>.csv`
+  - If PATH is a file, data is written to that file with appropriate extension
+  - If PATH is a directory, filename is formatted as `<symbol>_<start>_<end>.<ext>` where ext is csv or json
 - `-q, --quiet`: Suppress printing price history data to stdout
 - `-v, --verbose`: Print all logging to stdout (debug level)
+
+**Note**: Only one of `--csv` or `--json` can be specified at a time. If neither is specified, CSV format is used by default.
 
 ## Configuration
 
@@ -204,20 +208,56 @@ Retrieves only Date and Volume fields for Tesla stock in 2023, useful for volume
 
 ## Output Format
 
-The command outputs data in CSV format with the following characteristics:
+The command can output data in two formats: CSV (default) or JSON.
+
+### CSV Output Format
+
+CSV output has the following characteristics:
 
 - Column names are capitalized (e.g., "Date", "Open", "High", "Low", "Close", "Volume")
 - Dates are in YYYY-MM-DD format
 - Data is sorted in ascending order by date
 - Numeric values are not quoted
 
-Example output:
+Example CSV output:
 
 ```csv
 Date,Open,High,Low,Close,Volume
 2023-01-03,149.0,155.0,148.0,154.0,1000000
 2023-01-04,154.0,158.0,153.0,157.0,1100000
 2023-01-05,157.0,160.0,156.0,159.0,1050000
+```
+
+### JSON Output Format
+
+JSON output has the following characteristics:
+
+- Array of objects, one per record
+- Column names are capitalized (same as CSV)
+- Dates are in ISO 8601 format
+- Data is sorted in ascending order by date
+
+Example JSON output:
+
+```json
+[
+  {
+    "Date": "2023-01-03T00:00:00.000Z",
+    "Open": 149.0,
+    "High": 155.0,
+    "Low": 148.0,
+    "Close": 154.0,
+    "Volume": 1000000
+  },
+  {
+    "Date": "2023-01-04T00:00:00.000Z",
+    "Open": 154.0,
+    "High": 158.0,
+    "Low": 153.0,
+    "Close": 157.0,
+    "Volume": 1100000
+  }
+]
 ```
 
 ## Data Resampling
@@ -260,6 +300,30 @@ duk ph AAPL -n 30
 # Returns: Last 30 records available
 ```
 
+### Example 18: Output as JSON
+
+```bash
+duk ph AAPL -s 2023-01-01 -e 2023-01-31 --json
+```
+
+Retrieves data for Apple stock in January 2023 and outputs it in JSON format.
+
+### Example 19: Output JSON to File
+
+```bash
+duk ph MSFT -s 2023-01-01 -e 2023-12-31 --json -o msft_2023.json
+```
+
+Retrieves Microsoft stock data for 2023 and writes it to a JSON file.
+
+### Example 20: JSON Output to Directory
+
+```bash
+duk ph GOOGL -s 2023-01-01 -e 2023-12-31 --json -o ./data/
+```
+
+Retrieves Google stock data for 2023 and writes it to `./data/GOOGL_2023-01-01_2023-12-31.json`.
+
 ## Error Handling
 
 The command will exit with an error (exit code 1) in the following cases:
@@ -275,7 +339,12 @@ The command will exit with an error (exit code 1) in the following cases:
    Error: Only one of --ohlc, --hlc, --close, --hlcv, --cv can be specified
    ```
 
-3. **API Error**: Failed to fetch data from the API
+3. **Multiple Output Formats**: Both --csv and --json specified
+   ```
+   Error: Only one of --csv or --json can be specified
+   ```
+
+4. **API Error**: Failed to fetch data from the API
    ```
    Error: Failed to fetch price history: <error message>
    ```
@@ -305,7 +374,19 @@ No data found for SYMBOL
    duk ph AAPL -s 2023-01-01 -e 2023-12-31 --close | awk -F, 'NR>1 {sum+=$2; count++} END {print "Average:", sum/count}'
    ```
 
-3. **Use Field Filters for Performance**: Request only the fields you need to reduce data transfer and processing time:
+3. **Use JSON with jq**: JSON output works well with jq for advanced data processing:
+   ```bash
+   # Extract closing prices
+   duk ph AAPL -s 2023-01-01 -e 2023-12-31 --json | jq '.[].Close'
+   
+   # Calculate average closing price
+   duk ph AAPL -s 2023-01-01 -e 2023-12-31 --json | jq '[.[].Close] | add/length'
+   
+   # Filter records by date
+   duk ph AAPL -s 2023-01-01 -e 2023-12-31 --json | jq '.[] | select(.Date | startswith("2023-01"))'
+   ```
+
+4. **Use Field Filters for Performance**: Request only the fields you need to reduce data transfer and processing time:
    ```bash
    # For simple price analysis
    duk ph AAPL --close
@@ -314,12 +395,12 @@ No data found for SYMBOL
    duk ph AAPL --ohlc
    ```
 
-4. **Quiet Mode for Scripts**: Use `-q` flag in scripts to suppress data output while still getting status messages:
+5. **Quiet Mode for Scripts**: Use `-q` flag in scripts to suppress data output while still getting status messages:
    ```bash
    duk ph AAPL -o data.csv -q && echo "Data downloaded successfully"
    ```
 
-5. **Verbose Mode for Troubleshooting**: Use `-v` flag to see detailed logging when debugging issues:
+6. **Verbose Mode for Troubleshooting**: Use `-v` flag to see detailed logging when debugging issues:
    ```bash
    duk ph AAPL -v
    ```

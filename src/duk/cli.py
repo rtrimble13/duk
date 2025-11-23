@@ -77,13 +77,15 @@ def main(ctx, config):
     "--hlcv", is_flag=True, help="Return Date, High, Low, Close, Volume fields"
 )
 @click.option("--cv", is_flag=True, help="Return Date and Volume fields")
+@click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
+@click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
     "-o",
     "--output",
     type=click.Path(),
     help=(
         "Write data to file. If path is a directory, "
-        "format filename as <symbol>_<start>_<end>.csv"
+        "format filename as <symbol>_<start>_<end>.<ext>"
     ),
 )
 @click.pass_context
@@ -101,6 +103,8 @@ def ph(
     close,
     hlcv,
     cv,
+    output_csv,
+    output_json,
     output,
 ):
     """
@@ -138,6 +142,18 @@ def ph(
             err=True,
         )
         sys.exit(1)
+
+    # Determine output format
+    if output_csv and output_json:
+        logger.error("Only one output format can be specified")
+        click.echo(
+            "Error: Only one of --csv or --json can be specified",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Default to CSV if neither is specified
+    output_format = "json" if output_json else "csv"
 
     # Determine which fields to return
     fields = None
@@ -201,14 +217,19 @@ def ph(
         if output_path.is_dir():
             start_str = start_date or "earliest"
             end_str = end_date or "latest"
-            filename = f"{symbol}_{start_str}_{end_str}.csv"
+            ext = "json" if output_format == "json" else "csv"
+            filename = f"{symbol}_{start_str}_{end_str}.{ext}"
             output_path = output_path / filename
 
         # Ensure parent directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Write to file
-        output_df.to_csv(output_path, index=False)
+        # Write to file based on format
+        if output_format == "json":
+            output_df.to_json(output_path, orient="records", date_format="iso")
+        else:
+            output_df.to_csv(output_path, index=False)
+
         logger.info(f"Data written to {output_path}")
 
         if not quiet:
@@ -216,7 +237,10 @@ def ph(
     else:
         # Print to stdout unless quiet flag is set
         if not quiet:
-            click.echo(output_df.to_csv(index=False))
+            if output_format == "json":
+                click.echo(output_df.to_json(orient="records", date_format="iso"))
+            else:
+                click.echo(output_df.to_csv(index=False))
 
 
 if __name__ == "__main__":
