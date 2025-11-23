@@ -41,7 +41,7 @@ class DukConfig:
         """
         # Check environment variable first
         env_key = os.environ.get("FMP_API_KEY")
-        if env_key is not None:
+        if env_key:
             return env_key
 
         # Fall back to config file

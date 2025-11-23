@@ -175,3 +175,23 @@ class TestDukConfig:
             finally:
                 # Clean up environment variable
                 del os.environ["FMP_API_KEY"]
+
+    def test_fmp_key_empty_env_var_falls_back_to_config(self):
+        """Test empty environment variable falls back to config file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "test.toml")
+
+            # Create a config file with a key
+            with open(config_path, "w") as f:
+                f.write("[api]\n")
+                f.write('fmp_key = "config_file_key"\n')
+
+            # Set environment variable to empty string
+            os.environ["FMP_API_KEY"] = ""
+            try:
+                config = DukConfig(config_path)
+                # Empty env var should be ignored, config file used
+                assert config.fmp_key == "config_file_key"
+            finally:
+                # Clean up environment variable
+                del os.environ["FMP_API_KEY"]
