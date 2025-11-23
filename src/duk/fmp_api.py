@@ -205,6 +205,7 @@ def get_price_history(
     frequency: str = "day",
     limit: Optional[int] = None,
     fields: Optional[List[str]] = None,
+    adjusted: bool = False,
 ) -> pd.DataFrame:
     """
     Get historical price data as a pandas DataFrame.
@@ -227,6 +228,7 @@ def get_price_history(
             - end_date (no start_date): returns last `limit` records
         fields: Optional list of columns to return. Valid fields are:
             'open', 'high', 'low', 'close', 'volume'. Default is all fields.
+        adjusted: If True, retrieve dividend-adjusted price history. Default is False.
 
     Returns:
         pandas DataFrame with historical price data, indexed on Date (ascending).
@@ -304,13 +306,21 @@ def get_price_history(
 
     logger.info(f"Fetching price history for {symbol} from {from_date} to {to_date}")
 
-    # Fetch data from API
-    data = price_history_api(
-        symbol=symbol,
-        api_key=api_key,
-        from_date=from_date,
-        to_date=to_date,
-    )
+    # Fetch data from API - use adjusted or regular price history
+    if adjusted:
+        data = adjusted_price_history_api(
+            symbol=symbol,
+            api_key=api_key,
+            from_date=from_date,
+            to_date=to_date,
+        )
+    else:
+        data = price_history_api(
+            symbol=symbol,
+            api_key=api_key,
+            from_date=from_date,
+            to_date=to_date,
+        )
 
     # Convert to DataFrame
     if not data:
@@ -321,6 +331,10 @@ def get_price_history(
 
     # Convert df columns to lower case for consistency
     df.columns = [col.lower() for col in df.columns]
+
+    # Strip "adj" prefix from column names if adjusted data is used
+    if adjusted:
+        df.columns = [col.removeprefix("adj").strip() for col in df.columns]
 
     # Keep only the relevant columns
     expected_columns = ["date"] + fields

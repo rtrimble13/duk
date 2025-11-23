@@ -77,6 +77,7 @@ def main(ctx, config):
     "--hlcv", is_flag=True, help="Return Date, High, Low, Close, Volume fields"
 )
 @click.option("--cv", is_flag=True, help="Return Date and Volume fields")
+@click.option("--adj", is_flag=True, help="Retrieve dividend-adjusted price history")
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
@@ -103,6 +104,7 @@ def ph(
     close,
     hlcv,
     cv,
+    adj,
     output_csv,
     output_json,
     output,
@@ -187,6 +189,7 @@ def ph(
             frequency=frequency,
             limit=limit,
             fields=fields,
+            adjusted=adj,
         )
     except Exception as e:
         logger.error(f"Failed to fetch price history: {e}")
