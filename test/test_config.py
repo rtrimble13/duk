@@ -195,3 +195,23 @@ class TestDukConfig:
             finally:
                 # Clean up environment variable
                 del os.environ["FMP_API_KEY"]
+
+    def test_fmp_key_whitespace_env_var_falls_back_to_config(self):
+        """Test whitespace-only env variable falls back to config."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "test.toml")
+
+            # Create a config file with a key
+            with open(config_path, "w") as f:
+                f.write("[api]\n")
+                f.write('fmp_key = "config_file_key"\n')
+
+            # Set environment variable to whitespace-only string
+            os.environ["FMP_API_KEY"] = "   "
+            try:
+                config = DukConfig(config_path)
+                # Whitespace-only should be ignored, config file used
+                assert config.fmp_key == "config_file_key"
+            finally:
+                # Clean up environment variable
+                del os.environ["FMP_API_KEY"]

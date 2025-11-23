@@ -40,7 +40,7 @@ class DukConfig:
         If not set, retrieves from [api] section in config file.
         """
         # Check environment variable first
-        env_key = os.environ.get("FMP_API_KEY")
+        env_key = os.environ.get("FMP_API_KEY", "").strip()
         if env_key:
             return env_key
 
