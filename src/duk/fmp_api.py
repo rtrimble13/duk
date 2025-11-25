@@ -6,7 +6,7 @@ to retrieve financial and market data.
 """
 
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -194,6 +194,81 @@ def adjusted_price_history_api(
         return data
     else:
         logger.warning(f"Unexpected response format for {symbol}")
+        return []
+
+
+def treasury_rates_api(
+    api_key: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Request treasury rates from FMP API.
+
+    Retrieves historical US Treasury rates data from the Financial Modeling
+    Prep API.
+
+    Args:
+        api_key: FMP API key for authentication
+        start_date: Optional start date for historical data
+        end_date: Optional end date for historical data
+
+    Returns:
+        List of dictionaries containing treasury rates data. Each dictionary
+        contains fields like date and various treasury rate maturities.
+
+    Raises:
+        FMPAPIError: If the API request fails or returns an error
+        ValueError: If required parameters are invalid
+
+    Example:
+        >>> from datetime import date
+        >>> rates = treasury_rates_api("your_api_key")
+        >>> rates = treasury_rates_api("your_api_key",
+        ...                            start_date=date(2023, 1, 1),
+        ...                            end_date=date(2023, 12, 31))
+    """
+    if not api_key:
+        raise ValueError("API key cannot be empty")
+
+    # Construct the base URL
+    base_url = "https://financialmodelingprep.com/stable"
+    endpoint = f"{base_url}/treasury-rates"
+
+    # Build query parameters
+    params: Dict[str, Any] = {"apikey": api_key}
+    if start_date:
+        params["from"] = start_date.strftime("%Y-%m-%d")
+    if end_date:
+        params["to"] = end_date.strftime("%Y-%m-%d")
+
+    logger.debug("Requesting treasury rates from FMP API")
+
+    try:
+        response = requests.get(endpoint, params=params, timeout=30)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch treasury rates: {e}")
+        raise FMPAPIError(f"Failed to fetch treasury rates: {e}") from e
+
+    try:
+        data = response.json()
+    except ValueError as e:
+        logger.error(f"Failed to parse JSON response: {e}")
+        raise FMPAPIError(f"Failed to parse JSON response: {e}") from e
+
+    # Check if the response contains an error message
+    if isinstance(data, dict) and "Error Message" in data:
+        error_msg = data["Error Message"]
+        logger.error(f"FMP API error: {error_msg}")
+        raise FMPAPIError(f"FMP API error: {error_msg}")
+
+    # Extract data from response
+    if isinstance(data, list):
+        logger.info(f"Retrieved {len(data)} treasury rate records")
+        return data
+    else:
+        logger.warning("Unexpected response format for treasury rates")
         return []
 
 
