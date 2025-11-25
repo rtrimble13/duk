@@ -72,12 +72,12 @@ class TestPhCommand:
                 result = runner.invoke(main, ["--config", config_path, "ph", "AAPL"])
 
                 assert result.exit_code == 0
-                assert "Date" in result.output
-                assert "Open" in result.output
-                assert "High" in result.output
-                assert "Low" in result.output
-                assert "Close" in result.output
-                assert "Volume" in result.output
+                assert "date" in result.output
+                assert "open" in result.output
+                assert "high" in result.output
+                assert "low" in result.output
+                assert "close" in result.output
+                assert "volume" in result.output
 
     def test_ph_with_start_and_end_date(self):
         """Test ph command with start and end dates."""
@@ -408,8 +408,8 @@ class TestPhCommand:
                 # Verify file contents
                 with open(output_file, "r") as f:
                     contents = f.read()
-                    assert "Date" in contents
-                    assert "Close" in contents
+                    assert "date" in contents
+                    assert "close" in contents
                     assert "2023-01-02" in contents
                     assert "2023-01-03" in contents
 
@@ -598,8 +598,8 @@ class TestPhCommand:
 
                 assert result.exit_code == 0
                 # Check for CSV format in output
-                assert "Date" in result.output
-                assert "Close" in result.output
+                assert "date" in result.output
+                assert "close" in result.output
                 assert "2023-01-02" in result.output
                 assert "2023-01-03" in result.output
 
@@ -631,8 +631,8 @@ class TestPhCommand:
                 # Check for JSON format in output
                 assert "[" in result.output
                 assert "{" in result.output
-                assert "Date" in result.output
-                assert "Close" in result.output
+                assert "date" in result.output
+                assert "close" in result.output
 
     def test_ph_csv_and_json_mutually_exclusive(self):
         """Test that --csv and --json cannot be used together."""
@@ -695,8 +695,8 @@ class TestPhCommand:
                     data = json.load(f)
                     assert isinstance(data, list)
                     assert len(data) == 2
-                    assert "Date" in data[0]
-                    assert "Close" in data[0]
+                    assert "date" in data[0]
+                    assert "close" in data[0]
 
     def test_ph_json_output_to_directory(self):
         """Test ph command with --json writing to directory."""
@@ -768,7 +768,7 @@ class TestPhCommand:
 
                 assert result.exit_code == 0
                 # Default should be CSV format
-                assert "Date,Close" in result.output
+                assert "date,close" in result.output
                 assert "2023-01-02" in result.output
 
     def test_ph_with_adj_flag(self):

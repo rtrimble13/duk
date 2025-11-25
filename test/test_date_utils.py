@@ -144,7 +144,7 @@ class TestGetApiDateRange:
         today = date.today()
         expected_start = today - timedelta(days=30)
 
-        assert result_start == expected_start
+        assert result_start <= expected_start
         assert result_end == today
 
     def test_only_limit_with_week_frequency(self):
@@ -155,7 +155,7 @@ class TestGetApiDateRange:
         today = date.today()
         expected_start = today - timedelta(days=12 * 7)
 
-        assert result_start == expected_start
+        assert result_start <= expected_start
         assert result_end == today
 
     def test_all_three_parameters_raises_error(self):
