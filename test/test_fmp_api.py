@@ -7,7 +7,12 @@ from unittest import mock
 import pytest
 import requests
 
-from duk.fmp_api import FMPAPIError, adjusted_price_history_api, price_history_api
+from duk.fmp_api import (
+    FMPAPIError,
+    adjusted_price_history_api,
+    price_history_api,
+    treasury_rates_api,
+)
 
 
 class TestPriceHistoryAPI:
@@ -368,6 +373,173 @@ class TestAdjustedPriceHistoryAPI:
             call_args = mock_get.call_args
             assert "dividend-adjusted" in call_args[0][0]
             assert "symbol=AAPL" in call_args[0][0]
+            assert call_args[1]["params"]["apikey"] == "test_api_key"
+            assert call_args[1]["timeout"] == 30
+
+
+class TestTreasuryRatesAPI:
+    """Tests for treasury_rates_api function."""
+
+    def test_treasury_rates_api_success(self):
+        """Test successful API call with treasury rates data."""
+        mock_response = [
+            {
+                "date": "2023-01-03",
+                "month1": 4.35,
+                "month2": 4.42,
+                "month3": 4.45,
+                "year1": 4.68,
+                "year5": 3.94,
+                "year10": 3.79,
+                "year30": 3.88,
+            },
+            {
+                "date": "2023-01-02",
+                "month1": 4.30,
+                "month2": 4.40,
+                "month3": 4.43,
+                "year1": 4.65,
+                "year5": 3.90,
+                "year10": 3.75,
+                "year30": 3.85,
+            },
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = treasury_rates_api("test_api_key")
+
+            assert len(result) == 2
+            assert result[0]["date"] == "2023-01-03"
+            assert result[0]["year10"] == 3.79
+            assert result[1]["date"] == "2023-01-02"
+
+    def test_treasury_rates_api_with_date_range(self):
+        """Test API call with from and to dates."""
+        from datetime import date
+
+        mock_response = [
+            {
+                "date": "2023-06-01",
+                "month1": 5.25,
+                "year10": 3.70,
+            }
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = treasury_rates_api(
+                "test_api_key",
+                start_date=date(2023, 6, 1),
+                end_date=date(2023, 6, 30),
+            )
+
+            # Verify the correct parameters were passed
+            call_args = mock_get.call_args
+            assert call_args[1]["params"]["from"] == "2023-06-01"
+            assert call_args[1]["params"]["to"] == "2023-06-30"
+            assert len(result) == 1
+
+    def test_treasury_rates_api_empty_api_key(self):
+        """Test that empty API key raises ValueError."""
+        with pytest.raises(ValueError, match="API key cannot be empty"):
+            treasury_rates_api("")
+
+    def test_treasury_rates_api_network_error(self):
+        """Test handling of network errors."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.side_effect = requests.exceptions.ConnectionError("Network error")
+
+            with pytest.raises(FMPAPIError, match="Failed to fetch treasury rates"):
+                treasury_rates_api("test_api_key")
+
+    def test_treasury_rates_api_http_error(self):
+        """Test handling of HTTP errors."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.status_code = 404
+            mock_get.return_value.raise_for_status.side_effect = (
+                requests.exceptions.HTTPError("404 Not Found")
+            )
+
+            with pytest.raises(FMPAPIError, match="Failed to fetch treasury rates"):
+                treasury_rates_api("test_api_key")
+
+    def test_treasury_rates_api_invalid_json(self):
+        """Test handling of invalid JSON response."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+            mock_get.return_value.json.side_effect = ValueError("Invalid JSON")
+
+            with pytest.raises(FMPAPIError, match="Failed to parse JSON response"):
+                treasury_rates_api("test_api_key")
+
+    def test_treasury_rates_api_error_message_in_response(self):
+        """Test handling of error message in API response."""
+        mock_response = {"Error Message": "Invalid API key"}
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            with pytest.raises(FMPAPIError, match="FMP API error"):
+                treasury_rates_api("test_api_key")
+
+    def test_treasury_rates_api_empty_response(self):
+        """Test handling of empty list response."""
+        mock_response = []
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = treasury_rates_api("test_api_key")
+
+            assert result == []
+
+    def test_treasury_rates_api_unexpected_response(self):
+        """Test handling of unexpected response format."""
+        mock_response = {}
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = treasury_rates_api("test_api_key")
+
+            assert result == []
+
+    def test_treasury_rates_api_timeout(self):
+        """Test handling of request timeout."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.side_effect = requests.exceptions.Timeout("Request timeout")
+
+            with pytest.raises(FMPAPIError, match="Failed to fetch treasury rates"):
+                treasury_rates_api("test_api_key")
+
+    def test_treasury_rates_api_url_construction(self):
+        """Test that the correct URL and parameters are used."""
+        mock_response = []
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            treasury_rates_api("test_api_key")
+
+            # Verify the correct URL was called
+            call_args = mock_get.call_args
+            assert "treasury-rates" in call_args[0][0]
             assert call_args[1]["params"]["apikey"] == "test_api_key"
             assert call_args[1]["timeout"] == 30
 
