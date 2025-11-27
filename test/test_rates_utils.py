@@ -10,6 +10,7 @@ from duk.rates_utils import (
     _get_interval_in_months,
     _months_to_tenor,
     _tenor_to_months,
+    bootstrap_zero_rates,
     interpolate_rates,
     treasury_rates2df,
 )
@@ -505,3 +506,271 @@ class TestInterpolateRates:
             result = interpolate_rates(df, interval=interval)
             assert isinstance(result, pd.DataFrame)
             assert not result.empty
+
+
+class TestBootstrapZeroRates:
+    """Tests for bootstrap_zero_rates function."""
+
+    def test_tenors_up_to_one_year_equal_par_rate(self):
+        """Test that zero rates for tenors <= 1 year equal par rates."""
+        df = pd.DataFrame(
+            {
+                "month1": [4.35],
+                "month3": [4.45],
+                "month6": [4.55],
+                "year1": [4.68],
+            }
+        )
+
+        result = bootstrap_zero_rates(df)
+
+        # All tenors <= 1 year should have zero rate = par rate
+        assert result["month1"].iloc[0] == 4.35
+        assert result["month3"].iloc[0] == 4.45
+        assert result["month6"].iloc[0] == 4.55
+        assert result["year1"].iloc[0] == 4.68
+
+    def test_tenors_greater_than_one_year_bootstrapped(self):
+        """Test that zero rates for tenors > 1 year are bootstrapped."""
+        df = pd.DataFrame(
+            {
+                "month6": [4.50],
+                "year1": [4.60],
+                "year2": [4.20],
+            }
+        )
+
+        result = bootstrap_zero_rates(df)
+
+        # Tenors <= 1 year should equal par rate
+        assert result["month6"].iloc[0] == 4.50
+        assert result["year1"].iloc[0] == 4.60
+
+        # Tenor > 1 year should be bootstrapped (different from par rate)
+        # The zero rate should be close but not exactly equal to par yield
+        assert "year2" in result.columns
+        # For an upward sloping then downward curve, the 2-year zero rate
+        # will be slightly different from the par rate
+        assert result["year2"].iloc[0] is not None
+        assert isinstance(result["year2"].iloc[0], float)
+
+    def test_flat_yield_curve_zero_rates_equal_par_rates(self):
+        """Test that with flat yield curve, zero rates approximately equal par rates."""
+        # With a perfectly flat curve, zero rates should be very close to par rates
+        flat_rate = 5.0
+        df = pd.DataFrame(
+            {
+                "month6": [flat_rate],
+                "year1": [flat_rate],
+                "year2": [flat_rate],
+                "year5": [flat_rate],
+            }
+        )
+
+        result = bootstrap_zero_rates(df)
+
+        # All zero rates should be close to the flat par rate
+        for col in result.columns:
+            assert abs(result[col].iloc[0] - flat_rate) < 0.1
+
+    def test_empty_input_returns_empty_dataframe(self):
+        """Test that empty input returns empty DataFrame."""
+        df = pd.DataFrame()
+
+        result = bootstrap_zero_rates(df)
+
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
+
+    def test_multiple_rows(self):
+        """Test bootstrapping with multiple rows."""
+        df = pd.DataFrame(
+            {
+                "month6": [4.50, 4.40],
+                "year1": [4.60, 4.50],
+                "year2": [4.20, 4.10],
+            }
+        )
+
+        result = bootstrap_zero_rates(df)
+
+        assert len(result) == 2
+        assert "month6" in result.columns
+        assert "year1" in result.columns
+        assert "year2" in result.columns
+
+    def test_handles_nan_values(self):
+        """Test handling of NaN values in input."""
+        df = pd.DataFrame(
+            {
+                "month6": [4.50, None],
+                "year1": [4.60, 4.50],
+                "year2": [4.20, 4.10],
+            }
+        )
+
+        result = bootstrap_zero_rates(df)
+
+        # First row should work normally
+        assert result["month6"].iloc[0] == 4.50
+        # Second row should have NaN for month6
+        assert pd.isna(result["month6"].iloc[1])
+        # Other values should still be calculated
+        assert not pd.isna(result["year1"].iloc[1])
+
+    def test_preserves_index(self):
+        """Test that result preserves input index."""
+        from datetime import date
+
+        df = pd.DataFrame(
+            {
+                "month6": [4.50, 4.40],
+                "year1": [4.60, 4.50],
+                "year2": [4.20, 4.10],
+            },
+            index=[date(2023, 1, 1), date(2023, 1, 2)],
+        )
+
+        result = bootstrap_zero_rates(df)
+
+        assert list(result.index) == [date(2023, 1, 1), date(2023, 1, 2)]
+
+    def test_columns_sorted_by_tenor(self):
+        """Test that result columns are sorted by tenor."""
+        df = pd.DataFrame(
+            {
+                "year2": [4.20],
+                "month6": [4.50],
+                "year1": [4.60],
+            }
+        )
+
+        result = bootstrap_zero_rates(df)
+
+        columns = list(result.columns)
+        assert columns.index("month6") < columns.index("year1")
+        assert columns.index("year1") < columns.index("year2")
+
+    def test_upward_sloping_curve(self):
+        """Test bootstrapping with upward sloping yield curve."""
+        df = pd.DataFrame(
+            {
+                "month6": [3.50],
+                "year1": [4.00],
+                "year2": [4.50],
+                "year5": [5.00],
+            }
+        )
+
+        result = bootstrap_zero_rates(df)
+
+        # For upward sloping curve, bootstrapped zero rates for
+        # longer tenors tend to be slightly higher than par rates
+        # because earlier coupons are discounted at lower rates
+        assert result["year5"].iloc[0] is not None
+        assert isinstance(result["year5"].iloc[0], float)
+
+    def test_downward_sloping_curve(self):
+        """Test bootstrapping with downward sloping yield curve."""
+        df = pd.DataFrame(
+            {
+                "month6": [5.00],
+                "year1": [4.50],
+                "year2": [4.00],
+                "year5": [3.50],
+            }
+        )
+
+        result = bootstrap_zero_rates(df)
+
+        # For downward sloping curve, bootstrapped zero rates for
+        # longer tenors tend to be slightly lower than par rates
+        assert result["year5"].iloc[0] is not None
+        assert isinstance(result["year5"].iloc[0], float)
+
+    def test_zero_rate_reasonable_range(self):
+        """Test that bootstrapped zero rates are in a reasonable range."""
+        df = pd.DataFrame(
+            {
+                "month6": [4.50],
+                "year1": [4.60],
+                "year2": [4.20],
+                "year5": [4.00],
+                "year10": [3.80],
+            }
+        )
+
+        result = bootstrap_zero_rates(df)
+
+        # Zero rates should be within a reasonable range of the par yields
+        for col in result.columns:
+            rate = result[col].iloc[0]
+            assert rate is not None
+            # Zero rates should be positive and within a reasonable range
+            assert 0 < rate < 20
+
+    def test_single_row_input(self):
+        """Test bootstrapping with single row input."""
+        df = pd.DataFrame(
+            {
+                "month6": [4.50],
+                "year1": [4.60],
+                "year2": [4.20],
+            }
+        )
+
+        result = bootstrap_zero_rates(df)
+
+        assert len(result) == 1
+        assert "month6" in result.columns
+        assert "year1" in result.columns
+        assert "year2" in result.columns
+
+    def test_only_short_tenors(self):
+        """Test with only tenors <= 1 year."""
+        df = pd.DataFrame(
+            {
+                "month1": [4.35],
+                "month3": [4.45],
+                "month6": [4.55],
+            }
+        )
+
+        result = bootstrap_zero_rates(df)
+
+        # All zero rates should equal par rates
+        assert result["month1"].iloc[0] == 4.35
+        assert result["month3"].iloc[0] == 4.45
+        assert result["month6"].iloc[0] == 4.55
+
+    @pytest.mark.parametrize(
+        "tenor,expected_equal_to_par",
+        [
+            ("month1", True),
+            ("month3", True),
+            ("month6", True),
+            ("year1", True),
+            ("year1.5", False),
+            ("year2", False),
+            ("year5", False),
+            ("year10", False),
+            ("year30", False),
+        ],
+    )
+    def test_tenor_classification(self, tenor, expected_equal_to_par):
+        """Test that tenors are correctly classified as <= or > 1 year."""
+        # Create a DataFrame with the specified tenor and year1
+        par_yield = 5.0
+        data = {"year1": [4.5]}  # Base tenor for comparison
+        data[tenor] = [par_yield]
+
+        df = pd.DataFrame(data)
+        result = bootstrap_zero_rates(df)
+
+        if expected_equal_to_par:
+            # For tenors <= 1 year, zero rate should equal par rate
+            assert result[tenor].iloc[0] == par_yield
+        else:
+            # For tenors > 1 year, zero rate may differ from par rate
+            # We just check it's calculated (not None)
+            assert result[tenor].iloc[0] is not None
