@@ -3,7 +3,9 @@ Tests for FMP API module.
 """
 
 from unittest import mock
+from datetime import date as d
 
+import datetime as dt
 import pytest
 import requests
 
@@ -72,17 +74,20 @@ class TestPriceHistoryAPI:
             mock_get.return_value.status_code = 200
             mock_get.return_value.raise_for_status = mock.Mock()
 
+            from_date = dt.datetime.strptime("2023-06-01", "%Y-%m-%d")
+            to_date = dt.datetime.strptime("2023-06-30", "%Y-%m-%d")
+
             result = price_history_api(
                 "AAPL",
                 "test_api_key",
-                from_date="2023-06-01",
-                to_date="2023-06-30",
+                from_date=from_date,
+                to_date=to_date
             )
 
             # Verify the correct parameters were passed
             call_args = mock_get.call_args
-            assert call_args[1]["params"]["from"] == "2023-06-01"
-            assert call_args[1]["params"]["to"] == "2023-06-30"
+            assert call_args[1]["params"]["from"] == from_date.strftime("%Y-%m-%d")
+            assert call_args[1]["params"]["to"] == to_date.strftime("%Y-%m-%d")
             assert len(result) == 1
 
     def test_price_history_api_empty_symbol(self):
@@ -250,17 +255,20 @@ class TestAdjustedPriceHistoryAPI:
             mock_get.return_value.status_code = 200
             mock_get.return_value.raise_for_status = mock.Mock()
 
+            from_date = dt.datetime.strptime("2023-06-01", "%Y-%m-%d")
+            to_date = dt.datetime.strptime("2023-06-30", "%Y-%m-%d")
+
             result = adjusted_price_history_api(
                 "AAPL",
                 "test_api_key",
-                from_date="2023-06-01",
-                to_date="2023-06-30",
+                from_date=from_date,
+                to_date=to_date,
             )
 
             # Verify the correct parameters were passed
             call_args = mock_get.call_args
-            assert call_args[1]["params"]["from"] == "2023-06-01"
-            assert call_args[1]["params"]["to"] == "2023-06-30"
+            assert call_args[1]["params"]["from"] == from_date.strftime("%Y-%m-%d")
+            assert call_args[1]["params"]["to"] == to_date.strftime("%Y-%m-%d")
             assert len(result) == 1
 
     def test_adjusted_price_history_api_empty_symbol(self):
@@ -606,11 +614,11 @@ class TestGetPriceHistory:
             mock_get.return_value.raise_for_status = mock.Mock()
 
             result = get_price_history(
-                "test_api_key",
-                "AAPL",
-                start_date="2023-06-01",
-                end_date="2023-06-30",
-            )
+                    "test_api_key",
+                    "AAPL",
+                    start_date="2023-06-01",
+                    end_date="2023-06-30",
+                )
 
             assert len(result) == 2
             # Verify dates were passed to API
@@ -639,8 +647,8 @@ class TestGetPriceHistory:
             mock_get.return_value.raise_for_status = mock.Mock()
 
             result = get_price_history(
-                "test_api_key", "AAPL", start_date="2023-01-01", limit=3
-            )
+                    "test_api_key", "AAPL", start_date="2023-01-01", limit=3
+                )
 
             # Should keep first 3 records
             assert len(result) == 3
@@ -668,8 +676,8 @@ class TestGetPriceHistory:
             mock_get.return_value.raise_for_status = mock.Mock()
 
             result = get_price_history(
-                "test_api_key", "AAPL", end_date="2023-01-05", limit=3
-            )
+                    "test_api_key", "AAPL", end_date="2023-01-05", limit=3
+                )
 
             # Should keep last 3 records
             assert len(result) == 3
@@ -716,12 +724,12 @@ class TestGetPriceHistory:
             mock_get.return_value.raise_for_status = mock.Mock()
 
             result = get_price_history(
-                "test_api_key",
-                "AAPL",
-                start_date="2023-01-01",
-                end_date="2023-01-31",
-                frequency="week",
-            )
+                    "test_api_key",
+                    "AAPL",
+                    start_date="2023-01-01",
+                    end_date="2023-01-31",
+                    frequency="week",
+                )
 
             # Should have resampled data
             assert len(result) >= 1
@@ -767,12 +775,12 @@ class TestGetPriceHistory:
             mock_get.return_value.raise_for_status = mock.Mock()
 
             result = get_price_history(
-                "test_api_key",
-                "AAPL",
-                start_date="2023-01-01",
-                end_date="2023-02-28",
-                frequency="month",
-            )
+                    "test_api_key",
+                    "AAPL",
+                    start_date="2023-01-01",
+                    end_date="2023-02-28",
+                    frequency="month",
+                )
 
             # Should have resampled data with monthly frequency
             assert len(result) >= 1
@@ -823,7 +831,7 @@ class TestGetPriceHistory:
                 "AAPL",
                 start_date="2023-01-01",
                 end_date="2023-06-30",
-                frequency="quarter",
+                frequency="quarter"
             )
 
             assert len(result) >= 1
@@ -847,12 +855,12 @@ class TestGetPriceHistory:
             mock_get.return_value.raise_for_status = mock.Mock()
 
             result = get_price_history(
-                "test_api_key",
-                "AAPL",
-                start_date="2022-01-01",
-                end_date="2023-12-31",
-                frequency="annual",
-            )
+                    "test_api_key",
+                    "AAPL",
+                    start_date="2022-01-01",
+                    end_date="2023-12-31",
+                    frequency="annual",
+                )
 
             assert len(result) >= 1
 
@@ -1087,12 +1095,12 @@ class TestGetPriceHistory:
             # Request weekly data with limit=2 and start_date (no end_date)
             # Should fetch data from start_date, resample to weekly, then limit to 2
             result = get_price_history(
-                "test_api_key",
-                "AAPL",
-                start_date="2023-01-01",
-                frequency="week",
-                limit=2,
-            )
+                    "test_api_key",
+                    "AAPL",
+                    start_date="2023-01-01",
+                    frequency="week",
+                    limit=2,
+                )
 
             # Should have exactly 2 weekly records (limit applied after resampling)
             assert len(result) == 2

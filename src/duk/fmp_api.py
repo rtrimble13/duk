@@ -26,8 +26,8 @@ class FMPAPIError(Exception):
 def price_history_api(
     symbol: str,
     api_key: str,
-    from_date: Optional[str] = None,
-    to_date: Optional[str] = None,
+    from_date: Optional[date] = None,
+    to_date: Optional[date] = None,
 ) -> List[Dict[str, Any]]:
     """
     Request security price history from FMP API.
@@ -67,9 +67,9 @@ def price_history_api(
     # Build query parameters
     params = {"apikey": api_key}
     if from_date:
-        params["from"] = from_date
+        params["from"] = from_date.strftime("%Y-%m-%d")
     if to_date:
-        params["to"] = to_date
+        params["to"] = to_date.strftime("%Y-%m-%d")
 
     logger.debug(f"Requesting price history for {symbol} from FMP API")
 
@@ -109,8 +109,8 @@ def price_history_api(
 def adjusted_price_history_api(
     symbol: str,
     api_key: str,
-    from_date: Optional[str] = None,
-    to_date: Optional[str] = None,
+    from_date: Optional[date] = None,
+    to_date: Optional[date] = None,
 ) -> List[Dict[str, Any]]:
     """
     Request dividend-adjusted security price history from FMP API.
@@ -150,9 +150,9 @@ def adjusted_price_history_api(
     # Build query parameters
     params = {"apikey": api_key}
     if from_date:
-        params["from"] = from_date
+        params["from"] = from_date.strftime("%Y-%m-%d")
     if to_date:
-        params["to"] = to_date
+        params["to"] = to_date.strftime("%Y-%m-%d")
 
     logger.debug(
         f"Requesting dividend-adjusted price history for {symbol} from FMP API"
@@ -376,25 +376,25 @@ def get_price_history(
     )
 
     # Convert dates back to strings for the API call
-    from_date = calculated_start.strftime("%Y-%m-%d") if calculated_start else None
-    to_date = calculated_end.strftime("%Y-%m-%d") if calculated_end else None
+#    from_date = calculated_start.strftime("%Y-%m-%d") if calculated_start else None
+#    to_date = calculated_end.strftime("%Y-%m-%d") if calculated_end else None
 
-    logger.info(f"Fetching price history for {symbol} from {from_date} to {to_date}")
+    logger.info(f"Fetching price history for {symbol} from {calculated_start} to {calculated_end}")
 
     # Fetch data from API - use adjusted or regular price history
     if adjusted:
         data = adjusted_price_history_api(
             symbol=symbol,
             api_key=api_key,
-            from_date=from_date,
-            to_date=to_date,
+            from_date=calculated_start,
+            to_date=calculated_end,
         )
     else:
         data = price_history_api(
             symbol=symbol,
             api_key=api_key,
-            from_date=from_date,
-            to_date=to_date,
+            from_date=calculated_start,
+            to_date=calculated_end,
         )
 
     # Convert to DataFrame
