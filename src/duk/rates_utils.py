@@ -24,6 +24,10 @@ MONTHS_PER_YEAR = 12
 WEEKS_PER_YEAR = 52
 DAYS_PER_YEAR = 365
 
+# Precision for tenor calculations
+TENOR_DECIMAL_PRECISION = 3
+TARGET_TENOR_PRECISION = 6
+
 
 def treasury_rates2df(par_yields: List[Dict[str, Any]]) -> pd.DataFrame:
     """
@@ -117,7 +121,7 @@ def _months_to_tenor(months: float) -> str:
         years = months / MONTHS_PER_YEAR
         if years == int(years):
             return f"year{int(years)}"
-        return f"year{round(years, 3)}"
+        return f"year{round(years, TENOR_DECIMAL_PRECISION)}"
 
 
 def _get_interval_in_months(interval: str) -> float:
@@ -184,7 +188,7 @@ def _generate_target_tenors(
     # Generate target points based on interval
     current = min_tenor
     while current <= max_tenor:
-        target_tenors.add(round(current, 6))
+        target_tenors.add(round(current, TARGET_TENOR_PRECISION))
         current += interval_months
 
     return sorted(target_tenors)
