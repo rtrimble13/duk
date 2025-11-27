@@ -376,10 +376,13 @@ def get_price_history(
     )
 
     # Convert dates back to strings for the API call
-#    from_date = calculated_start.strftime("%Y-%m-%d") if calculated_start else None
-#    to_date = calculated_end.strftime("%Y-%m-%d") if calculated_end else None
+    #    from_date = calculated_start.strftime("%Y-%m-%d") if calculated_start else None
+    #    to_date = calculated_end.strftime("%Y-%m-%d") if calculated_end else None
 
-    logger.info(f"Fetching price history for {symbol} from {calculated_start} to {calculated_end}")
+    logger.info(
+        f"Fetching price history for {symbol} from "
+        f"{calculated_start} to {calculated_end}"
+    )
 
     # Fetch data from API - use adjusted or regular price history
     if adjusted:

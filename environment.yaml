@@ -6,6 +6,8 @@ dependencies:
   - python>=3.9
   - pip
   - pytest
+  - pandas
+  - scipy
   - pip:
     - click>=8.0.0
     - configistate>=0.1.0

@@ -279,14 +279,10 @@ def interpolate_rates(
         y = [row[t] for t in existing_tenors]
 
         # Handle NaN values by filtering them out
-        valid_points = [
-            (xi, yi) for xi, yi in zip(x, y) if pd.notna(yi)
-        ]
+        valid_points = [(xi, yi) for xi, yi in zip(x, y) if pd.notna(yi)]
 
         if len(valid_points) < 2:
-            logger.warning(
-                f"Row {idx} has fewer than 2 valid data points, skipping"
-            )
+            logger.warning(f"Row {idx} has fewer than 2 valid data points, skipping")
             continue
 
         x_valid, y_valid = zip(*valid_points)
@@ -324,12 +320,10 @@ def interpolate_rates(
         return pd.DataFrame()
 
     # Create result DataFrame with same index as input
-    result_df = pd.DataFrame(result_data, index=rate_curve.index[:len(result_data)])
+    result_df = pd.DataFrame(result_data, index=rate_curve.index[: len(result_data)])
 
     # Sort columns by tenor (in months)
-    sorted_columns = sorted(
-        result_df.columns, key=lambda c: _tenor_to_months(c)
-    )
+    sorted_columns = sorted(result_df.columns, key=lambda c: _tenor_to_months(c))
     result_df = result_df[sorted_columns]
 
     logger.info(

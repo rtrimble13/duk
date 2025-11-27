@@ -34,18 +34,12 @@ install:
 
 # Run the test suite
 test:
-	@echo "Running tests in 'duk' conda environment"
-	@if command -v conda >/dev/null 2>&1; then \
-		conda run -n duk python -m pytest test/ -v; \
-	else \
-		echo "conda not found, using system python"; \
-		python -m pytest test/ -v; \
-	fi
+	python -m pytest test/ -v; \
 
 fmt:
 	python -m black src/ test/
 	python -m isort src/ test/
-	python -m flake8 src/ test/ --max-line-length=80
+	python -m flake8 src/ test/ --max-line-length=88
 
 # Build conda distribution
 dist:
