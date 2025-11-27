@@ -7,7 +7,7 @@ data retrieved from APIs.
 
 import logging
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 from scipy.interpolate import CubicSpline
@@ -332,3 +332,222 @@ def interpolate_rates(
     )
 
     return result_df
+
+
+def _get_sorted_tenors(df: pd.DataFrame) -> List[Tuple[str, float]]:
+    """
+    Get sorted list of (tenor_name, tenor_in_months) tuples from DataFrame columns.
+
+    Args:
+        df: DataFrame with tenor columns (e.g., 'month1', 'year1', etc.)
+
+    Returns:
+        List of (column_name, months) tuples sorted by months ascending.
+    """
+    tenor_list = []
+    for col in df.columns:
+        try:
+            months = _tenor_to_months(col)
+            tenor_list.append((col, months))
+        except ValueError:
+            logger.warning(f"Skipping unrecognized tenor column: {col}")
+    return sorted(tenor_list, key=lambda x: x[1])
+
+
+def bootstrap_zero_rates(par_yields: pd.DataFrame) -> pd.DataFrame:
+    """
+    Bootstrap zero-rate curve from treasury par yield curve.
+
+    This function calculates zero (spot) rates from par yields. For tenors
+    up to 1 year, the zero rate equals the par rate. For tenors greater than
+    1 year, the function bootstraps zero rates assuming semi-annual coupon
+    payments where the coupon rate equals the par yield.
+
+    The bootstrapping algorithm solves for the zero rate at each maturity
+    using the relationship between bond price, coupon payments, and
+    discount factors derived from previously calculated zero rates.
+
+    Args:
+        par_yields: DataFrame with par yield data. Columns should be tenor
+            names (e.g., 'month1', 'year1', 'year10'). Each row represents
+            a different date's yield curve. Par yields should be expressed
+            as percentages (e.g., 4.5 for 4.5%).
+
+    Returns:
+        DataFrame with bootstrapped zero rates. Has the same structure as
+        the input DataFrame with zero rates replacing par yields.
+
+    Example:
+        >>> df = pd.DataFrame({
+        ...     'month6': [4.50],
+        ...     'year1': [4.68],
+        ...     'year2': [4.20],
+        ...     'year5': [3.90]
+        ... })
+        >>> zero_rates = bootstrap_zero_rates(df)
+        >>> # Zero rates for month6 and year1 equal par yields
+        >>> # Zero rates for year2+ are bootstrapped
+    """
+    if par_yields.empty:
+        logger.warning("Empty par_yields input, returning empty DataFrame")
+        return pd.DataFrame()
+
+    logger.debug(f"Bootstrapping zero rates for {len(par_yields)} rows")
+
+    # Get sorted tenors
+    sorted_tenors = _get_sorted_tenors(par_yields)
+
+    if not sorted_tenors:
+        logger.warning("No valid tenor columns found")
+        return pd.DataFrame()
+
+    result_data = []
+
+    for idx, row in par_yields.iterrows():
+        # Dictionary to store zero rates for this row
+        # Keys are months (float), values are zero rates
+        zero_rates_by_month: Dict[float, float] = {}
+        row_result: Dict[str, float] = {}
+
+        for tenor_name, months in sorted_tenors:
+            par_yield = row[tenor_name]
+
+            # Skip if par yield is NaN
+            if pd.isna(par_yield):
+                row_result[tenor_name] = None
+                continue
+
+            # Convert par yield from percentage to decimal
+            par_yield_decimal = par_yield / 100.0
+            years = months / MONTHS_PER_YEAR
+
+            if months <= MONTHS_PER_YEAR:
+                # For tenors <= 1 year, zero rate equals par rate
+                zero_rate = par_yield
+            else:
+                # For tenors > 1 year, bootstrap using semi-annual coupons
+                # Semi-annual coupon payment (as decimal of face value)
+                coupon = par_yield_decimal / 2.0
+
+                # Calculate the sum of discounted coupon payments
+                # using previously bootstrapped zero rates
+                discounted_coupons = 0.0
+
+                # Semi-annual payment periods from 0.5 years to (T - 0.5) years
+                # We need zero rates at each 6-month interval
+                period = 0.5
+                while period < years:
+                    period_months = period * MONTHS_PER_YEAR
+
+                    # Find the zero rate for this period
+                    # First, try exact match
+                    if period_months in zero_rates_by_month:
+                        z_rate = zero_rates_by_month[period_months]
+                    else:
+                        # Interpolate from available zero rates
+                        z_rate = _interpolate_zero_rate(
+                            period_months, zero_rates_by_month
+                        )
+
+                    if z_rate is not None:
+                        # Convert to decimal and calculate discount factor
+                        z_rate_decimal = z_rate / 100.0
+                        discount_factor = 1.0 / (
+                            (1 + z_rate_decimal / 2) ** (2 * period)
+                        )
+                        discounted_coupons += coupon * discount_factor
+
+                    period += 0.5
+
+                # Solve for the zero rate at maturity
+                # Bond price = 1 (par)
+                # 1 = sum(coupon * DF_i) + (1 + coupon) * DF_T
+                # DF_T = (1 - discounted_coupons) / (1 + coupon)
+                final_payment = 1.0 + coupon
+                df_T = (1.0 - discounted_coupons) / final_payment
+
+                if df_T > 0:
+                    # DF_T = 1 / (1 + z/2)^(2*T)
+                    # Solve for z: z = 2 * (DF_T^(-1/(2*T)) - 1)
+                    zero_rate_decimal = 2.0 * (df_T ** (-1.0 / (2.0 * years)) - 1.0)
+                    zero_rate = zero_rate_decimal * 100.0
+                else:
+                    logger.warning(
+                        f"Row {idx}: Negative discount factor for {tenor_name}, "
+                        f"using par yield as fallback"
+                    )
+                    zero_rate = par_yield
+
+            row_result[tenor_name] = zero_rate
+            zero_rates_by_month[months] = zero_rate
+
+        result_data.append(row_result)
+
+    if not result_data:
+        logger.warning("No valid rows for bootstrapping")
+        return pd.DataFrame()
+
+    # Create result DataFrame with same index as input
+    result_df = pd.DataFrame(result_data, index=par_yields.index[: len(result_data)])
+
+    # Sort columns by tenor (in months)
+    sorted_columns = sorted(result_df.columns, key=lambda c: _tenor_to_months(c))
+    result_df = result_df[sorted_columns]
+
+    logger.info(f"Bootstrapping complete for {len(result_df)} rows")
+
+    return result_df
+
+
+def _interpolate_zero_rate(
+    target_months: float, zero_rates: Dict[float, float]
+) -> float:
+    """
+    Interpolate zero rate at target tenor from available zero rates.
+
+    Uses linear interpolation between the two nearest tenor points.
+
+    Args:
+        target_months: The tenor (in months) at which to interpolate.
+        zero_rates: Dictionary mapping months to zero rates.
+
+    Returns:
+        Interpolated zero rate, or None if interpolation is not possible.
+    """
+    if not zero_rates:
+        return None
+
+    # Find the nearest lower and upper bounds
+    months_list = sorted(zero_rates.keys())
+
+    # If target is below all available tenors, use the lowest
+    if target_months <= months_list[0]:
+        return zero_rates[months_list[0]]
+
+    # If target is above all available tenors, use the highest
+    if target_months >= months_list[-1]:
+        return zero_rates[months_list[-1]]
+
+    # Find surrounding points for interpolation
+    lower_month = None
+    upper_month = None
+
+    for m in months_list:
+        if m <= target_months:
+            lower_month = m
+        if m >= target_months and upper_month is None:
+            upper_month = m
+
+    if lower_month is None or upper_month is None:
+        return None
+
+    if lower_month == upper_month:
+        return zero_rates[lower_month]
+
+    # Linear interpolation
+    lower_rate = zero_rates[lower_month]
+    upper_rate = zero_rates[upper_month]
+    fraction = (target_months - lower_month) / (upper_month - lower_month)
+    interpolated_rate = lower_rate + fraction * (upper_rate - lower_rate)
+
+    return interpolated_rate
