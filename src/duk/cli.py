@@ -291,6 +291,13 @@ def ph(
         "format filename as yc_<start>_<end>.<ext>"
     ),
 )
+@click.option(
+    "-p",
+    "--precision",
+    type=int,
+    default=4,
+    help="Decimal precision for yield rates (default: 4)",
+)
 @click.pass_context
 def yc(
     ctx,
@@ -306,6 +313,7 @@ def yc(
     output_csv,
     output_json,
     output,
+    precision,
 ):
     """
     Request yield curve data.
@@ -405,6 +413,12 @@ def yc(
             click.echo("No yield curve data found")
         sys.exit(0)
 
+    # Apply precision to yield rates
+    rate_columns = df.select_dtypes(include=["float", "int"]).columns 
+    # Exclude non-rate columns like 'date' or 'years'
+    rate_columns = [col for col in rate_columns if col not in ["date", "years"]]
+    df[rate_columns] = df[rate_columns].round(precision)
+    
     # Filter for key-rates if specified (after fetching data)
     if key_rates:
         # Check if we have a single-date response (tenor-indexed)
