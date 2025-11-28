@@ -2,6 +2,7 @@
 Unit tests for yc command.
 """
 
+import json
 import os
 import tempfile
 from datetime import date
@@ -604,8 +605,6 @@ class TestYcCommand:
 
                 # Verify file contents
                 with open(output_file, "r") as f:
-                    import json
-
                     data = json.load(f)
                     assert isinstance(data, list)
                     assert len(data) == 2

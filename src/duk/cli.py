@@ -15,6 +15,9 @@ from duk.config import get_config
 from duk.fmp_api import get_price_history, get_yield_curve
 from duk.logging_config import setup_logging
 
+# Key rate tenors for yield curve analysis
+KEY_RATE_TENORS = ["year1", "year5", "year10", "year20", "year30"]
+
 
 @click.group()
 @click.version_option(version=__version__, message="%(version)s")
@@ -378,7 +381,7 @@ def yc(
 
     # Handle key-rates option
     if key_rates:
-        tenors_tuple = ("year1", "year30")
+        tenors_tuple = (KEY_RATE_TENORS[0], KEY_RATE_TENORS[-1])
 
     # Fetch yield curve
     try:
@@ -404,15 +407,14 @@ def yc(
 
     # Filter for key-rates if specified (after fetching data)
     if key_rates:
-        key_rate_tenors = ["year1", "year5", "year10", "year20", "year30"]
         # Check if we have a single-date response (tenor-indexed)
         if "years" in df.columns:
             # Single date format - filter by index (tenor names)
-            available_key_tenors = [t for t in key_rate_tenors if t in df.index]
+            available_key_tenors = [t for t in KEY_RATE_TENORS if t in df.index]
             df = df.loc[available_key_tenors]
         else:
             # Multiple date format - filter by columns (tenor names)
-            available_key_tenors = [t for t in key_rate_tenors if t in df.columns]
+            available_key_tenors = [t for t in KEY_RATE_TENORS if t in df.columns]
             df = df[available_key_tenors]
 
     logger.info(f"Retrieved yield curve data with {len(df)} records")
