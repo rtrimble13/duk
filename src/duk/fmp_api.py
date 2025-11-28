@@ -619,17 +619,17 @@ def get_yield_curve(
             df = df.tail(limit)
             logger.debug(f"Keeping last {limit} records")
 
-    # Apply interpolation if interval is specified
-    if interval is not None:
-        logger.debug(f"Interpolating rates with interval: {interval}")
-        df = interpolate_rates(df, interval=interval)
-
     # Apply zero rate transformation if requested
     if zero_rates:
         logger.debug("Bootstrapping zero rates")
         # Interpolate to semi-annual before bootstrapping as per requirements
         df = interpolate_rates(df, interval="semi-annual")
         df = bootstrap_zero_rates(df)
+
+    # Apply interpolation if interval is specified (after zero rate bootstrapping)
+    if interval is not None:
+        logger.debug(f"Interpolating rates with interval: {interval}")
+        df = interpolate_rates(df, interval=interval)
 
     # Apply tenor filter if specified
     if tenors is not None:
@@ -671,6 +671,7 @@ def get_yield_curve(
                 months = _tenor_to_months(col)
                 years = months / MONTHS_PER_YEAR
                 # Calculate estimated date as record_date + years
+                # Using 365 days/year (standard financial approximation)
                 estimated_date = record_date + timedelta(days=int(years * 365))
                 rate_value = df[col].iloc[0]
                 tenor_data.append(
