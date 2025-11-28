@@ -1260,3 +1260,389 @@ class TestGetPriceHistory:
             # Verify values are correct after column rename
             assert result.iloc[0]["close"] == 150.0
             assert result.iloc[0]["open"] == 149.0
+
+
+class TestGetYieldCurve:
+    """Tests for get_yield_curve function."""
+
+    def test_get_yield_curve_multiple_dates(self):
+        """Test yield curve with multiple dates returns date-indexed DataFrame."""
+        from duk.fmp_api import get_yield_curve
+
+        mock_response = [
+            {
+                "date": "2023-01-03",
+                "month1": 4.35,
+                "month3": 4.45,
+                "year1": 4.68,
+                "year10": 3.79,
+            },
+            {
+                "date": "2023-01-02",
+                "month1": 4.30,
+                "month3": 4.40,
+                "year1": 4.65,
+                "year10": 3.75,
+            },
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_yield_curve(
+                "test_api_key",
+                start_date="2023-01-02",
+                end_date="2023-01-03",
+            )
+
+            assert len(result) == 2
+            assert result.index.name == "date"
+            assert "month1" in result.columns
+            assert "year10" in result.columns
+            # Check date order is ascending
+            assert result.index[0] < result.index[1]
+
+    def test_get_yield_curve_single_date_par_rate(self):
+        """Test yield curve with single date returns tenor-indexed DataFrame."""
+        from duk.fmp_api import get_yield_curve
+
+        mock_response = [
+            {
+                "date": "2023-06-01",
+                "month1": 4.35,
+                "month6": 4.50,
+                "year1": 4.68,
+                "year10": 3.79,
+            },
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_yield_curve(
+                "test_api_key",
+                start_date="2023-06-01",
+                end_date="2023-06-01",
+            )
+
+            # Single date should return tenor-indexed DataFrame
+            assert result.index.name == "tenor"
+            assert "years" in result.columns
+            assert "date" in result.columns
+            assert "par_rate" in result.columns
+            assert "zero_rate" not in result.columns
+
+            # Check tenor values
+            assert "month1" in result.index
+            assert "year10" in result.index
+
+            # Check years values
+            assert result.loc["month1", "years"] == 1 / 12
+            assert result.loc["year10", "years"] == 10.0
+
+            # Check par_rate values
+            assert result.loc["month1", "par_rate"] == 4.35
+            assert result.loc["year10", "par_rate"] == 3.79
+
+    def test_get_yield_curve_single_date_zero_rate(self):
+        """Test yield curve with single date and zero_rates=True."""
+        from duk.fmp_api import get_yield_curve
+
+        mock_response = [
+            {
+                "date": "2023-06-01",
+                "month6": 4.50,
+                "year1": 4.60,
+                "year2": 4.20,
+            },
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_yield_curve(
+                "test_api_key",
+                start_date="2023-06-01",
+                end_date="2023-06-01",
+                zero_rates=True,
+            )
+
+            # Single date with zero_rates should return tenor-indexed DataFrame
+            assert result.index.name == "tenor"
+            assert "zero_rate" in result.columns
+            assert "par_rate" not in result.columns
+
+    def test_get_yield_curve_with_limit(self):
+        """Test yield curve with limit parameter."""
+        from duk.fmp_api import get_yield_curve
+
+        mock_response = [
+            {"date": "2023-01-05", "year10": 3.80},
+            {"date": "2023-01-04", "year10": 3.78},
+            {"date": "2023-01-03", "year10": 3.76},
+            {"date": "2023-01-02", "year10": 3.74},
+            {"date": "2023-01-01", "year10": 3.72},
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_yield_curve(
+                "test_api_key",
+                end_date="2023-01-05",
+                limit=3,
+            )
+
+            # Should keep last 3 records
+            assert len(result) == 3
+
+    def test_get_yield_curve_with_tenors_filter(self):
+        """Test yield curve with tenors filter."""
+        from duk.fmp_api import get_yield_curve
+
+        mock_response = [
+            {
+                "date": "2023-06-01",
+                "month1": 4.35,
+                "month6": 4.50,
+                "year1": 4.68,
+                "year5": 4.00,
+                "year10": 3.79,
+                "year30": 3.88,
+            },
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_yield_curve(
+                "test_api_key",
+                start_date="2023-06-01",
+                end_date="2023-06-01",
+                tenors=("year1", "year10"),
+            )
+
+            # Should only include year1 through year10
+            assert "year1" in result.index
+            assert "year5" in result.index
+            assert "year10" in result.index
+            # Should exclude month1, month6, year30
+            assert "month1" not in result.index
+            assert "month6" not in result.index
+            assert "year30" not in result.index
+
+    def test_get_yield_curve_with_interval(self):
+        """Test yield curve with interval interpolation."""
+        from duk.fmp_api import get_yield_curve
+
+        mock_response = [
+            {
+                "date": "2023-06-01",
+                "year1": 4.68,
+                "year5": 4.00,
+            },
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_yield_curve(
+                "test_api_key",
+                start_date="2023-06-01",
+                end_date="2023-06-01",
+                interval="annual",
+            )
+
+            # Should have interpolated points
+            assert "year2" in result.index
+            assert "year3" in result.index
+            assert "year4" in result.index
+
+    def test_get_yield_curve_empty_response(self):
+        """Test handling of empty API response."""
+        from duk.fmp_api import get_yield_curve
+
+        mock_response = []
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_yield_curve("test_api_key")
+
+            assert len(result) == 0
+            assert isinstance(result, __import__("pandas").DataFrame)
+
+    def test_get_yield_curve_invalid_date_format(self):
+        """Test handling of invalid date format."""
+        from duk.fmp_api import get_yield_curve
+
+        with pytest.raises(ValueError):
+            get_yield_curve("test_api_key", start_date="invalid-date")
+
+    def test_get_yield_curve_invalid_tenors(self):
+        """Test handling of invalid tenors parameter."""
+        from duk.fmp_api import get_yield_curve
+
+        mock_response = [
+            {"date": "2023-06-01", "year1": 4.68},
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            with pytest.raises(ValueError, match="Invalid tenor in filter"):
+                get_yield_curve(
+                    "test_api_key",
+                    start_date="2023-06-01",
+                    end_date="2023-06-01",
+                    tenors=("invalid", "year10"),
+                )
+
+    def test_get_yield_curve_tenors_tuple_length(self):
+        """Test that tenors must be a tuple of length 2."""
+        from duk.fmp_api import get_yield_curve
+
+        mock_response = [
+            {"date": "2023-06-01", "year1": 4.68},
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            with pytest.raises(ValueError, match="must be a tuple"):
+                get_yield_curve(
+                    "test_api_key",
+                    start_date="2023-06-01",
+                    end_date="2023-06-01",
+                    tenors=("year1",),
+                )
+
+    def test_get_yield_curve_date_column_calculation(self):
+        """Test that date column is correctly calculated for single date."""
+        from datetime import date, timedelta
+
+        from duk.fmp_api import get_yield_curve
+
+        mock_response = [
+            {
+                "date": "2023-06-01",
+                "year1": 4.68,
+                "year5": 4.00,
+            },
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_yield_curve(
+                "test_api_key",
+                start_date="2023-06-01",
+                end_date="2023-06-01",
+            )
+
+            record_date = date(2023, 6, 1)
+            # year1 should be ~1 year in the future
+            expected_date_year1 = record_date + timedelta(days=int(1 * 365))
+            assert result.loc["year1", "date"] == expected_date_year1
+
+            # year5 should be ~5 years in the future
+            expected_date_year5 = record_date + timedelta(days=int(5 * 365))
+            assert result.loc["year5", "date"] == expected_date_year5
+
+    def test_get_yield_curve_multiple_dates_preserves_all_tenors(self):
+        """Test that multiple dates result preserves all tenor columns."""
+        from duk.fmp_api import get_yield_curve
+
+        mock_response = [
+            {"date": "2023-01-02", "month1": 4.30, "year1": 4.65, "year10": 3.75},
+            {"date": "2023-01-03", "month1": 4.35, "year1": 4.68, "year10": 3.79},
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_yield_curve(
+                "test_api_key",
+                start_date="2023-01-02",
+                end_date="2023-01-03",
+            )
+
+            assert "month1" in result.columns
+            assert "year1" in result.columns
+            assert "year10" in result.columns
+            assert len(result) == 2
+
+    def test_get_yield_curve_with_start_date_and_limit(self):
+        """Test yield curve with start_date and limit keeps first N records."""
+        from duk.fmp_api import get_yield_curve
+
+        mock_response = [
+            {"date": "2023-01-01", "year10": 3.72},
+            {"date": "2023-01-02", "year10": 3.74},
+            {"date": "2023-01-03", "year10": 3.76},
+            {"date": "2023-01-04", "year10": 3.78},
+            {"date": "2023-01-05", "year10": 3.80},
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_yield_curve(
+                "test_api_key",
+                start_date="2023-01-01",
+                limit=3,
+            )
+
+            # Should keep first 3 records
+            assert len(result) == 3
+
+    def test_get_yield_curve_zero_rates_applies_bootstrap(self):
+        """Test that zero_rates=True applies bootstrap transformation."""
+        from duk.fmp_api import get_yield_curve
+
+        mock_response = [
+            {"date": "2023-01-02", "month6": 4.50, "year1": 4.60},
+            {"date": "2023-01-03", "month6": 4.55, "year1": 4.65},
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = get_yield_curve(
+                "test_api_key",
+                start_date="2023-01-02",
+                end_date="2023-01-03",
+                zero_rates=True,
+            )
+
+            # Should have multiple dates (2 records)
+            assert len(result) == 2
+            # Columns should be tenors
+            assert "month6" in result.columns
+            assert "year1" in result.columns
