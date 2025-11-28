@@ -480,3 +480,221 @@ def get_price_history(
 
     logger.info(f"Returning {len(df)} records for {symbol}")
     return df
+
+
+def get_yield_curve(
+    api_key: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: Optional[int] = None,
+    zero_rates: bool = False,
+    tenors: Optional[tuple] = None,
+    interval: Optional[str] = None,
+) -> pd.DataFrame:
+    """
+    Get treasury yield curve data as a pandas DataFrame.
+
+    This function retrieves treasury rates from the FMP API and processes them
+    to return a yield curve. It supports date range filtering, zero rate
+    bootstrapping, tenor filtering, and interpolation.
+
+    Args:
+        api_key: FMP API key for authentication
+        start_date: Optional start date string (format: YYYY-MM-DD)
+        end_date: Optional end date string (format: YYYY-MM-DD)
+        limit: Optional number of records to return. When combined with:
+            - start_date (no end_date): returns first `limit` records
+            - end_date (no start_date): returns last `limit` records
+        zero_rates: If True, transform par rates to zero rates using
+            bootstrapping. Default is False.
+        tenors: Optional tuple of (start_tenor, end_tenor) to filter the
+            yield curve. For example, ('month1', 'year10') returns only
+            tenors between 1 month and 10 years inclusive.
+        interval: Optional interpolation interval. Valid values are:
+            'day', 'week', 'month', 'quarter', 'semi-annual', 'annual'.
+            If provided, the yield curve is interpolated to this interval.
+
+    Returns:
+        pandas DataFrame with yield curve data.
+
+        If multiple dates are returned:
+            - DataFrame is indexed on date (ascending order)
+            - Columns are the tenor names (e.g., 'month1', 'year1', 'year10')
+
+        If only one date is returned:
+            - DataFrame is indexed on tenor names
+            - Contains columns:
+                - 'years': Tenor value in years (float)
+                - 'date': Estimated date (record date + years)
+                - 'par_rate' or 'zero_rate': Rate values (depending on
+                  zero_rates parameter)
+
+    Raises:
+        ValueError: If parameters are invalid
+        FMPAPIError: If the API request fails
+
+    Examples:
+        >>> # Get yield curve for a specific date
+        >>> df = get_yield_curve("your_api_key",
+        ...                      start_date="2023-06-01",
+        ...                      end_date="2023-06-01")
+
+        >>> # Get zero rate curve for a specific date
+        >>> df = get_yield_curve("your_api_key",
+        ...                      start_date="2023-06-01",
+        ...                      end_date="2023-06-01",
+        ...                      zero_rates=True)
+
+        >>> # Get last 30 days of yield curves
+        >>> df = get_yield_curve("your_api_key", limit=30)
+
+        >>> # Get yield curve with quarterly interpolation
+        >>> df = get_yield_curve("your_api_key",
+        ...                      start_date="2023-06-01",
+        ...                      end_date="2023-06-01",
+        ...                      interval="quarter")
+
+        >>> # Get only 1-year to 10-year tenors
+        >>> df = get_yield_curve("your_api_key",
+        ...                      start_date="2023-06-01",
+        ...                      end_date="2023-06-01",
+        ...                      tenors=("year1", "year10"))
+    """
+    from datetime import timedelta
+
+    from duk.rates_utils import (
+        MONTHS_PER_YEAR,
+        _tenor_to_months,
+        bootstrap_zero_rates,
+        interpolate_rates,
+        treasury_rates2df,
+    )
+
+    # Convert string dates to date objects
+    start_date_obj = None
+    end_date_obj = None
+    if start_date:
+        start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
+    if end_date:
+        end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
+
+    # Calculate date range using get_api_date_range (mimics get_price_history)
+    calculated_start, calculated_end = get_api_date_range(
+        start_date=start_date_obj,
+        end_date=end_date_obj,
+        limit=limit,
+        frequency="day",
+    )
+
+    logger.info(f"Fetching yield curve from {calculated_start} to {calculated_end}")
+
+    # Fetch data from API
+    data = treasury_rates_api(
+        api_key=api_key,
+        start_date=calculated_start,
+        end_date=calculated_end,
+    )
+
+    # Convert to DataFrame using treasury_rates2df
+    if not data:
+        logger.warning("No data returned for yield curve")
+        return pd.DataFrame()
+
+    df = treasury_rates2df(data)
+
+    if df.empty:
+        return df
+
+    # Sort by date index ascending
+    df = df.sort_index()
+
+    # Apply limit if specified (after sorting)
+    if limit is not None and limit > 0:
+        # Case: limit with start_date and no end_date - keep first `limit` records
+        if start_date_obj is not None and end_date_obj is None:
+            df = df.head(limit)
+            logger.debug(f"Keeping first {limit} records")
+        # Case: limit with end_date and no start_date - keep last `limit` records
+        else:
+            df = df.tail(limit)
+            logger.debug(f"Keeping last {limit} records")
+
+    # Apply zero rate transformation if requested
+    if zero_rates:
+        logger.debug("Bootstrapping zero rates")
+        # Interpolate to semi-annual before bootstrapping as per requirements
+        df = interpolate_rates(df, interval="semi-annual")
+        df = bootstrap_zero_rates(df)
+
+    # Apply interpolation if interval is specified (after zero rate bootstrapping)
+    if interval is not None:
+        logger.debug(f"Interpolating rates with interval: {interval}")
+        df = interpolate_rates(df, interval=interval)
+
+    # Apply tenor filter if specified
+    if tenors is not None:
+        if len(tenors) != 2:
+            raise ValueError("tenors must be a tuple of (start_tenor, end_tenor)")
+
+        start_tenor, end_tenor = tenors
+        try:
+            start_months = _tenor_to_months(start_tenor)
+            end_months = _tenor_to_months(end_tenor)
+        except ValueError as e:
+            raise ValueError(f"Invalid tenor in filter: {e}") from e
+
+        # Filter columns based on tenor range
+        filtered_columns = []
+        for col in df.columns:
+            try:
+                col_months = _tenor_to_months(col)
+                if start_months <= col_months <= end_months:
+                    filtered_columns.append(col)
+            except ValueError:
+                # Skip columns that aren't valid tenors
+                pass
+
+        # Sort filtered columns by tenor
+        filtered_columns = sorted(filtered_columns, key=lambda c: _tenor_to_months(c))
+        df = df[filtered_columns]
+
+    # Handle single date vs multiple dates output format
+    if len(df) == 1:
+        # Single date record - transform to tenor-indexed DataFrame
+        record_date = df.index[0]
+        rate_column_name = "zero_rate" if zero_rates else "par_rate"
+
+        # Get tenor columns and their values
+        tenor_data = []
+        for col in df.columns:
+            try:
+                months = _tenor_to_months(col)
+                years = months / MONTHS_PER_YEAR
+                # Calculate estimated date as record_date + years
+                # Using 365 days/year (standard financial approximation)
+                estimated_date = record_date + timedelta(days=int(years * 365))
+                rate_value = df[col].iloc[0]
+                tenor_data.append(
+                    {
+                        "tenor": col,
+                        "years": years,
+                        "date": estimated_date,
+                        rate_column_name: rate_value,
+                    }
+                )
+            except ValueError:
+                # Skip non-tenor columns
+                pass
+
+        if not tenor_data:
+            return pd.DataFrame()
+
+        result_df = pd.DataFrame(tenor_data)
+        result_df = result_df.set_index("tenor")
+
+        logger.info(f"Returning single-date yield curve with {len(result_df)} tenors")
+        return result_df
+
+    # Multiple dates - return as-is with date index
+    logger.info(f"Returning {len(df)} yield curve records")
+    return df
