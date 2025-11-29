@@ -10,8 +10,13 @@ import requests
 
 from duk.fmp_api import (
     FMPAPIError,
+    actively_trading_list_api,
     adjusted_price_history_api,
+    company_list_api,
+    etf_symbol_list_api,
+    industry_list_api,
     price_history_api,
+    sector_list_api,
     treasury_rates_api,
 )
 
@@ -1646,3 +1651,636 @@ class TestGetYieldCurve:
             # Columns should be tenors
             assert "month6" in result.columns
             assert "year1" in result.columns
+
+
+class TestCompanyListAPI:
+    """Tests for company_list_api function."""
+
+    def test_company_list_api_success(self):
+        """Test successful API call with company list data."""
+        mock_response = [
+            {
+                "symbol": "AAPL",
+                "name": "Apple Inc.",
+                "price": 150.0,
+                "exchange": "NASDAQ",
+            },
+            {
+                "symbol": "MSFT",
+                "name": "Microsoft Corporation",
+                "price": 300.0,
+                "exchange": "NASDAQ",
+            },
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = company_list_api("test_api_key")
+
+            assert len(result) == 2
+            assert result[0]["symbol"] == "AAPL"
+            assert result[1]["symbol"] == "MSFT"
+
+    def test_company_list_api_empty_api_key(self):
+        """Test that empty API key raises ValueError."""
+        with pytest.raises(ValueError, match="API key cannot be empty"):
+            company_list_api("")
+
+    def test_company_list_api_network_error(self):
+        """Test handling of network errors."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.side_effect = requests.exceptions.ConnectionError("Network error")
+
+            with pytest.raises(FMPAPIError, match="Failed to fetch company list"):
+                company_list_api("test_api_key")
+
+    def test_company_list_api_http_error(self):
+        """Test handling of HTTP errors."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.status_code = 404
+            mock_get.return_value.raise_for_status.side_effect = (
+                requests.exceptions.HTTPError("404 Not Found")
+            )
+
+            with pytest.raises(FMPAPIError, match="Failed to fetch company list"):
+                company_list_api("test_api_key")
+
+    def test_company_list_api_invalid_json(self):
+        """Test handling of invalid JSON response."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+            mock_get.return_value.json.side_effect = ValueError("Invalid JSON")
+
+            with pytest.raises(FMPAPIError, match="Failed to parse JSON response"):
+                company_list_api("test_api_key")
+
+    def test_company_list_api_error_message_in_response(self):
+        """Test handling of error message in API response."""
+        mock_response = {"Error Message": "Invalid API key"}
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            with pytest.raises(FMPAPIError, match="FMP API error"):
+                company_list_api("test_api_key")
+
+    def test_company_list_api_empty_response(self):
+        """Test handling of empty list response."""
+        mock_response = []
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = company_list_api("test_api_key")
+
+            assert result == []
+
+    def test_company_list_api_unexpected_response(self):
+        """Test handling of unexpected response format."""
+        mock_response = {}
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = company_list_api("test_api_key")
+
+            assert result == []
+
+    def test_company_list_api_timeout(self):
+        """Test handling of request timeout."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.side_effect = requests.exceptions.Timeout("Request timeout")
+
+            with pytest.raises(FMPAPIError, match="Failed to fetch company list"):
+                company_list_api("test_api_key")
+
+    def test_company_list_api_url_construction(self):
+        """Test that the correct URL and parameters are used."""
+        mock_response = []
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            company_list_api("test_api_key")
+
+            # Verify the correct URL was called
+            call_args = mock_get.call_args
+            assert "stock-list" in call_args[0][0]
+            assert call_args[1]["params"]["apikey"] == "test_api_key"
+            assert call_args[1]["timeout"] == 30
+
+
+class TestEtfSymbolListAPI:
+    """Tests for etf_symbol_list_api function."""
+
+    def test_etf_symbol_list_api_success(self):
+        """Test successful API call with ETF list data."""
+        mock_response = [
+            {
+                "symbol": "SPY",
+                "name": "SPDR S&P 500 ETF Trust",
+                "price": 450.0,
+                "exchange": "NYSE Arca",
+            },
+            {
+                "symbol": "QQQ",
+                "name": "Invesco QQQ Trust",
+                "price": 380.0,
+                "exchange": "NASDAQ",
+            },
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = etf_symbol_list_api("test_api_key")
+
+            assert len(result) == 2
+            assert result[0]["symbol"] == "SPY"
+            assert result[1]["symbol"] == "QQQ"
+
+    def test_etf_symbol_list_api_empty_api_key(self):
+        """Test that empty API key raises ValueError."""
+        with pytest.raises(ValueError, match="API key cannot be empty"):
+            etf_symbol_list_api("")
+
+    def test_etf_symbol_list_api_network_error(self):
+        """Test handling of network errors."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.side_effect = requests.exceptions.ConnectionError("Network error")
+
+            with pytest.raises(FMPAPIError, match="Failed to fetch ETF symbol list"):
+                etf_symbol_list_api("test_api_key")
+
+    def test_etf_symbol_list_api_http_error(self):
+        """Test handling of HTTP errors."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.status_code = 404
+            mock_get.return_value.raise_for_status.side_effect = (
+                requests.exceptions.HTTPError("404 Not Found")
+            )
+
+            with pytest.raises(FMPAPIError, match="Failed to fetch ETF symbol list"):
+                etf_symbol_list_api("test_api_key")
+
+    def test_etf_symbol_list_api_invalid_json(self):
+        """Test handling of invalid JSON response."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+            mock_get.return_value.json.side_effect = ValueError("Invalid JSON")
+
+            with pytest.raises(FMPAPIError, match="Failed to parse JSON response"):
+                etf_symbol_list_api("test_api_key")
+
+    def test_etf_symbol_list_api_error_message_in_response(self):
+        """Test handling of error message in API response."""
+        mock_response = {"Error Message": "Invalid API key"}
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            with pytest.raises(FMPAPIError, match="FMP API error"):
+                etf_symbol_list_api("test_api_key")
+
+    def test_etf_symbol_list_api_empty_response(self):
+        """Test handling of empty list response."""
+        mock_response = []
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = etf_symbol_list_api("test_api_key")
+
+            assert result == []
+
+    def test_etf_symbol_list_api_unexpected_response(self):
+        """Test handling of unexpected response format."""
+        mock_response = {}
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = etf_symbol_list_api("test_api_key")
+
+            assert result == []
+
+    def test_etf_symbol_list_api_timeout(self):
+        """Test handling of request timeout."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.side_effect = requests.exceptions.Timeout("Request timeout")
+
+            with pytest.raises(FMPAPIError, match="Failed to fetch ETF symbol list"):
+                etf_symbol_list_api("test_api_key")
+
+    def test_etf_symbol_list_api_url_construction(self):
+        """Test that the correct URL and parameters are used."""
+        mock_response = []
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            etf_symbol_list_api("test_api_key")
+
+            # Verify the correct URL was called
+            call_args = mock_get.call_args
+            assert "etf-list" in call_args[0][0]
+            assert call_args[1]["params"]["apikey"] == "test_api_key"
+            assert call_args[1]["timeout"] == 30
+
+
+class TestSectorListAPI:
+    """Tests for sector_list_api function."""
+
+    def test_sector_list_api_success(self):
+        """Test successful API call with sector list data."""
+        mock_response = [
+            {"sector": "Technology"},
+            {"sector": "Healthcare"},
+            {"sector": "Financial Services"},
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = sector_list_api("test_api_key")
+
+            assert len(result) == 3
+            assert result[0]["sector"] == "Technology"
+            assert result[1]["sector"] == "Healthcare"
+
+    def test_sector_list_api_empty_api_key(self):
+        """Test that empty API key raises ValueError."""
+        with pytest.raises(ValueError, match="API key cannot be empty"):
+            sector_list_api("")
+
+    def test_sector_list_api_network_error(self):
+        """Test handling of network errors."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.side_effect = requests.exceptions.ConnectionError("Network error")
+
+            with pytest.raises(FMPAPIError, match="Failed to fetch sector list"):
+                sector_list_api("test_api_key")
+
+    def test_sector_list_api_http_error(self):
+        """Test handling of HTTP errors."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.status_code = 404
+            mock_get.return_value.raise_for_status.side_effect = (
+                requests.exceptions.HTTPError("404 Not Found")
+            )
+
+            with pytest.raises(FMPAPIError, match="Failed to fetch sector list"):
+                sector_list_api("test_api_key")
+
+    def test_sector_list_api_invalid_json(self):
+        """Test handling of invalid JSON response."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+            mock_get.return_value.json.side_effect = ValueError("Invalid JSON")
+
+            with pytest.raises(FMPAPIError, match="Failed to parse JSON response"):
+                sector_list_api("test_api_key")
+
+    def test_sector_list_api_error_message_in_response(self):
+        """Test handling of error message in API response."""
+        mock_response = {"Error Message": "Invalid API key"}
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            with pytest.raises(FMPAPIError, match="FMP API error"):
+                sector_list_api("test_api_key")
+
+    def test_sector_list_api_empty_response(self):
+        """Test handling of empty list response."""
+        mock_response = []
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = sector_list_api("test_api_key")
+
+            assert result == []
+
+    def test_sector_list_api_unexpected_response(self):
+        """Test handling of unexpected response format."""
+        mock_response = {}
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = sector_list_api("test_api_key")
+
+            assert result == []
+
+    def test_sector_list_api_timeout(self):
+        """Test handling of request timeout."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.side_effect = requests.exceptions.Timeout("Request timeout")
+
+            with pytest.raises(FMPAPIError, match="Failed to fetch sector list"):
+                sector_list_api("test_api_key")
+
+    def test_sector_list_api_url_construction(self):
+        """Test that the correct URL and parameters are used."""
+        mock_response = []
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            sector_list_api("test_api_key")
+
+            # Verify the correct URL was called
+            call_args = mock_get.call_args
+            assert "sector-list" in call_args[0][0]
+            assert call_args[1]["params"]["apikey"] == "test_api_key"
+            assert call_args[1]["timeout"] == 30
+
+
+class TestIndustryListAPI:
+    """Tests for industry_list_api function."""
+
+    def test_industry_list_api_success(self):
+        """Test successful API call with industry list data."""
+        mock_response = [
+            {"industry": "Software - Application"},
+            {"industry": "Semiconductors"},
+            {"industry": "Biotechnology"},
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = industry_list_api("test_api_key")
+
+            assert len(result) == 3
+            assert result[0]["industry"] == "Software - Application"
+            assert result[1]["industry"] == "Semiconductors"
+
+    def test_industry_list_api_empty_api_key(self):
+        """Test that empty API key raises ValueError."""
+        with pytest.raises(ValueError, match="API key cannot be empty"):
+            industry_list_api("")
+
+    def test_industry_list_api_network_error(self):
+        """Test handling of network errors."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.side_effect = requests.exceptions.ConnectionError("Network error")
+
+            with pytest.raises(FMPAPIError, match="Failed to fetch industry list"):
+                industry_list_api("test_api_key")
+
+    def test_industry_list_api_http_error(self):
+        """Test handling of HTTP errors."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.status_code = 404
+            mock_get.return_value.raise_for_status.side_effect = (
+                requests.exceptions.HTTPError("404 Not Found")
+            )
+
+            with pytest.raises(FMPAPIError, match="Failed to fetch industry list"):
+                industry_list_api("test_api_key")
+
+    def test_industry_list_api_invalid_json(self):
+        """Test handling of invalid JSON response."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+            mock_get.return_value.json.side_effect = ValueError("Invalid JSON")
+
+            with pytest.raises(FMPAPIError, match="Failed to parse JSON response"):
+                industry_list_api("test_api_key")
+
+    def test_industry_list_api_error_message_in_response(self):
+        """Test handling of error message in API response."""
+        mock_response = {"Error Message": "Invalid API key"}
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            with pytest.raises(FMPAPIError, match="FMP API error"):
+                industry_list_api("test_api_key")
+
+    def test_industry_list_api_empty_response(self):
+        """Test handling of empty list response."""
+        mock_response = []
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = industry_list_api("test_api_key")
+
+            assert result == []
+
+    def test_industry_list_api_unexpected_response(self):
+        """Test handling of unexpected response format."""
+        mock_response = {}
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = industry_list_api("test_api_key")
+
+            assert result == []
+
+    def test_industry_list_api_timeout(self):
+        """Test handling of request timeout."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.side_effect = requests.exceptions.Timeout("Request timeout")
+
+            with pytest.raises(FMPAPIError, match="Failed to fetch industry list"):
+                industry_list_api("test_api_key")
+
+    def test_industry_list_api_url_construction(self):
+        """Test that the correct URL and parameters are used."""
+        mock_response = []
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            industry_list_api("test_api_key")
+
+            # Verify the correct URL was called
+            call_args = mock_get.call_args
+            assert "industry-list" in call_args[0][0]
+            assert call_args[1]["params"]["apikey"] == "test_api_key"
+            assert call_args[1]["timeout"] == 30
+
+
+class TestActivelyTradingListAPI:
+    """Tests for actively_trading_list_api function."""
+
+    def test_actively_trading_list_api_success(self):
+        """Test successful API call with actively trading list data."""
+        mock_response = [
+            {
+                "symbol": "AAPL",
+                "name": "Apple Inc.",
+                "price": 150.0,
+                "exchange": "NASDAQ",
+            },
+            {
+                "symbol": "TSLA",
+                "name": "Tesla, Inc.",
+                "price": 250.0,
+                "exchange": "NASDAQ",
+            },
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = actively_trading_list_api("test_api_key")
+
+            assert len(result) == 2
+            assert result[0]["symbol"] == "AAPL"
+            assert result[1]["symbol"] == "TSLA"
+
+    def test_actively_trading_list_api_empty_api_key(self):
+        """Test that empty API key raises ValueError."""
+        with pytest.raises(ValueError, match="API key cannot be empty"):
+            actively_trading_list_api("")
+
+    def test_actively_trading_list_api_network_error(self):
+        """Test handling of network errors."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.side_effect = requests.exceptions.ConnectionError("Network error")
+
+            with pytest.raises(
+                FMPAPIError, match="Failed to fetch actively trading list"
+            ):
+                actively_trading_list_api("test_api_key")
+
+    def test_actively_trading_list_api_http_error(self):
+        """Test handling of HTTP errors."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.status_code = 404
+            mock_get.return_value.raise_for_status.side_effect = (
+                requests.exceptions.HTTPError("404 Not Found")
+            )
+
+            with pytest.raises(
+                FMPAPIError, match="Failed to fetch actively trading list"
+            ):
+                actively_trading_list_api("test_api_key")
+
+    def test_actively_trading_list_api_invalid_json(self):
+        """Test handling of invalid JSON response."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+            mock_get.return_value.json.side_effect = ValueError("Invalid JSON")
+
+            with pytest.raises(FMPAPIError, match="Failed to parse JSON response"):
+                actively_trading_list_api("test_api_key")
+
+    def test_actively_trading_list_api_error_message_in_response(self):
+        """Test handling of error message in API response."""
+        mock_response = {"Error Message": "Invalid API key"}
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            with pytest.raises(FMPAPIError, match="FMP API error"):
+                actively_trading_list_api("test_api_key")
+
+    def test_actively_trading_list_api_empty_response(self):
+        """Test handling of empty list response."""
+        mock_response = []
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = actively_trading_list_api("test_api_key")
+
+            assert result == []
+
+    def test_actively_trading_list_api_unexpected_response(self):
+        """Test handling of unexpected response format."""
+        mock_response = {}
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = actively_trading_list_api("test_api_key")
+
+            assert result == []
+
+    def test_actively_trading_list_api_timeout(self):
+        """Test handling of request timeout."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.side_effect = requests.exceptions.Timeout("Request timeout")
+
+            with pytest.raises(
+                FMPAPIError, match="Failed to fetch actively trading list"
+            ):
+                actively_trading_list_api("test_api_key")
+
+    def test_actively_trading_list_api_url_construction(self):
+        """Test that the correct URL and parameters are used."""
+        mock_response = []
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            actively_trading_list_api("test_api_key")
+
+            # Verify the correct URL was called
+            call_args = mock_get.call_args
+            assert "actively-trading-list" in call_args[0][0]
+            assert call_args[1]["params"]["apikey"] == "test_api_key"
+            assert call_args[1]["timeout"] == 30
