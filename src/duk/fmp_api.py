@@ -272,6 +272,314 @@ def treasury_rates_api(
         return []
 
 
+def company_list_api(api_key: str) -> List[Dict[str, Any]]:
+    """
+    Request list of all company stocks from FMP API.
+
+    Retrieves a list of all available company stock symbols and their
+    information from the Financial Modeling Prep API.
+
+    Args:
+        api_key: FMP API key for authentication
+
+    Returns:
+        List of dictionaries containing company stock information. Each
+        dictionary typically contains fields like symbol, name, price,
+        exchange, and other company details.
+
+    Raises:
+        FMPAPIError: If the API request fails or returns an error
+        ValueError: If required parameters are invalid
+
+    Example:
+        >>> companies = company_list_api("your_api_key")
+    """
+    if not api_key:
+        raise ValueError("API key cannot be empty")
+
+    # Construct the base URL
+    base_url = "https://financialmodelingprep.com/stable"
+    endpoint = f"{base_url}/stock-list"
+
+    # Build query parameters
+    params: Dict[str, Any] = {"apikey": api_key}
+
+    logger.debug("Requesting company list from FMP API")
+
+    try:
+        response = requests.get(endpoint, params=params, timeout=30)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch company list: {e}")
+        raise FMPAPIError(f"Failed to fetch company list: {e}") from e
+
+    try:
+        data = response.json()
+    except ValueError as e:
+        logger.error(f"Failed to parse JSON response: {e}")
+        raise FMPAPIError(f"Failed to parse JSON response: {e}") from e
+
+    # Check if the response contains an error message
+    if isinstance(data, dict) and "Error Message" in data:
+        error_msg = data["Error Message"]
+        logger.error(f"FMP API error: {error_msg}")
+        raise FMPAPIError(f"FMP API error: {error_msg}")
+
+    # Extract data from response
+    if isinstance(data, list):
+        logger.info(f"Retrieved {len(data)} company records")
+        return data
+    else:
+        logger.warning("Unexpected response format for company list")
+        return []
+
+
+def etf_symbol_list_api(api_key: str) -> List[Dict[str, Any]]:
+    """
+    Request list of all ETF symbols from FMP API.
+
+    Retrieves a list of all available ETF (Exchange Traded Fund) symbols
+    and their information from the Financial Modeling Prep API.
+
+    Args:
+        api_key: FMP API key for authentication
+
+    Returns:
+        List of dictionaries containing ETF information. Each dictionary
+        typically contains fields like symbol, name, price, exchange, and
+        other ETF details.
+
+    Raises:
+        FMPAPIError: If the API request fails or returns an error
+        ValueError: If required parameters are invalid
+
+    Example:
+        >>> etfs = etf_symbol_list_api("your_api_key")
+    """
+    if not api_key:
+        raise ValueError("API key cannot be empty")
+
+    # Construct the base URL
+    base_url = "https://financialmodelingprep.com/stable"
+    endpoint = f"{base_url}/etf-list"
+
+    # Build query parameters
+    params: Dict[str, Any] = {"apikey": api_key}
+
+    logger.debug("Requesting ETF symbol list from FMP API")
+
+    try:
+        response = requests.get(endpoint, params=params, timeout=30)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch ETF symbol list: {e}")
+        raise FMPAPIError(f"Failed to fetch ETF symbol list: {e}") from e
+
+    try:
+        data = response.json()
+    except ValueError as e:
+        logger.error(f"Failed to parse JSON response: {e}")
+        raise FMPAPIError(f"Failed to parse JSON response: {e}") from e
+
+    # Check if the response contains an error message
+    if isinstance(data, dict) and "Error Message" in data:
+        error_msg = data["Error Message"]
+        logger.error(f"FMP API error: {error_msg}")
+        raise FMPAPIError(f"FMP API error: {error_msg}")
+
+    # Extract data from response
+    if isinstance(data, list):
+        logger.info(f"Retrieved {len(data)} ETF records")
+        return data
+    else:
+        logger.warning("Unexpected response format for ETF symbol list")
+        return []
+
+
+def sector_list_api(api_key: str) -> List[Dict[str, Any]]:
+    """
+    Request list of all sectors from FMP API.
+
+    Retrieves a list of all available market sectors from the Financial
+    Modeling Prep API.
+
+    Args:
+        api_key: FMP API key for authentication
+
+    Returns:
+        List of dictionaries containing sector information. Each dictionary
+        typically contains the sector name and related details.
+
+    Raises:
+        FMPAPIError: If the API request fails or returns an error
+        ValueError: If required parameters are invalid
+
+    Example:
+        >>> sectors = sector_list_api("your_api_key")
+    """
+    if not api_key:
+        raise ValueError("API key cannot be empty")
+
+    # Construct the base URL
+    base_url = "https://financialmodelingprep.com/stable"
+    endpoint = f"{base_url}/sector-list"
+
+    # Build query parameters
+    params: Dict[str, Any] = {"apikey": api_key}
+
+    logger.debug("Requesting sector list from FMP API")
+
+    try:
+        response = requests.get(endpoint, params=params, timeout=30)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch sector list: {e}")
+        raise FMPAPIError(f"Failed to fetch sector list: {e}") from e
+
+    try:
+        data = response.json()
+    except ValueError as e:
+        logger.error(f"Failed to parse JSON response: {e}")
+        raise FMPAPIError(f"Failed to parse JSON response: {e}") from e
+
+    # Check if the response contains an error message
+    if isinstance(data, dict) and "Error Message" in data:
+        error_msg = data["Error Message"]
+        logger.error(f"FMP API error: {error_msg}")
+        raise FMPAPIError(f"FMP API error: {error_msg}")
+
+    # Extract data from response
+    if isinstance(data, list):
+        logger.info(f"Retrieved {len(data)} sector records")
+        return data
+    else:
+        logger.warning("Unexpected response format for sector list")
+        return []
+
+
+def industry_list_api(api_key: str) -> List[Dict[str, Any]]:
+    """
+    Request list of all industries from FMP API.
+
+    Retrieves a list of all available industries from the Financial
+    Modeling Prep API.
+
+    Args:
+        api_key: FMP API key for authentication
+
+    Returns:
+        List of dictionaries containing industry information. Each dictionary
+        typically contains the industry name and related details.
+
+    Raises:
+        FMPAPIError: If the API request fails or returns an error
+        ValueError: If required parameters are invalid
+
+    Example:
+        >>> industries = industry_list_api("your_api_key")
+    """
+    if not api_key:
+        raise ValueError("API key cannot be empty")
+
+    # Construct the base URL
+    base_url = "https://financialmodelingprep.com/stable"
+    endpoint = f"{base_url}/industry-list"
+
+    # Build query parameters
+    params: Dict[str, Any] = {"apikey": api_key}
+
+    logger.debug("Requesting industry list from FMP API")
+
+    try:
+        response = requests.get(endpoint, params=params, timeout=30)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch industry list: {e}")
+        raise FMPAPIError(f"Failed to fetch industry list: {e}") from e
+
+    try:
+        data = response.json()
+    except ValueError as e:
+        logger.error(f"Failed to parse JSON response: {e}")
+        raise FMPAPIError(f"Failed to parse JSON response: {e}") from e
+
+    # Check if the response contains an error message
+    if isinstance(data, dict) and "Error Message" in data:
+        error_msg = data["Error Message"]
+        logger.error(f"FMP API error: {error_msg}")
+        raise FMPAPIError(f"FMP API error: {error_msg}")
+
+    # Extract data from response
+    if isinstance(data, list):
+        logger.info(f"Retrieved {len(data)} industry records")
+        return data
+    else:
+        logger.warning("Unexpected response format for industry list")
+        return []
+
+
+def actively_trading_list_api(api_key: str) -> List[Dict[str, Any]]:
+    """
+    Request list of actively trading securities from FMP API.
+
+    Retrieves a list of all actively trading securities from the Financial
+    Modeling Prep API.
+
+    Args:
+        api_key: FMP API key for authentication
+
+    Returns:
+        List of dictionaries containing actively trading security information.
+        Each dictionary typically contains fields like symbol, name, price,
+        exchange, and other details.
+
+    Raises:
+        FMPAPIError: If the API request fails or returns an error
+        ValueError: If required parameters are invalid
+
+    Example:
+        >>> active = actively_trading_list_api("your_api_key")
+    """
+    if not api_key:
+        raise ValueError("API key cannot be empty")
+
+    # Construct the base URL
+    base_url = "https://financialmodelingprep.com/stable"
+    endpoint = f"{base_url}/actively-trading-list"
+
+    # Build query parameters
+    params: Dict[str, Any] = {"apikey": api_key}
+
+    logger.debug("Requesting actively trading list from FMP API")
+
+    try:
+        response = requests.get(endpoint, params=params, timeout=30)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch actively trading list: {e}")
+        raise FMPAPIError(f"Failed to fetch actively trading list: {e}") from e
+
+    try:
+        data = response.json()
+    except ValueError as e:
+        logger.error(f"Failed to parse JSON response: {e}")
+        raise FMPAPIError(f"Failed to parse JSON response: {e}") from e
+
+    # Check if the response contains an error message
+    if isinstance(data, dict) and "Error Message" in data:
+        error_msg = data["Error Message"]
+        logger.error(f"FMP API error: {error_msg}")
+        raise FMPAPIError(f"FMP API error: {error_msg}")
+
+    # Extract data from response
+    if isinstance(data, list):
+        logger.info(f"Retrieved {len(data)} actively trading records")
+        return data
+    else:
+        logger.warning("Unexpected response format for actively trading list")
+        return []
+
+
 def get_price_history(
     api_key: str,
     symbol: str,
