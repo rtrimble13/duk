@@ -9,10 +9,17 @@ import sys
 from pathlib import Path
 
 import click
+import pandas as pd
 
 from duk import __version__
 from duk.config import get_config
-from duk.fmp_api import get_price_history, get_yield_curve
+from duk.fmp_api import (
+    actively_trading_list_api,
+    get_price_history,
+    get_yield_curve,
+    industry_list_api,
+    sector_list_api,
+)
 from duk.logging_config import setup_logging
 
 # Key rate tenors for yield curve analysis
@@ -414,11 +421,11 @@ def yc(
         sys.exit(0)
 
     # Apply precision to yield rates
-    rate_columns = df.select_dtypes(include=["float", "int"]).columns 
+    rate_columns = df.select_dtypes(include=["float", "int"]).columns
     # Exclude non-rate columns like 'date' or 'years'
     rate_columns = [col for col in rate_columns if col not in ["date", "years"]]
     df[rate_columns] = df[rate_columns].round(precision)
-    
+
     # Filter for key-rates if specified (after fetching data)
     if key_rates:
         # Check if we have a single-date response (tenor-indexed)
@@ -469,6 +476,162 @@ def yc(
             click.echo(output_df.to_json(orient="records", date_format="iso"))
         else:
             click.echo(output_df.to_csv(index=False))
+
+
+@main.command()
+@click.option("-v", "--verbose", is_flag=True, help="Print all logging to stdout")
+@click.option(
+    "-q", "--quiet", is_flag=True, help="Suppress printing list data to stdout"
+)
+@click.option("-n", "--limit", type=int, help="Limit number of records to return")
+@click.option("--sectors", is_flag=True, help="List all market sectors")
+@click.option("--industries", is_flag=True, help="List all industries")
+@click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
+@click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(),
+    help="Write data to file",
+)
+@click.pass_context
+def ls(
+    ctx,
+    verbose,
+    quiet,
+    limit,
+    sectors,
+    industries,
+    output_csv,
+    output_json,
+    output,
+):
+    """
+    List company and market information.
+
+    By default, returns actively trading securities with symbol and name.
+    Use --sectors to list market sectors.
+    Use --industries to list industries.
+    """
+    # Get logger from context
+    logger = ctx.obj.get("logger", logging.getLogger("duk"))
+
+    # Adjust logging based on verbose flag
+    if verbose:
+        logger.setLevel(logging.INFO)
+        # Enable console output for all handlers
+        for handler in logger.handlers:
+            if isinstance(handler, logging.StreamHandler) and not isinstance(
+                handler, logging.FileHandler
+            ):
+                handler.setLevel(logging.DEBUG)
+
+    # Get API key from configuration
+    cfg = ctx.obj["config"]
+    api_key = cfg.fmp_key
+
+    if not api_key:
+        logger.error("FMP API key not configured")
+        click.echo(
+            "Error: FMP API key not configured. Set FMP_API_KEY environment variable "
+            "or add fmp_key to [api] section in ~/.dukrc",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Check for mutually exclusive options
+    if sum([sectors, industries]) > 1:
+        logger.error("Only one list type option can be specified")
+        click.echo(
+            "Error: Only one of --sectors or --industries can be specified",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Determine output format
+    if output_csv and output_json:
+        logger.error("Only one output format can be specified")
+        click.echo(
+            "Error: Only one of --csv or --json can be specified",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Default to CSV if neither is specified
+    output_format = "json" if output_json else "csv"
+
+    # Fetch data based on options
+    try:
+        if sectors:
+            logger.info("Requesting sector list")
+            data = sector_list_api(api_key)
+        elif industries:
+            logger.info("Requesting industry list")
+            data = industry_list_api(api_key)
+        else:
+            logger.info("Requesting actively trading list")
+            data = actively_trading_list_api(api_key)
+    except Exception as e:
+        logger.error(f"Failed to fetch list data: {e}")
+        click.echo(f"Error: Failed to fetch list data: {e}", err=True)
+        sys.exit(1)
+
+    if not data:
+        logger.warning("No data returned")
+        if not quiet:
+            click.echo("No data found")
+        sys.exit(0)
+
+    logger.info(f"Retrieved {len(data)} records")
+
+    # Convert to DataFrame
+    df = pd.DataFrame(data)
+
+    # Filter to expected columns based on list type
+    if sectors:
+        # Expected output: 'sector' field
+        if "sector" in df.columns:
+            df = df[["sector"]]
+    elif industries:
+        # Expected output: 'industry' field
+        if "industry" in df.columns:
+            df = df[["industry"]]
+    else:
+        # Expected output: 'symbol' and 'name' fields
+        expected_cols = ["symbol", "name"]
+        available_cols = [col for col in expected_cols if col in df.columns]
+        if available_cols:
+            df = df[available_cols]
+
+    # Apply limit if specified
+    if limit is not None and limit > 0:
+        df = df.head(limit)
+        logger.debug(f"Limiting to {limit} records")
+
+    # Handle output to file
+    if output:
+        output_path = Path(output)
+
+        # Ensure parent directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write to file based on format
+        if output_format == "json":
+            df.to_json(output_path, orient="records", date_format="iso")
+        else:
+            df.to_csv(output_path, index=False)
+
+        logger.info(f"Data written to {output_path}")
+
+        if not quiet:
+            click.echo(f"Data written to {output_path}")
+
+    # Print to stdout unless quiet flag is set
+    if not quiet:
+        if output_format == "json":
+            click.echo(df.to_json(orient="records", date_format="iso"))
+        else:
+            click.echo(df.to_csv(index=False))
 
 
 if __name__ == "__main__":
