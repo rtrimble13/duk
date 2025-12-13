@@ -631,3 +631,75 @@ class TestScreenSecuritiesMultiple:
             assert isinstance(result, pd.DataFrame)
             assert len(result) == 2
             mock_api.assert_called_once()
+
+    def test_screen_securities_sectors_and_industries_separate_loops(self):
+        """Test sectors and industries screened separately, not cross product."""
+        from unittest import mock
+
+        from duk.ls_utils import screen_securities
+
+        call_log = []
+
+        def mock_screener_side_effect(*args, **kwargs):
+            sector = kwargs.get("sector")
+            industry = kwargs.get("industry")
+            call_log.append({"sector": sector, "industry": industry})
+
+            # Return different securities based on what's being screened
+            if sector == "Technology" and industry is None:
+                return [
+                    {"symbol": "AAPL", "name": "Apple Inc.", "sector": "Technology"}
+                ]
+            elif sector == "Healthcare" and industry is None:
+                return [
+                    {
+                        "symbol": "JNJ",
+                        "name": "Johnson & Johnson",
+                        "sector": "Healthcare",
+                    }
+                ]
+            elif industry == "Software" and sector is None:
+                return [
+                    {
+                        "symbol": "MSFT",
+                        "name": "Microsoft Corporation",
+                        "industry": "Software",
+                    }
+                ]
+            elif industry == "Hardware" and sector is None:
+                return [
+                    {
+                        "symbol": "HPE",
+                        "name": "Hewlett Packard Enterprise",
+                        "industry": "Hardware",
+                    }
+                ]
+            return []
+
+        with mock.patch(
+            "duk.fmp_api.screener_api", side_effect=mock_screener_side_effect
+        ) as mock_api:
+            result = screen_securities(
+                "test_api_key",
+                sector=["Technology", "Healthcare"],
+                industry=["Software", "Hardware"],
+            )
+
+            # Should make 4 calls: Tech, Healthcare, Software, Hardware
+            # (NOT cross product)
+            assert mock_api.call_count == 4
+
+            # Verify the calls were made separately for sectors and industries
+            expected_calls = [
+                {"sector": "Technology", "industry": None},
+                {"sector": "Healthcare", "industry": None},
+                {"sector": None, "industry": "Software"},
+                {"sector": None, "industry": "Hardware"},
+            ]
+
+            assert call_log == expected_calls
+
+            # Should have 4 unique securities
+            assert isinstance(result, pd.DataFrame)
+            assert len(result) == 4
+            assert set(result["symbol"].values) == {"AAPL", "JNJ", "MSFT", "HPE"}

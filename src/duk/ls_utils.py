@@ -422,25 +422,48 @@ def screen_securities(
     """
     logger.debug("Starting screen_securities with multiple sector/industry support")
 
-    # Handle sector and industry lists
-    sectors_to_screen = sector if sector else [None]
-    industries_to_screen = industry if industry else [None]
-
-    # If both sector and industry have multiple values, we need to screen
-    # the cross product
     all_results = []
 
-    for sector_value in sectors_to_screen:
-        for industry_value in industries_to_screen:
-            logger.debug(
-                f"Screening with sector={sector_value}, industry={industry_value}"
-            )
+    # Screen each sector separately
+    if sector:
+        for sector_value in sector:
+            logger.debug(f"Screening with sector={sector_value}")
 
             df = _screen_securities(
                 api_key=api_key,
                 marketCapMoreThan=marketCapMoreThan,
                 marketCapLowerThan=marketCapLowerThan,
                 sector=sector_value,
+                industry=None,
+                betaMoreThan=betaMoreThan,
+                betaLowerThan=betaLowerThan,
+                priceMoreThan=priceMoreThan,
+                priceLowerThan=priceLowerThan,
+                dividendMoreThan=dividendMoreThan,
+                dividendLowerThan=dividendLowerThan,
+                volumeMoreThan=volumeMoreThan,
+                volumeLowerThan=volumeLowerThan,
+                exchange=exchange,
+                country=country,
+                isEtf=isEtf,
+                isFund=isFund,
+                isActivelyTrading=isActivelyTrading,
+                limit=limit,
+            )
+
+            if not df.empty:
+                all_results.append(df)
+
+    # Screen each industry separately
+    if industry:
+        for industry_value in industry:
+            logger.debug(f"Screening with industry={industry_value}")
+
+            df = _screen_securities(
+                api_key=api_key,
+                marketCapMoreThan=marketCapMoreThan,
+                marketCapLowerThan=marketCapLowerThan,
+                sector=None,
                 industry=industry_value,
                 betaMoreThan=betaMoreThan,
                 betaLowerThan=betaLowerThan,
@@ -460,6 +483,35 @@ def screen_securities(
 
             if not df.empty:
                 all_results.append(df)
+
+    # If neither sector nor industry is provided, screen without filters
+    if not sector and not industry:
+        logger.debug("Screening without sector or industry filters")
+
+        df = _screen_securities(
+            api_key=api_key,
+            marketCapMoreThan=marketCapMoreThan,
+            marketCapLowerThan=marketCapLowerThan,
+            sector=None,
+            industry=None,
+            betaMoreThan=betaMoreThan,
+            betaLowerThan=betaLowerThan,
+            priceMoreThan=priceMoreThan,
+            priceLowerThan=priceLowerThan,
+            dividendMoreThan=dividendMoreThan,
+            dividendLowerThan=dividendLowerThan,
+            volumeMoreThan=volumeMoreThan,
+            volumeLowerThan=volumeLowerThan,
+            exchange=exchange,
+            country=country,
+            isEtf=isEtf,
+            isFund=isFund,
+            isActivelyTrading=isActivelyTrading,
+            limit=limit,
+        )
+
+        if not df.empty:
+            all_results.append(df)
 
     # Combine all results
     if not all_results:
