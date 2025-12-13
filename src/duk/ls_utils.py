@@ -14,6 +14,64 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
+def _process_list_data(
+    data: List[Dict[str, Any]],
+    field_name: str,
+    id_col: str,
+    hash_col: str,
+    name_col: str,
+) -> pd.DataFrame:
+    """
+    Generic function to process list data with sorting and hash generation.
+
+    Args:
+        data: List of dictionaries containing the data
+        field_name: Name of the field in input data (e.g., 'sector', 'industry')
+        id_col: Name for the ID column in output (e.g., 'sector_id')
+        hash_col: Name for the hash column in output (e.g., 'sector_hash')
+        name_col: Name for the name column in output (e.g., 'sector_name')
+
+    Returns:
+        pandas DataFrame with three columns: id, hash, and name
+    """
+    if not data:
+        logger.warning(f"Empty {field_name} data input, returning empty DataFrame")
+        return pd.DataFrame(columns=[id_col, hash_col, name_col])
+
+    logger.debug(f"Processing {len(data)} {field_name} records")
+
+    # Create DataFrame from list of dictionaries
+    df = pd.DataFrame(data)
+
+    # Check if field exists
+    if field_name not in df.columns:
+        logger.warning(f"No '{field_name}' column found in data")
+        return pd.DataFrame(columns=[id_col, hash_col, name_col])
+
+    # Extract names and sort alphabetically
+    names = df[field_name].tolist()
+    names_sorted = sorted(names)
+
+    # Create new DataFrame with processed data
+    processed_data = []
+    for idx, name in enumerate(names_sorted, start=1):
+        # Generate SHA256 hash and take first 5 characters
+        name_hash = hashlib.sha256(name.encode()).hexdigest()[:5]
+
+        processed_data.append(
+            {
+                id_col: idx,
+                hash_col: name_hash,
+                name_col: name,
+            }
+        )
+
+    result_df = pd.DataFrame(processed_data)
+    logger.info(f"Processed {len(result_df)} {field_name} records")
+
+    return result_df
+
+
 def process_sectors(sector_data: List[Dict[str, Any]]) -> pd.DataFrame:
     """
     Process sector list API data into a structured DataFrame.
@@ -40,42 +98,13 @@ def process_sectors(sector_data: List[Dict[str, Any]]) -> pd.DataFrame:
         >>> df = process_sectors(sectors)
         >>> print(df.head())
     """
-    if not sector_data:
-        logger.warning("Empty sector_data input, returning empty DataFrame")
-        return pd.DataFrame(columns=["sector_id", "sector_hash", "sector_name"])
-
-    logger.debug(f"Processing {len(sector_data)} sector records")
-
-    # Create DataFrame from list of dictionaries
-    df = pd.DataFrame(sector_data)
-
-    # Check if 'sector' column exists
-    if "sector" not in df.columns:
-        logger.warning("No 'sector' column found in sector_data")
-        return pd.DataFrame(columns=["sector_id", "sector_hash", "sector_name"])
-
-    # Extract sector names and sort alphabetically
-    sectors = df["sector"].tolist()
-    sectors_sorted = sorted(sectors)
-
-    # Create new DataFrame with processed data
-    processed_data = []
-    for idx, sector_name in enumerate(sectors_sorted, start=1):
-        # Generate SHA256 hash and take first 5 characters
-        sector_hash = hashlib.sha256(sector_name.encode()).hexdigest()[:5]
-
-        processed_data.append(
-            {
-                "sector_id": idx,
-                "sector_hash": sector_hash,
-                "sector_name": sector_name,
-            }
-        )
-
-    result_df = pd.DataFrame(processed_data)
-    logger.info(f"Processed {len(result_df)} sector records")
-
-    return result_df
+    return _process_list_data(
+        data=sector_data,
+        field_name="sector",
+        id_col="sector_id",
+        hash_col="sector_hash",
+        name_col="sector_name",
+    )
 
 
 def process_industries(industry_data: List[Dict[str, Any]]) -> pd.DataFrame:
@@ -104,39 +133,10 @@ def process_industries(industry_data: List[Dict[str, Any]]) -> pd.DataFrame:
         >>> df = process_industries(industries)
         >>> print(df.head())
     """
-    if not industry_data:
-        logger.warning("Empty industry_data input, returning empty DataFrame")
-        return pd.DataFrame(columns=["industry_id", "industry_hash", "industry_name"])
-
-    logger.debug(f"Processing {len(industry_data)} industry records")
-
-    # Create DataFrame from list of dictionaries
-    df = pd.DataFrame(industry_data)
-
-    # Check if 'industry' column exists
-    if "industry" not in df.columns:
-        logger.warning("No 'industry' column found in industry_data")
-        return pd.DataFrame(columns=["industry_id", "industry_hash", "industry_name"])
-
-    # Extract industry names and sort alphabetically
-    industries = df["industry"].tolist()
-    industries_sorted = sorted(industries)
-
-    # Create new DataFrame with processed data
-    processed_data = []
-    for idx, industry_name in enumerate(industries_sorted, start=1):
-        # Generate SHA256 hash and take first 5 characters
-        industry_hash = hashlib.sha256(industry_name.encode()).hexdigest()[:5]
-
-        processed_data.append(
-            {
-                "industry_id": idx,
-                "industry_hash": industry_hash,
-                "industry_name": industry_name,
-            }
-        )
-
-    result_df = pd.DataFrame(processed_data)
-    logger.info(f"Processed {len(result_df)} industry records")
-
-    return result_df
+    return _process_list_data(
+        data=industry_data,
+        field_name="industry",
+        id_col="industry_id",
+        hash_col="industry_hash",
+        name_col="industry_name",
+    )
