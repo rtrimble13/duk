@@ -3,10 +3,10 @@
     "python.defaultInterpreterPath": "/home/rtrimble/miniconda3/envs/duk/bin/python",
     "python.testing.pytestPath": "/home/rtrimble/miniconda3/envs/duk/bin/pytest",
     "python.envFile": "${workspaceFolder}/.env",
+    "python.terminal.useEnvFile": true,
     "python.testing.pytestArgs": [
         "test"
     ],
-    "python.interpreter.useEnvFromEnvFile": true,
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "python-envs.defaultEnvManager": "ms-python.python:conda",

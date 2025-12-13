@@ -2026,7 +2026,7 @@ class TestSectorListAPI:
 
             # Verify the correct URL was called
             call_args = mock_get.call_args
-            assert "sector-list" in call_args[0][0]
+            assert "available-sectors" in call_args[0][0]
             assert call_args[1]["params"]["apikey"] == "test_api_key"
             assert call_args[1]["timeout"] == 30
 
@@ -2146,7 +2146,7 @@ class TestIndustryListAPI:
 
             # Verify the correct URL was called
             call_args = mock_get.call_args
-            assert "industry-list" in call_args[0][0]
+            assert "available-industries" in call_args[0][0]
             assert call_args[1]["params"]["apikey"] == "test_api_key"
             assert call_args[1]["timeout"] == 30
 
