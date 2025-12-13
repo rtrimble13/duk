@@ -56,7 +56,7 @@ def _process_list_data(
     processed_data = []
     for idx, name in enumerate(names_sorted, start=1):
         # Generate SHA256 hash and take first 5 characters
-        name_hash = hashlib.sha256(name.encode()).hexdigest()[:5]
+        name_hash = hashlib.sha256(name.encode("utf-8")).hexdigest()[:5]
 
         processed_data.append(
             {

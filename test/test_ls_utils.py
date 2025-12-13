@@ -65,7 +65,7 @@ class TestProcessSectors:
         result = process_sectors(sector_data)
 
         # Calculate expected hash
-        expected_hash = hashlib.sha256("Technology".encode()).hexdigest()[:5]
+        expected_hash = hashlib.sha256("Technology".encode("utf-8")).hexdigest()[:5]
         assert result["sector_hash"].iloc[0] == expected_hash
 
     def test_sector_hash_length(self):
@@ -197,7 +197,7 @@ class TestProcessIndustries:
         result = process_industries(industry_data)
 
         # Calculate expected hash
-        expected_hash = hashlib.sha256("Software".encode()).hexdigest()[:5]
+        expected_hash = hashlib.sha256("Software".encode("utf-8")).hexdigest()[:5]
         assert result["industry_hash"].iloc[0] == expected_hash
 
     def test_industry_hash_length(self):
