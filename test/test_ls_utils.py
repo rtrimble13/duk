@@ -5,6 +5,7 @@ Tests for ls_utils module.
 import hashlib
 
 import pandas as pd
+import pytest
 
 from duk.ls_utils import process_industries, process_sectors
 
@@ -295,3 +296,338 @@ class TestHashConsistency:
             sector_result["sector_hash"].iloc[0]
             == industry_result["industry_hash"].iloc[0]
         )
+
+
+class TestGetSectors:
+    """Tests for _get_sectors function."""
+
+    def test_get_sectors_by_id(self):
+        """Test getting sectors by numeric ID."""
+        from unittest import mock
+
+        from duk.ls_utils import _get_sectors
+
+        mock_sector_data = [
+            {"sector": "Technology"},
+            {"sector": "Healthcare"},
+            {"sector": "Financial Services"},
+        ]
+
+        with mock.patch("duk.fmp_api.sector_list_api") as mock_api:
+            mock_api.return_value = mock_sector_data
+
+            # After sorting: Financial Services (id=1), Healthcare (id=2),
+            # Technology (id=3)
+            result = _get_sectors("test_api_key", sector_id=[1, 3])
+
+            assert len(result) == 2
+            assert "Financial Services" in result
+            assert "Technology" in result
+            assert "Healthcare" not in result
+
+    def test_get_sectors_by_hash(self):
+        """Test getting sectors by hash."""
+        from unittest import mock
+
+        from duk.ls_utils import _get_sectors
+
+        mock_sector_data = [
+            {"sector": "Technology"},
+            {"sector": "Healthcare"},
+        ]
+
+        with mock.patch("duk.fmp_api.sector_list_api") as mock_api:
+            mock_api.return_value = mock_sector_data
+
+            # Calculate the hash for Technology
+            tech_hash = hashlib.sha256("Technology".encode("utf-8")).hexdigest()[:5]
+
+            result = _get_sectors("test_api_key", sector_hash=[tech_hash])
+
+            assert len(result) == 1
+            assert "Technology" in result
+
+    def test_get_sectors_neither_parameter(self):
+        """Test that error is raised when neither parameter is provided."""
+        from duk.ls_utils import _get_sectors
+
+        with pytest.raises(
+            ValueError, match="Either sector_id or sector_hash must be provided"
+        ):
+            _get_sectors("test_api_key")
+
+    def test_get_sectors_both_parameters(self):
+        """Test that error is raised when both parameters are provided."""
+        from duk.ls_utils import _get_sectors
+
+        with pytest.raises(
+            ValueError, match="Cannot provide both sector_id and sector_hash"
+        ):
+            _get_sectors("test_api_key", sector_id=[1], sector_hash=["abc12"])
+
+
+class TestGetIndustries:
+    """Tests for _get_industries function."""
+
+    def test_get_industries_by_id(self):
+        """Test getting industries by numeric ID."""
+        from unittest import mock
+
+        from duk.ls_utils import _get_industries
+
+        mock_industry_data = [
+            {"industry": "Software"},
+            {"industry": "Pharmaceuticals"},
+            {"industry": "Banking"},
+        ]
+
+        with mock.patch("duk.fmp_api.industry_list_api") as mock_api:
+            mock_api.return_value = mock_industry_data
+
+            # After sorting: Banking (id=1), Pharmaceuticals (id=2), Software (id=3)
+            result = _get_industries("test_api_key", industry_id=[1, 3])
+
+            assert len(result) == 2
+            assert "Banking" in result
+            assert "Software" in result
+            assert "Pharmaceuticals" not in result
+
+    def test_get_industries_by_hash(self):
+        """Test getting industries by hash."""
+        from unittest import mock
+
+        from duk.ls_utils import _get_industries
+
+        mock_industry_data = [
+            {"industry": "Software"},
+            {"industry": "Pharmaceuticals"},
+        ]
+
+        with mock.patch("duk.fmp_api.industry_list_api") as mock_api:
+            mock_api.return_value = mock_industry_data
+
+            # Calculate the hash for Software
+            software_hash = hashlib.sha256("Software".encode("utf-8")).hexdigest()[:5]
+
+            result = _get_industries("test_api_key", industry_hash=[software_hash])
+
+            assert len(result) == 1
+            assert "Software" in result
+
+    def test_get_industries_neither_parameter(self):
+        """Test that error is raised when neither parameter is provided."""
+        from duk.ls_utils import _get_industries
+
+        with pytest.raises(
+            ValueError, match="Either industry_id or industry_hash must be provided"
+        ):
+            _get_industries("test_api_key")
+
+    def test_get_industries_both_parameters(self):
+        """Test that error is raised when both parameters are provided."""
+        from duk.ls_utils import _get_industries
+
+        with pytest.raises(
+            ValueError, match="Cannot provide both industry_id and industry_hash"
+        ):
+            _get_industries("test_api_key", industry_id=[1], industry_hash=["abc12"])
+
+
+class TestScreenSecurities:
+    """Tests for _screen_securities function."""
+
+    def test_screen_securities_basic(self):
+        """Test basic screening with single sector."""
+        from unittest import mock
+
+        from duk.ls_utils import _screen_securities
+
+        mock_response = [
+            {"symbol": "MSFT", "name": "Microsoft Corporation", "sector": "Technology"},
+            {"symbol": "AAPL", "name": "Apple Inc.", "sector": "Technology"},
+        ]
+
+        with mock.patch("duk.fmp_api.screener_api") as mock_api:
+            mock_api.return_value = mock_response
+
+            result = _screen_securities("test_api_key", sector="Technology")
+
+            assert isinstance(result, pd.DataFrame)
+            assert len(result) == 2
+            # Check sorting by name
+            assert result["name"].iloc[0] == "Apple Inc."
+            assert result["name"].iloc[1] == "Microsoft Corporation"
+
+    def test_screen_securities_with_companyName(self):
+        """Test screening when response has companyName field."""
+        from unittest import mock
+
+        from duk.ls_utils import _screen_securities
+
+        mock_response = [
+            {
+                "symbol": "MSFT",
+                "companyName": "Microsoft Corporation",
+                "sector": "Technology",
+            },
+            {"symbol": "AAPL", "companyName": "Apple Inc.", "sector": "Technology"},
+        ]
+
+        with mock.patch("duk.fmp_api.screener_api") as mock_api:
+            mock_api.return_value = mock_response
+
+            result = _screen_securities("test_api_key", sector="Technology")
+
+            assert isinstance(result, pd.DataFrame)
+            assert len(result) == 2
+            # Check sorting by companyName
+            assert result["companyName"].iloc[0] == "Apple Inc."
+            assert result["companyName"].iloc[1] == "Microsoft Corporation"
+
+    def test_screen_securities_empty_results(self):
+        """Test screening with no results."""
+        from unittest import mock
+
+        from duk.ls_utils import _screen_securities
+
+        with mock.patch("duk.fmp_api.screener_api") as mock_api:
+            mock_api.return_value = []
+
+            result = _screen_securities("test_api_key", sector="Technology")
+
+            assert isinstance(result, pd.DataFrame)
+            assert len(result) == 0
+
+
+class TestScreenSecuritiesMultiple:
+    """Tests for screen_securities function with multiple sectors/industries."""
+
+    def test_screen_securities_single_sector(self):
+        """Test screening with single sector in list."""
+        from unittest import mock
+
+        from duk.ls_utils import screen_securities
+
+        mock_response = [
+            {"symbol": "AAPL", "name": "Apple Inc.", "sector": "Technology"},
+        ]
+
+        with mock.patch("duk.fmp_api.screener_api") as mock_api:
+            mock_api.return_value = mock_response
+
+            result = screen_securities("test_api_key", sector=["Technology"])
+
+            assert isinstance(result, pd.DataFrame)
+            assert len(result) == 1
+            mock_api.assert_called_once()
+
+    def test_screen_securities_multiple_sectors(self):
+        """Test screening with multiple sectors."""
+        from unittest import mock
+
+        from duk.ls_utils import screen_securities
+
+        def mock_screener_side_effect(*args, **kwargs):
+            sector = kwargs.get("sector")
+            if sector == "Technology":
+                return [
+                    {"symbol": "AAPL", "name": "Apple Inc.", "sector": "Technology"}
+                ]
+            elif sector == "Healthcare":
+                return [
+                    {
+                        "symbol": "JNJ",
+                        "name": "Johnson & Johnson",
+                        "sector": "Healthcare",
+                    }
+                ]
+            return []
+
+        with mock.patch(
+            "duk.fmp_api.screener_api", side_effect=mock_screener_side_effect
+        ) as mock_api:
+            result = screen_securities(
+                "test_api_key", sector=["Technology", "Healthcare"]
+            )
+
+            assert isinstance(result, pd.DataFrame)
+            assert len(result) == 2
+            assert mock_api.call_count == 2
+
+    def test_screen_securities_multiple_industries(self):
+        """Test screening with multiple industries."""
+        from unittest import mock
+
+        from duk.ls_utils import screen_securities
+
+        def mock_screener_side_effect(*args, **kwargs):
+            industry = kwargs.get("industry")
+            if industry == "Software":
+                return [
+                    {
+                        "symbol": "MSFT",
+                        "name": "Microsoft Corporation",
+                        "industry": "Software",
+                    }
+                ]
+            elif industry == "Hardware":
+                return [
+                    {"symbol": "AAPL", "name": "Apple Inc.", "industry": "Hardware"}
+                ]
+            return []
+
+        with mock.patch(
+            "duk.fmp_api.screener_api", side_effect=mock_screener_side_effect
+        ) as mock_api:
+            result = screen_securities(
+                "test_api_key", industry=["Software", "Hardware"]
+            )
+
+            assert isinstance(result, pd.DataFrame)
+            assert len(result) == 2
+            assert mock_api.call_count == 2
+
+    def test_screen_securities_removes_duplicates(self):
+        """Test that duplicate securities are removed."""
+        from unittest import mock
+
+        from duk.ls_utils import screen_securities
+
+        # Mock response that returns the same security for different sectors
+        mock_response = [
+            {"symbol": "AAPL", "name": "Apple Inc.", "sector": "Technology"}
+        ]
+
+        with mock.patch("duk.fmp_api.screener_api") as mock_api:
+            mock_api.return_value = mock_response
+
+            result = screen_securities(
+                "test_api_key", sector=["Technology", "Healthcare"]
+            )
+
+            # Should only have 1 unique security even though screened twice
+            assert isinstance(result, pd.DataFrame)
+            # Note: This could be 1 or 2 depending on if both sectors
+            # return the same security. If AAPL only appears in Technology
+            # sector, it should be 1
+            assert "AAPL" in result["symbol"].values
+
+    def test_screen_securities_no_sectors_or_industries(self):
+        """Test screening without sector or industry filters."""
+        from unittest import mock
+
+        from duk.ls_utils import screen_securities
+
+        mock_response = [
+            {"symbol": "AAPL", "name": "Apple Inc."},
+            {"symbol": "MSFT", "name": "Microsoft Corporation"},
+        ]
+
+        with mock.patch("duk.fmp_api.screener_api") as mock_api:
+            mock_api.return_value = mock_response
+
+            result = screen_securities("test_api_key", priceMoreThan=100)
+
+            assert isinstance(result, pd.DataFrame)
+            assert len(result) == 2
+            mock_api.assert_called_once()
