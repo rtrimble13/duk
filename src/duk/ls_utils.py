@@ -524,6 +524,9 @@ def screen_securities(
     if "symbol" in combined_df.columns:
         combined_df = combined_df.drop_duplicates(subset=["symbol"])
         logger.debug(f"Removed duplicates, {len(combined_df)} unique securities remain")
+        # Set symbol as the index
+        combined_df = combined_df.set_index("symbol")
+        logger.debug("Set symbol as DataFrame index")
 
     # Sort by companyName if it exists, otherwise try 'name'
     if "companyName" in combined_df.columns:

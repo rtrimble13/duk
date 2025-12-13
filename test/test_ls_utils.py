@@ -610,7 +610,7 @@ class TestScreenSecuritiesMultiple:
             # Note: This could be 1 or 2 depending on if both sectors
             # return the same security. If AAPL only appears in Technology
             # sector, it should be 1
-            assert "AAPL" in result["symbol"].values
+            assert "AAPL" in result.index
 
     def test_screen_securities_no_sectors_or_industries(self):
         """Test screening without sector or industry filters."""
@@ -702,4 +702,4 @@ class TestScreenSecuritiesMultiple:
             # Should have 4 unique securities
             assert isinstance(result, pd.DataFrame)
             assert len(result) == 4
-            assert set(result["symbol"].values) == {"AAPL", "JNJ", "MSFT", "HPE"}
+            assert set(result.index) == {"AAPL", "JNJ", "MSFT", "HPE"}
