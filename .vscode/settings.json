@@ -2,6 +2,9 @@
     "makefile.configureOnOpen": false,
     "python.defaultInterpreterPath": "/home/rtrimble/miniconda3/envs/duk/bin/python",
     "python.testing.pytestPath": "/home/rtrimble/miniconda3/envs/duk/bin/pytest",
+    "python.analysis.extraPaths": [
+        "/home/rtrimble/miniconda3/envs/duk/lib/python3.11/site-packages"
+    ],
     "python.envFile": "${workspaceFolder}/.env",
     "python.terminal.useEnvFile": true,
     "python.testing.pytestArgs": [
