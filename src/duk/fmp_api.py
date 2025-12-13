@@ -422,7 +422,7 @@ def sector_list_api(api_key: str) -> List[Dict[str, Any]]:
 
     # Construct the base URL
     base_url = "https://financialmodelingprep.com/stable"
-    endpoint = f"{base_url}/sector-list"
+    endpoint = f"{base_url}/available-sectors"
 
     # Build query parameters
     params: Dict[str, Any] = {"apikey": api_key}
@@ -483,7 +483,7 @@ def industry_list_api(api_key: str) -> List[Dict[str, Any]]:
 
     # Construct the base URL
     base_url = "https://financialmodelingprep.com/stable"
-    endpoint = f"{base_url}/industry-list"
+    endpoint = f"{base_url}/available-industries"
 
     # Build query parameters
     params: Dict[str, Any] = {"apikey": api_key}
