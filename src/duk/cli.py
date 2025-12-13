@@ -21,6 +21,7 @@ from duk.fmp_api import (
     sector_list_api,
 )
 from duk.logging_config import setup_logging
+from duk.ls_utils import process_industries, process_sectors
 
 # Key rate tenors for yield curve analysis
 KEY_RATE_TENORS = ["year1", "year5", "year10", "year20", "year30"]
@@ -584,20 +585,15 @@ def ls(
 
     logger.info(f"Retrieved {len(data)} records")
 
-    # Convert to DataFrame
-    df = pd.DataFrame(data)
-
-    # Filter to expected columns based on list type
+    # Process data based on list type
     if sectors:
-        # Expected output: 'sector' field
-        if "sector" in df.columns:
-            df = df[["sector"]]
+        df = process_sectors(data)
     elif industries:
-        # Expected output: 'industry' field
-        if "industry" in df.columns:
-            df = df[["industry"]]
+        df = process_industries(data)
     else:
-        # Expected output: 'symbol' and 'name' fields
+        # Convert to DataFrame for actively trading list
+        df = pd.DataFrame(data)
+        # Filter to expected columns
         expected_cols = ["symbol", "name"]
         available_cols = [col for col in expected_cols if col in df.columns]
         if available_cols:
