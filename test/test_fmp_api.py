@@ -16,6 +16,7 @@ from duk.fmp_api import (
     etf_symbol_list_api,
     industry_list_api,
     price_history_api,
+    screener_api,
     sector_list_api,
     treasury_rates_api,
 )
@@ -2284,3 +2285,452 @@ class TestActivelyTradingListAPI:
             assert "actively-trading-list" in call_args[0][0]
             assert call_args[1]["params"]["apikey"] == "test_api_key"
             assert call_args[1]["timeout"] == 30
+
+
+class TestScreenerAPI:
+    """Tests for screener_api function."""
+
+    def test_screener_api_success(self):
+        """Test successful API call with screener data."""
+        mock_response = [
+            {
+                "symbol": "AAPL",
+                "name": "Apple Inc.",
+                "price": 150.0,
+                "exchange": "NASDAQ",
+                "marketCap": 2500000000000,
+                "sector": "Technology",
+                "industry": "Consumer Electronics",
+            },
+            {
+                "symbol": "MSFT",
+                "name": "Microsoft Corporation",
+                "price": 300.0,
+                "exchange": "NASDAQ",
+                "marketCap": 2300000000000,
+                "sector": "Technology",
+                "industry": "Software - Infrastructure",
+            },
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = screener_api("test_api_key")
+
+            assert len(result) == 2
+            assert result[0]["symbol"] == "AAPL"
+            assert result[1]["symbol"] == "MSFT"
+
+    def test_screener_api_with_sector_filter(self):
+        """Test API call with sector filter."""
+        mock_response = [
+            {
+                "symbol": "AAPL",
+                "name": "Apple Inc.",
+                "sector": "Technology",
+            }
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = screener_api("test_api_key", sector="Technology")
+
+            # Verify the correct parameters were passed
+            call_args = mock_get.call_args
+            assert call_args[1]["params"]["sector"] == "Technology"
+            assert len(result) == 1
+
+    def test_screener_api_with_market_cap_filters(self):
+        """Test API call with market cap filters."""
+        mock_response = [
+            {"symbol": "AAPL", "marketCap": 2500000000000},
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = screener_api(
+                "test_api_key",
+                marketCapMoreThan=1000000000,
+                marketCapLowerThan=5000000000000,
+            )
+
+            # Verify the correct parameters were passed
+            call_args = mock_get.call_args
+            assert call_args[1]["params"]["marketCapMoreThan"] == 1000000000
+            assert call_args[1]["params"]["marketCapLowerThan"] == 5000000000000
+            assert len(result) == 1
+
+    def test_screener_api_with_price_filters(self):
+        """Test API call with price filters."""
+        mock_response = [
+            {"symbol": "AAPL", "price": 150.0},
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = screener_api("test_api_key", priceMoreThan=10, priceLowerThan=200)
+
+            # Verify the correct parameters were passed
+            call_args = mock_get.call_args
+            assert call_args[1]["params"]["priceMoreThan"] == 10
+            assert call_args[1]["params"]["priceLowerThan"] == 200
+            assert len(result) == 1
+
+    def test_screener_api_with_beta_filters(self):
+        """Test API call with beta filters."""
+        mock_response = [
+            {"symbol": "AAPL", "beta": 1.2},
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = screener_api("test_api_key", betaMoreThan=0.5, betaLowerThan=1.5)
+
+            # Verify the correct parameters were passed
+            call_args = mock_get.call_args
+            assert call_args[1]["params"]["betaMoreThan"] == 0.5
+            assert call_args[1]["params"]["betaLowerThan"] == 1.5
+            assert len(result) == 1
+
+    def test_screener_api_with_dividend_filters(self):
+        """Test API call with dividend filters."""
+        mock_response = [
+            {"symbol": "AAPL", "dividend": 0.92},
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = screener_api(
+                "test_api_key", dividendMoreThan=0.5, dividendLowerThan=2
+            )
+
+            # Verify the correct parameters were passed
+            call_args = mock_get.call_args
+            assert call_args[1]["params"]["dividendMoreThan"] == 0.5
+            assert call_args[1]["params"]["dividendLowerThan"] == 2
+            assert len(result) == 1
+
+    def test_screener_api_with_volume_filters(self):
+        """Test API call with volume filters."""
+        mock_response = [
+            {"symbol": "AAPL", "volume": 50000000},
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = screener_api(
+                "test_api_key", volumeMoreThan=1000, volumeLowerThan=1000000000
+            )
+
+            # Verify the correct parameters were passed
+            call_args = mock_get.call_args
+            assert call_args[1]["params"]["volumeMoreThan"] == 1000
+            assert call_args[1]["params"]["volumeLowerThan"] == 1000000000
+            assert len(result) == 1
+
+    def test_screener_api_with_exchange_filter(self):
+        """Test API call with exchange filter."""
+        mock_response = [
+            {"symbol": "AAPL", "exchange": "NASDAQ"},
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = screener_api("test_api_key", exchange="NASDAQ")
+
+            # Verify the correct parameters were passed
+            call_args = mock_get.call_args
+            assert call_args[1]["params"]["exchange"] == "NASDAQ"
+            assert len(result) == 1
+
+    def test_screener_api_with_country_filter(self):
+        """Test API call with country filter."""
+        mock_response = [
+            {"symbol": "AAPL", "country": "US"},
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = screener_api("test_api_key", country="US")
+
+            # Verify the correct parameters were passed
+            call_args = mock_get.call_args
+            assert call_args[1]["params"]["country"] == "US"
+            assert len(result) == 1
+
+    def test_screener_api_with_industry_filter(self):
+        """Test API call with industry filter."""
+        mock_response = [
+            {"symbol": "AAPL", "industry": "Consumer Electronics"},
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = screener_api("test_api_key", industry="Consumer Electronics")
+
+            # Verify the correct parameters were passed
+            call_args = mock_get.call_args
+            assert call_args[1]["params"]["industry"] == "Consumer Electronics"
+            assert len(result) == 1
+
+    def test_screener_api_with_boolean_filters(self):
+        """Test API call with boolean filters."""
+        mock_response = [
+            {"symbol": "AAPL", "isEtf": False, "isFund": False},
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = screener_api(
+                "test_api_key",
+                isEtf=False,
+                isFund=False,
+                isActivelyTrading=True,
+            )
+
+            # Verify the correct parameters were passed (as lowercase strings)
+            call_args = mock_get.call_args
+            assert call_args[1]["params"]["isEtf"] == "false"
+            assert call_args[1]["params"]["isFund"] == "false"
+            assert call_args[1]["params"]["isActivelyTrading"] == "true"
+            assert len(result) == 1
+
+    def test_screener_api_with_limit(self):
+        """Test API call with limit parameter."""
+        mock_response = [{"symbol": f"SYM{i}", "price": 100.0 + i} for i in range(100)]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = screener_api("test_api_key", limit=100)
+
+            # Verify the correct parameters were passed
+            call_args = mock_get.call_args
+            assert call_args[1]["params"]["limit"] == 100
+            assert len(result) == 100
+
+    def test_screener_api_with_all_filters(self):
+        """Test API call with multiple filters combined."""
+        mock_response = [
+            {
+                "symbol": "AAPL",
+                "name": "Apple Inc.",
+                "price": 150.0,
+                "marketCap": 2500000000000,
+                "sector": "Technology",
+                "industry": "Consumer Electronics",
+                "beta": 1.2,
+                "dividend": 0.92,
+                "volume": 50000000,
+                "exchange": "NASDAQ",
+                "country": "US",
+            },
+        ]
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = screener_api(
+                "test_api_key",
+                marketCapMoreThan=1000000000,
+                marketCapLowerThan=5000000000000,
+                sector="Technology",
+                industry="Consumer Electronics",
+                betaMoreThan=0.5,
+                betaLowerThan=1.5,
+                priceMoreThan=10,
+                priceLowerThan=200,
+                dividendMoreThan=0.5,
+                dividendLowerThan=2,
+                volumeMoreThan=1000,
+                volumeLowerThan=1000000000,
+                exchange="NASDAQ",
+                country="US",
+                isEtf=False,
+                isFund=False,
+                isActivelyTrading=True,
+                limit=100,
+            )
+
+            # Verify all parameters were passed
+            call_args = mock_get.call_args
+            params = call_args[1]["params"]
+            assert params["marketCapMoreThan"] == 1000000000
+            assert params["marketCapLowerThan"] == 5000000000000
+            assert params["sector"] == "Technology"
+            assert params["industry"] == "Consumer Electronics"
+            assert params["betaMoreThan"] == 0.5
+            assert params["betaLowerThan"] == 1.5
+            assert params["priceMoreThan"] == 10
+            assert params["priceLowerThan"] == 200
+            assert params["dividendMoreThan"] == 0.5
+            assert params["dividendLowerThan"] == 2
+            assert params["volumeMoreThan"] == 1000
+            assert params["volumeLowerThan"] == 1000000000
+            assert params["exchange"] == "NASDAQ"
+            assert params["country"] == "US"
+            assert params["isEtf"] == "false"
+            assert params["isFund"] == "false"
+            assert params["isActivelyTrading"] == "true"
+            assert params["limit"] == 100
+            assert len(result) == 1
+
+    def test_screener_api_empty_api_key(self):
+        """Test that empty API key raises ValueError."""
+        with pytest.raises(ValueError, match="API key cannot be empty"):
+            screener_api("")
+
+    def test_screener_api_network_error(self):
+        """Test handling of network errors."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.side_effect = requests.exceptions.ConnectionError("Network error")
+
+            with pytest.raises(
+                FMPAPIError, match="Failed to fetch stock screener results"
+            ):
+                screener_api("test_api_key")
+
+    def test_screener_api_http_error(self):
+        """Test handling of HTTP errors."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.status_code = 404
+            mock_get.return_value.raise_for_status.side_effect = (
+                requests.exceptions.HTTPError("404 Not Found")
+            )
+
+            with pytest.raises(
+                FMPAPIError, match="Failed to fetch stock screener results"
+            ):
+                screener_api("test_api_key")
+
+    def test_screener_api_invalid_json(self):
+        """Test handling of invalid JSON response."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+            mock_get.return_value.json.side_effect = ValueError("Invalid JSON")
+
+            with pytest.raises(FMPAPIError, match="Failed to parse JSON response"):
+                screener_api("test_api_key")
+
+    def test_screener_api_error_message_in_response(self):
+        """Test handling of error message in API response."""
+        mock_response = {"Error Message": "Invalid API key"}
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            with pytest.raises(FMPAPIError, match="FMP API error"):
+                screener_api("test_api_key")
+
+    def test_screener_api_empty_response(self):
+        """Test handling of empty list response."""
+        mock_response = []
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = screener_api("test_api_key")
+
+            assert result == []
+
+    def test_screener_api_unexpected_response(self):
+        """Test handling of unexpected response format."""
+        mock_response = {}
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            result = screener_api("test_api_key")
+
+            assert result == []
+
+    def test_screener_api_timeout(self):
+        """Test handling of request timeout."""
+        with mock.patch("requests.get") as mock_get:
+            mock_get.side_effect = requests.exceptions.Timeout("Request timeout")
+
+            with pytest.raises(
+                FMPAPIError, match="Failed to fetch stock screener results"
+            ):
+                screener_api("test_api_key")
+
+    def test_screener_api_url_construction(self):
+        """Test that the correct URL and parameters are used."""
+        mock_response = []
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            screener_api("test_api_key")
+
+            # Verify the correct URL was called
+            call_args = mock_get.call_args
+            assert "company-screener" in call_args[0][0]
+            assert call_args[1]["params"]["apikey"] == "test_api_key"
+            assert call_args[1]["timeout"] == 30
+
+    def test_screener_api_none_parameters_not_included(self):
+        """Test that None parameters are not included in the request."""
+        mock_response = []
+
+        with mock.patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = mock_response
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.raise_for_status = mock.Mock()
+
+            screener_api("test_api_key", sector=None, industry=None, limit=None)
+
+            # Verify that None parameters are not in the request params
+            call_args = mock_get.call_args
+            params = call_args[1]["params"]
+            assert "sector" not in params
+            assert "industry" not in params
+            assert "limit" not in params
+            # Only apikey should be present
+            assert "apikey" in params

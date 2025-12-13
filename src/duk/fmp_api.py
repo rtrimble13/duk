@@ -580,6 +580,158 @@ def actively_trading_list_api(api_key: str) -> List[Dict[str, Any]]:
         return []
 
 
+def screener_api(
+    api_key: str,
+    marketCapMoreThan: Optional[float] = None,
+    marketCapLowerThan: Optional[float] = None,
+    sector: Optional[str] = None,
+    industry: Optional[str] = None,
+    betaMoreThan: Optional[float] = None,
+    betaLowerThan: Optional[float] = None,
+    priceMoreThan: Optional[float] = None,
+    priceLowerThan: Optional[float] = None,
+    dividendMoreThan: Optional[float] = None,
+    dividendLowerThan: Optional[float] = None,
+    volumeMoreThan: Optional[int] = None,
+    volumeLowerThan: Optional[int] = None,
+    exchange: Optional[str] = None,
+    country: Optional[str] = None,
+    isEtf: Optional[bool] = None,
+    isFund: Optional[bool] = None,
+    isActivelyTrading: Optional[bool] = None,
+    limit: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Request stock screener results from FMP API.
+
+    Retrieves a list of stocks that match the specified screening criteria
+    from the Financial Modeling Prep API.
+
+    Args:
+        api_key: FMP API key for authentication
+        marketCapMoreThan: Optional minimum market capitalization
+        marketCapLowerThan: Optional maximum market capitalization
+        sector: Optional sector filter (e.g., "Technology")
+        industry: Optional industry filter (e.g., "Consumer Electronics")
+        betaMoreThan: Optional minimum beta value
+        betaLowerThan: Optional maximum beta value
+        priceMoreThan: Optional minimum stock price
+        priceLowerThan: Optional maximum stock price
+        dividendMoreThan: Optional minimum dividend
+        dividendLowerThan: Optional maximum dividend
+        volumeMoreThan: Optional minimum trading volume
+        volumeLowerThan: Optional maximum trading volume
+        exchange: Optional exchange filter (e.g., "NASDAQ")
+        country: Optional country filter (e.g., "US")
+        isEtf: Optional filter for ETFs (True/False)
+        isFund: Optional filter for funds (True/False)
+        isActivelyTrading: Optional filter for actively trading securities (True/False)
+        limit: Optional maximum number of results to return
+
+    Returns:
+        List of dictionaries containing stock screening results. Each dictionary
+        contains fields like symbol, name, price, market cap, sector, industry,
+        and other company details.
+
+    Raises:
+        FMPAPIError: If the API request fails or returns an error
+        ValueError: If required parameters are invalid
+
+    Example:
+        >>> # Screen for technology stocks with market cap > $1B
+        >>> results = screener_api(
+        ...     "your_api_key",
+        ...     sector="Technology",
+        ...     marketCapMoreThan=1000000000,
+        ...     limit=100
+        ... )
+        >>> # Screen for stocks on NASDAQ with price between $10 and $200
+        >>> results = screener_api(
+        ...     "your_api_key",
+        ...     exchange="NASDAQ",
+        ...     priceMoreThan=10,
+        ...     priceLowerThan=200,
+        ...     isActivelyTrading=True
+        ... )
+    """
+    if not api_key:
+        raise ValueError("API key cannot be empty")
+
+    # Construct the base URL
+    base_url = "https://financialmodelingprep.com/stable"
+    endpoint = f"{base_url}/company-screener"
+
+    # Build query parameters
+    params: Dict[str, Any] = {"apikey": api_key}
+
+    # Add optional parameters if provided
+    if marketCapMoreThan is not None:
+        params["marketCapMoreThan"] = marketCapMoreThan
+    if marketCapLowerThan is not None:
+        params["marketCapLowerThan"] = marketCapLowerThan
+    if sector is not None:
+        params["sector"] = sector
+    if industry is not None:
+        params["industry"] = industry
+    if betaMoreThan is not None:
+        params["betaMoreThan"] = betaMoreThan
+    if betaLowerThan is not None:
+        params["betaLowerThan"] = betaLowerThan
+    if priceMoreThan is not None:
+        params["priceMoreThan"] = priceMoreThan
+    if priceLowerThan is not None:
+        params["priceLowerThan"] = priceLowerThan
+    if dividendMoreThan is not None:
+        params["dividendMoreThan"] = dividendMoreThan
+    if dividendLowerThan is not None:
+        params["dividendLowerThan"] = dividendLowerThan
+    if volumeMoreThan is not None:
+        params["volumeMoreThan"] = volumeMoreThan
+    if volumeLowerThan is not None:
+        params["volumeLowerThan"] = volumeLowerThan
+    if exchange is not None:
+        params["exchange"] = exchange
+    if country is not None:
+        params["country"] = country
+    if isEtf is not None:
+        params["isEtf"] = str(isEtf).lower()
+    if isFund is not None:
+        params["isFund"] = str(isFund).lower()
+    if isActivelyTrading is not None:
+        params["isActivelyTrading"] = str(isActivelyTrading).lower()
+    if limit is not None:
+        params["limit"] = limit
+
+    logger.debug("Requesting stock screener results from FMP API")
+
+    try:
+        response = requests.get(endpoint, params=params, timeout=30)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to fetch stock screener results: {e}")
+        raise FMPAPIError(f"Failed to fetch stock screener results: {e}") from e
+
+    try:
+        data = response.json()
+    except ValueError as e:
+        logger.error(f"Failed to parse JSON response: {e}")
+        raise FMPAPIError(f"Failed to parse JSON response: {e}") from e
+
+    # Check if the response contains an error message
+    if isinstance(data, dict) and "Error Message" in data:
+        error_msg = data["Error Message"]
+        logger.error(f"FMP API error: {error_msg}")
+        raise FMPAPIError(f"FMP API error: {error_msg}")
+
+    # Extract data from response
+    if isinstance(data, list):
+        logger.info(f"Retrieved {len(data)} stock screener records")
+        return data
+    else:
+        logger.warning("Unexpected response format for stock screener")
+        return []
+
+
 def get_price_history(
     api_key: str,
     symbol: str,

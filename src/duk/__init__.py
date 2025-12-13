@@ -3,7 +3,7 @@ duk - A CLI tool and library for downloading markets and financial data.
 """
 
 from duk.date_utils import DateRangeError, get_api_date_range
-from duk.fmp_api import FMPAPIError, get_price_history, price_history_api
+from duk.fmp_api import FMPAPIError, get_price_history, price_history_api, screener_api
 
 __version__ = "0.2.0"
 
@@ -13,5 +13,6 @@ __all__ = [
     "DateRangeError",
     "FMPAPIError",
     "price_history_api",
+    "screener_api",
     "get_price_history",
 ]
