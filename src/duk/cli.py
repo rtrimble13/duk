@@ -87,7 +87,7 @@ def main(ctx, config):
 @click.option(
     "--hlcv", is_flag=True, help="Return Date, High, Low, Close, Volume fields"
 )
-@click.option("--cv", is_flag=True, help="Return Date and Volume fields")
+@click.option("--cv", is_flag=True, help="Return Date, Close, Volume fields")
 @click.option("--adj", is_flag=True, help="Retrieve dividend-adjusted price history")
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
@@ -188,7 +188,7 @@ def ph(
     elif hlcv:
         fields = ["high", "low", "close", "volume"]
     elif cv:
-        fields = ["volume"]
+        fields = ["close", "volume"]
 
     # Fetch price history
     try:

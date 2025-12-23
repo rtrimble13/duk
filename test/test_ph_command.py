@@ -306,6 +306,7 @@ class TestPhCommand:
         mock_df = pd.DataFrame(
             {
                 "date": pd.to_datetime(["2023-01-02"]),
+                "close": [150.0],
                 "volume": [900000],
             }
         )
@@ -328,7 +329,7 @@ class TestPhCommand:
                 assert result.exit_code == 0
                 mock_get.assert_called_once()
                 call_kwargs = mock_get.call_args[1]
-                assert call_kwargs["fields"] == ["volume"]
+                assert call_kwargs["fields"] == ["close", "volume"]
 
     def test_ph_multiple_field_filters_error(self):
         """Test that using multiple field filters raises an error."""

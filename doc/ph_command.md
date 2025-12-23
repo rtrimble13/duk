@@ -37,7 +37,7 @@ These options control which price fields are returned. Only one field filter can
 - `--hlc`: Return Date, High, Low, and Close fields
 - `--close`: Return Date and Close fields only
 - `--hlcv`: Return Date, High, Low, Close, and Volume fields
-- `--cv`: Return Date and Volume fields only
+- `--cv`: Return Date, Close, and Volume fields
 
 If no field filter is specified, all available fields are returned (Date, Open, High, Low, Close, Volume).
 
@@ -204,7 +204,7 @@ Retrieves the last 5 years of annual price data for Google stock.
 duk ph TSLA -s 2023-01-01 -e 2023-12-31 --cv
 ```
 
-Retrieves only Date and Volume fields for Tesla stock in 2023, useful for volume analysis.
+Retrieves Date, Close, and Volume fields for Tesla stock in 2023.
 
 ## Output Format
 
