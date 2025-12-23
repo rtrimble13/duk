@@ -55,7 +55,7 @@ The duk library can be used programmatically in Python applications:
 
 **Key Features**:
 - Flexible date range specification
-- Multiple frequency options (daily, weekly, monthly, quarterly, annual)
+- Multiple frequency options (daily, weekly, monthly, quarterly, semi-annual, annual)
 - Field selection for custom data views
 - Pandas DataFrame output for easy analysis
 
