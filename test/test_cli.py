@@ -641,3 +641,175 @@ class TestLSCommandScreening:
 
             assert result.exit_code == 1
             assert "must start with > or <" in result.output
+
+    @mock.patch("duk.fmp_api.screener_api")
+    def test_ls_screen_with_price_range(self, mock_api):
+        """Test ls command with price range using multiple --price options."""
+        # Mock API response
+        mock_api.return_value = [
+            {
+                "symbol": "AAPL",
+                "companyName": "Apple Inc.",
+                "price": 75.0,
+            },
+        ]
+
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "test.toml")
+
+            # Create a test config file with API key
+            with open(config_path, "w") as f:
+                f.write("[api]\n")
+                f.write('fmp_key = "test_key"\n')
+                f.write("\n")
+                f.write("[general]\n")
+                f.write('log_level = "error"\n')
+
+            result = runner.invoke(
+                main, ["--config", config_path, "ls", "--price=>50", "--price=<100"]
+            )
+
+            assert result.exit_code == 0
+            assert "AAPL" in result.output
+            # Verify screener_api was called with both bounds
+            mock_api.assert_called_once()
+            call_kwargs = mock_api.call_args[1]
+            assert call_kwargs["priceMoreThan"] == 50.0
+            assert call_kwargs["priceLowerThan"] == 100.0
+
+    @mock.patch("duk.fmp_api.screener_api")
+    def test_ls_screen_with_market_cap_range(self, mock_api):
+        """Test ls command with market cap range."""
+        # Mock API response
+        mock_api.return_value = [
+            {
+                "symbol": "AAPL",
+                "companyName": "Apple Inc.",
+                "marketCap": 1500000000000,
+            },
+        ]
+
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "test.toml")
+
+            # Create a test config file with API key
+            with open(config_path, "w") as f:
+                f.write("[api]\n")
+                f.write('fmp_key = "test_key"\n')
+                f.write("\n")
+                f.write("[general]\n")
+                f.write('log_level = "error"\n')
+
+            result = runner.invoke(
+                main,
+                [
+                    "--config",
+                    config_path,
+                    "ls",
+                    "--market-cap=>1000000000000",
+                    "--market-cap=<2000000000000",
+                ],
+            )
+
+            assert result.exit_code == 0
+            assert "AAPL" in result.output
+            # Verify screener_api was called with both bounds
+            mock_api.assert_called_once()
+            call_kwargs = mock_api.call_args[1]
+            assert call_kwargs["marketCapMoreThan"] == 1000000000000.0
+            assert call_kwargs["marketCapLowerThan"] == 2000000000000.0
+
+    @mock.patch("duk.fmp_api.screener_api")
+    def test_ls_screen_with_combined_ranges(self, mock_api):
+        """Test ls command with multiple parameter ranges."""
+        # Mock API response
+        mock_api.return_value = [
+            {
+                "symbol": "AAPL",
+                "companyName": "Apple Inc.",
+                "sector": "Technology",
+                "price": 75.0,
+                "volume": 60000000,
+            },
+        ]
+
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "test.toml")
+
+            # Create a test config file with API key
+            with open(config_path, "w") as f:
+                f.write("[api]\n")
+                f.write('fmp_key = "test_key"\n')
+                f.write("\n")
+                f.write("[general]\n")
+                f.write('log_level = "error"\n')
+
+            result = runner.invoke(
+                main,
+                [
+                    "--config",
+                    config_path,
+                    "ls",
+                    "--sector=Technology",
+                    "--price=>50",
+                    "--price=<100",
+                    "--volume=>50000000",
+                    "--volume=<100000000",
+                ],
+            )
+
+            assert result.exit_code == 0
+            assert "AAPL" in result.output
+            # Verify screener_api was called with all filters
+            mock_api.assert_called_once()
+            call_kwargs = mock_api.call_args[1]
+            assert call_kwargs["sector"] == "Technology"
+            assert call_kwargs["priceMoreThan"] == 50.0
+            assert call_kwargs["priceLowerThan"] == 100.0
+            assert call_kwargs["volumeMoreThan"] == 50000000
+            assert call_kwargs["volumeLowerThan"] == 100000000
+
+    def test_ls_screen_duplicate_greater_than_error(self):
+        """Test that duplicate > operators for same parameter cause error."""
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "test.toml")
+
+            # Create a test config file with API key
+            with open(config_path, "w") as f:
+                f.write("[api]\n")
+                f.write('fmp_key = "test_key"\n')
+                f.write("\n")
+                f.write("[general]\n")
+                f.write('log_level = "error"\n')
+
+            result = runner.invoke(
+                main, ["--config", config_path, "ls", "--price=>50", "--price=>100"]
+            )
+
+            assert result.exit_code == 1
+            assert "Cannot specify multiple '>' values" in result.output
+
+    def test_ls_screen_duplicate_less_than_error(self):
+        """Test that duplicate < operators for same parameter cause error."""
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = os.path.join(tmpdir, "test.toml")
+
+            # Create a test config file with API key
+            with open(config_path, "w") as f:
+                f.write("[api]\n")
+                f.write('fmp_key = "test_key"\n')
+                f.write("\n")
+                f.write("[general]\n")
+                f.write('log_level = "error"\n')
+
+            result = runner.invoke(
+                main, ["--config", config_path, "ls", "--price=<50", "--price=<100"]
+            )
+
+            assert result.exit_code == 1
+            assert "Cannot specify multiple '<' values" in result.output

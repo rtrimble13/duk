@@ -30,6 +30,7 @@ If no list type option is specified, the command returns actively trading securi
 These options are used to filter securities when screening. Each numeric filter supports comparison operators:
 - Use `>` for "greater than" (e.g., `--price=>50`)
 - Use `<` for "less than" (e.g., `--price=<200`)
+- **Range filtering**: Specify the same option multiple times to create a range (e.g., `--price=>50 --price=<200`)
 
 **Numeric Filters:**
 - `--market-cap`: Filter by market capitalization (e.g., `--market-cap=>1000000000`)
@@ -164,30 +165,20 @@ Retrieves all securities in Software, Pharmaceuticals, or Banking industries.
 duk ls --price=>50 --price=<200
 ```
 
-**Note**: You cannot specify both greater than and less than for the same parameter in a single call. To get a range, you would need to filter the results separately.
+Retrieves securities priced between $50 and $200. You can specify the same parameter multiple times with different operators to create a range.
 
-Use `--price=>50` to get securities priced above $50:
-```bash
-duk ls --price=>50
-```
-
-Or use `--price=<200` to get securities priced below $200:
-```bash
-duk ls --price=<200
-```
-
-#### Example 12: Screen by Market Capitalization
+#### Example 12: Screen by Market Capitalization Range
 
 ```bash
-duk ls --market-cap=>1000000000
+duk ls --market-cap=>1000000000 --market-cap=<10000000000
 ```
 
-Retrieves securities with market cap greater than $1 billion.
+Retrieves securities with market cap between $1 billion and $10 billion.
 
 #### Example 13: Combined Screening
 
 ```bash
-duk ls --sectors=Technology --price=>100 --market-cap=>10000000000
+duk ls --sector=Technology --price=>100 --market-cap=>10000000000
 ```
 
 Retrieves Technology sector securities priced above $100 with market cap above $10 billion.
@@ -195,7 +186,7 @@ Retrieves Technology sector securities priced above $100 with market cap above $
 #### Example 14: Screen with Exchange Filter
 
 ```bash
-duk ls --sectors=Technology --exchange=NASDAQ
+duk ls --sector=Technology --exchange=NASDAQ
 ```
 
 Retrieves Technology sector securities listed on NASDAQ.
@@ -203,7 +194,7 @@ Retrieves Technology sector securities listed on NASDAQ.
 #### Example 15: Screen for High Beta Stocks
 
 ```bash
-duk ls --beta=>1.5 --sectors=Technology
+duk ls --beta=>1.5 --sector=Technology
 ```
 
 Retrieves Technology sector securities with beta greater than 1.5.
@@ -235,7 +226,7 @@ Screens for Technology stocks priced above $100 and saves to file.
 #### Example 19: Quiet Mode Screening
 
 ```bash
-duk ls --sectors=Healthcare --price=>50 -o healthcare.csv -q
+duk ls --sector=Healthcare --price=>50 -o healthcare.csv -q
 ```
 
 Screens Healthcare stocks and saves to file without printing to stdout.
@@ -243,10 +234,18 @@ Screens Healthcare stocks and saves to file without printing to stdout.
 #### Example 20: JSON Output with Screening
 
 ```bash
-duk ls --sectors=Technology --market-cap=>1000000000 --json
+duk ls --sector=Technology --market-cap=>1000000000 --json
 ```
 
 Screens Technology stocks with large market cap and outputs in JSON format.
+
+#### Example 21: Combined Range Filters
+
+```bash
+duk ls --sector=Technology --price=>50 --price=<200 --volume=>10000000 --volume=<100000000
+```
+
+Retrieves Technology sector securities with price between $50-$200 and volume between 10M-100M shares.
 
 ## Output Format
 
@@ -405,7 +404,12 @@ The command will exit with an error (exit code 1) in the following cases:
    Error: Invalid numeric value: abc
    ```
 
-6. **API Error**: Failed to fetch data from the API
+6. **Duplicate Range Values**: Specifying multiple > or < values for the same parameter
+   ```
+   Error: Cannot specify multiple '>' values for the same parameter
+   ```
+
+7. **API Error**: Failed to fetch data from the API
    ```
    Error: Failed to fetch list data: <error message>
    ```
@@ -462,7 +466,7 @@ No data found
 
 6. **Use Limit for Testing**: Use `--limit` to get a small sample when testing screening queries:
    ```bash
-   duk ls --sectors=Technology --price=>100 -n 10
+   duk ls --sector=Technology --price=>100 -n 10
    ```
 
 7. **Screening Multiple Sectors or Industries**: When you want to screen across multiple sectors or industries, use comma-separated values:
@@ -474,6 +478,15 @@ No data found
    - `--price=>100` means "price greater than 100"
    - `--price=<100` means "price less than 100"
    - `--price=100` will produce an error
+
+9. **Range-Based Filtering**: Specify the same option multiple times to create a range:
+   ```bash
+   # Price between $50 and $200
+   duk ls --price=>50 --price=<200
+   
+   # Market cap between $1B and $10B, with price range
+   duk ls --market-cap=>1000000000 --market-cap=<10000000000 --price=>50 --price=<200
+   ```
 
 ## Related Functions
 

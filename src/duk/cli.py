@@ -509,23 +509,43 @@ def yc(
 )
 @click.option(
     "--market-cap",
-    help="Filter by market cap (use >value or <value syntax)",
+    multiple=True,
+    help=(
+        "Filter by market cap (use >value or <value syntax, "
+        "can be specified multiple times for range)"
+    ),
 )
 @click.option(
     "--price",
-    help="Filter by stock price (use >value or <value syntax)",
+    multiple=True,
+    help=(
+        "Filter by stock price (use >value or <value syntax, "
+        "can be specified multiple times for range)"
+    ),
 )
 @click.option(
     "--volume",
-    help="Filter by trading volume (use >value or <value syntax)",
+    multiple=True,
+    help=(
+        "Filter by trading volume (use >value or <value syntax, "
+        "can be specified multiple times for range)"
+    ),
 )
 @click.option(
     "--beta",
-    help="Filter by beta value (use >value or <value syntax)",
+    multiple=True,
+    help=(
+        "Filter by beta value (use >value or <value syntax, "
+        "can be specified multiple times for range)"
+    ),
 )
 @click.option(
     "--dividend",
-    help="Filter by dividend (use >value or <value syntax)",
+    multiple=True,
+    help=(
+        "Filter by dividend (use >value or <value syntax, "
+        "can be specified multiple times for range)"
+    ),
 )
 @click.option(
     "--exchange",
@@ -620,35 +640,58 @@ def ls(
         sys.exit(1)
 
     # Helper function to parse comparison operators
-    def parse_filter_value(value_str):
-        """Parse filter values with > or < operators.
+    def parse_filter_values(value_tuple):
+        """Parse filter values with > or < operators, supporting ranges.
 
         Args:
-            value_str: String like ">100" or "<50" or "100"
+            value_tuple: Tuple of strings like (">100",) or (">50", "<100")
 
         Returns:
-            Tuple of (more_than, lower_than) where one will be None
+            Tuple of (more_than, lower_than) where both can be set for ranges
         """
-        if not value_str:
+        if not value_tuple:
             return None, None
 
-        value_str = value_str.strip()
+        more_than = None
+        lower_than = None
 
-        if value_str.startswith(">"):
-            try:
-                return float(value_str[1:]), None
-            except ValueError:
-                raise ValueError(f"Invalid numeric value: {value_str[1:]}")
-        elif value_str.startswith("<"):
-            try:
-                return None, float(value_str[1:])
-            except ValueError:
-                raise ValueError(f"Invalid numeric value: {value_str[1:]}")
-        else:
-            # No operator, treat as exact value (not used in screening API)
-            raise ValueError(
-                f"Filter value must start with > or < operator: {value_str}"
-            )
+        for value_str in value_tuple:
+            if not value_str:
+                continue
+
+            value_str = value_str.strip()
+
+            if value_str.startswith(">"):
+                try:
+                    val = float(value_str[1:])
+                    if more_than is not None:
+                        raise ValueError(
+                            "Cannot specify multiple '>' values for the same parameter"
+                        )
+                    more_than = val
+                except ValueError as e:
+                    if "Cannot specify" in str(e):
+                        raise
+                    raise ValueError(f"Invalid numeric value: {value_str[1:]}")
+            elif value_str.startswith("<"):
+                try:
+                    val = float(value_str[1:])
+                    if lower_than is not None:
+                        raise ValueError(
+                            "Cannot specify multiple '<' values for the same parameter"
+                        )
+                    lower_than = val
+                except ValueError as e:
+                    if "Cannot specify" in str(e):
+                        raise
+                    raise ValueError(f"Invalid numeric value: {value_str[1:]}")
+            else:
+                # No operator, treat as exact value (not used in screening API)
+                raise ValueError(
+                    f"Filter value must start with > or < operator: {value_str}"
+                )
+
+        return more_than, lower_than
 
     # Determine if we're doing screening or listing
     screening_params = [
@@ -722,15 +765,15 @@ def ls(
             logger.info("Using security screening")
 
             # Parse filter parameters
-            market_cap_more, market_cap_lower = parse_filter_value(market_cap)
-            price_more, price_lower = parse_filter_value(price)
-            beta_more, beta_lower = parse_filter_value(beta)
-            dividend_more, dividend_lower = parse_filter_value(dividend)
+            market_cap_more, market_cap_lower = parse_filter_values(market_cap)
+            price_more, price_lower = parse_filter_values(price)
+            beta_more, beta_lower = parse_filter_values(beta)
+            dividend_more, dividend_lower = parse_filter_values(dividend)
 
             # Volume needs to be parsed as int
             volume_more, volume_lower = None, None
             if volume:
-                volume_more_float, volume_lower_float = parse_filter_value(volume)
+                volume_more_float, volume_lower_float = parse_filter_values(volume)
                 if volume_more_float is not None:
                     volume_more = int(volume_more_float)
                 if volume_lower_float is not None:
