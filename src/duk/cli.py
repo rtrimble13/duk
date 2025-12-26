@@ -21,7 +21,7 @@ from duk.fmp_api import (
     sector_list_api,
 )
 from duk.logging_config import setup_logging
-from duk.ls_utils import process_industries, process_sectors
+from duk.ls_utils import process_industries, process_sectors, screen_securities
 
 # Key rate tenors for yield curve analysis
 KEY_RATE_TENORS = ["year1", "year5", "year10", "year20", "year30"]
@@ -485,8 +485,91 @@ def yc(
     "-q", "--quiet", is_flag=True, help="Suppress printing list data to stdout"
 )
 @click.option("-n", "--limit", type=int, help="Limit number of records to return")
-@click.option("--sectors", is_flag=True, help="List all market sectors")
-@click.option("--industries", is_flag=True, help="List all industries")
+@click.option(
+    "--sectors",
+    "sectors_list_flag",
+    is_flag=True,
+    help="List all market sectors",
+)
+@click.option(
+    "--industries",
+    "industries_list_flag",
+    is_flag=True,
+    help="List all industries",
+)
+@click.option(
+    "--sector",
+    "sectors_filter",
+    help="Screen by sectors (comma-separated values)",
+)
+@click.option(
+    "--industry",
+    "industries_filter",
+    help="Screen by industries (comma-separated values)",
+)
+@click.option(
+    "--market-cap",
+    multiple=True,
+    help=(
+        "Filter by market cap (use >value or <value syntax, "
+        "can be specified multiple times for range)"
+    ),
+)
+@click.option(
+    "--price",
+    multiple=True,
+    help=(
+        "Filter by stock price (use >value or <value syntax, "
+        "can be specified multiple times for range)"
+    ),
+)
+@click.option(
+    "--volume",
+    multiple=True,
+    help=(
+        "Filter by trading volume (use >value or <value syntax, "
+        "can be specified multiple times for range)"
+    ),
+)
+@click.option(
+    "--beta",
+    multiple=True,
+    help=(
+        "Filter by beta value (use >value or <value syntax, "
+        "can be specified multiple times for range)"
+    ),
+)
+@click.option(
+    "--dividend",
+    multiple=True,
+    help=(
+        "Filter by dividend (use >value or <value syntax, "
+        "can be specified multiple times for range)"
+    ),
+)
+@click.option(
+    "--exchange",
+    help="Filter by exchange (e.g., NASDAQ, NYSE)",
+)
+@click.option(
+    "--country",
+    help="Filter by country code (e.g., US)",
+)
+@click.option(
+    "--is-etf",
+    is_flag=True,
+    help="Filter for ETFs only",
+)
+@click.option(
+    "--is-fund",
+    is_flag=True,
+    help="Filter for funds only",
+)
+@click.option(
+    "--is-actively-trading",
+    is_flag=True,
+    help="Filter for actively trading securities only",
+)
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
@@ -501,8 +584,20 @@ def ls(
     verbose,
     quiet,
     limit,
-    sectors,
-    industries,
+    sectors_list_flag,
+    industries_list_flag,
+    sectors_filter,
+    industries_filter,
+    market_cap,
+    price,
+    volume,
+    beta,
+    dividend,
+    exchange,
+    country,
+    is_etf,
+    is_fund,
+    is_actively_trading,
     output_csv,
     output_json,
     output,
@@ -511,8 +606,12 @@ def ls(
     List company and market information.
 
     By default, returns actively trading securities with symbol and name.
-    Use --sectors to list market sectors.
-    Use --industries to list industries.
+    Use --sectors to list market sectors or --sector="Tech,Healthcare" to screen.
+    Use --industries to list industries or --industry="Software,Banking" to screen.
+
+    Screening supports comparison operators:
+    - Use > for greater than (e.g., --price=">50")
+    - Use < for less than (e.g., --market-cap="<1000000000")
     """
     # Get logger from context
     logger = ctx.obj.get("logger", logging.getLogger("duk"))
@@ -540,11 +639,108 @@ def ls(
         )
         sys.exit(1)
 
-    # Check for mutually exclusive options
-    if sum([sectors, industries]) > 1:
+    # Helper function to parse comparison operators
+    def parse_filter_values(value_tuple):
+        """Parse filter values with > or < operators, supporting ranges.
+
+        Args:
+            value_tuple: Tuple of strings like (">100",) or (">50", "<100")
+
+        Returns:
+            Tuple of (more_than, lower_than) where both can be set for ranges
+        """
+        if not value_tuple:
+            return None, None
+
+        more_than = None
+        lower_than = None
+
+        for value_str in value_tuple:
+            if not value_str:
+                continue
+
+            value_str = value_str.strip()
+
+            if value_str.startswith(">"):
+                try:
+                    val = float(value_str[1:])
+                    if more_than is not None:
+                        raise ValueError(
+                            "Cannot specify multiple '>' values for the same parameter"
+                        )
+                    more_than = val
+                except ValueError as e:
+                    if "Cannot specify" in str(e):
+                        raise
+                    raise ValueError(f"Invalid numeric value: {value_str[1:]}")
+            elif value_str.startswith("<"):
+                try:
+                    val = float(value_str[1:])
+                    if lower_than is not None:
+                        raise ValueError(
+                            "Cannot specify multiple '<' values for the same parameter"
+                        )
+                    lower_than = val
+                except ValueError as e:
+                    if "Cannot specify" in str(e):
+                        raise
+                    raise ValueError(f"Invalid numeric value: {value_str[1:]}")
+            else:
+                # No operator, treat as exact value (not used in screening API)
+                raise ValueError(
+                    f"Filter value must start with > or < operator: {value_str}"
+                )
+
+        return more_than, lower_than
+
+    # Determine if we're doing screening or listing
+    screening_params = [
+        market_cap,
+        price,
+        volume,
+        beta,
+        dividend,
+        exchange,
+        country,
+        is_etf,
+        is_fund,
+        is_actively_trading,
+    ]
+    has_screening_params = any(param for param in screening_params)
+
+    # Parse sectors and industries
+    sectors_list = None
+    industries_list = None
+
+    if sectors_filter:
+        # Sectors with values - use for screening
+        sectors_list = [s.strip() for s in sectors_filter.split(",")]
+    if industries_filter:
+        # Industries with values - use for screening
+        industries_list = [i.strip() for i in industries_filter.split(",")]
+
+    # Check for mutually exclusive options in list mode
+    if sectors_list_flag and industries_list_flag:
         logger.error("Only one list type option can be specified")
         click.echo(
             "Error: Only one of --sectors or --industries can be specified",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Check if mixing list and filter flags
+    if sectors_list_flag and sectors_filter:
+        logger.error("Cannot use both --sectors and --sector")
+        click.echo(
+            "Error: Cannot use both --sectors (list flag) and --sector (filter)",
+            err=True,
+        )
+        sys.exit(1)
+
+    if industries_list_flag and industries_filter:
+        logger.error("Cannot use both --industries and --industry")
+        click.echo(
+            "Error: Cannot use both --industries (list flag) and --industry (filter)",
             err=True,
         )
         sys.exit(1)
@@ -561,48 +757,110 @@ def ls(
     # Default to CSV if neither is specified
     output_format = "json" if output_json else "csv"
 
-    # Fetch data based on options
+    # Decide between listing and screening
+    use_screening = sectors_list or industries_list or has_screening_params
+
     try:
-        if sectors:
-            logger.info("Requesting sector list")
-            data = sector_list_api(api_key)
-        elif industries:
-            logger.info("Requesting industry list")
-            data = industry_list_api(api_key)
+        if use_screening:
+            logger.info("Using security screening")
+
+            # Parse filter parameters
+            market_cap_more, market_cap_lower = parse_filter_values(market_cap)
+            price_more, price_lower = parse_filter_values(price)
+            beta_more, beta_lower = parse_filter_values(beta)
+            dividend_more, dividend_lower = parse_filter_values(dividend)
+
+            # Volume needs to be parsed as int
+            volume_more, volume_lower = None, None
+            if volume:
+                volume_more_float, volume_lower_float = parse_filter_values(volume)
+                if volume_more_float is not None:
+                    volume_more = int(volume_more_float)
+                if volume_lower_float is not None:
+                    volume_lower = int(volume_lower_float)
+
+            # Call screen_securities
+            df = screen_securities(
+                api_key=api_key,
+                marketCapMoreThan=market_cap_more,
+                marketCapLowerThan=market_cap_lower,
+                sector=sectors_list,
+                industry=industries_list,
+                betaMoreThan=beta_more,
+                betaLowerThan=beta_lower,
+                priceMoreThan=price_more,
+                priceLowerThan=price_lower,
+                dividendMoreThan=dividend_more,
+                dividendLowerThan=dividend_lower,
+                volumeMoreThan=volume_more,
+                volumeLowerThan=volume_lower,
+                exchange=exchange,
+                country=country,
+                isEtf=is_etf if is_etf else None,
+                isFund=is_fund if is_fund else None,
+                isActivelyTrading=is_actively_trading if is_actively_trading else None,
+                limit=limit,
+            )
+
+            if df.empty:
+                logger.warning("No screening results returned")
+                if not quiet:
+                    click.echo("No data found")
+                sys.exit(0)
+
+            logger.info(f"Retrieved {len(df)} screening results")
+
+            # Reset index if it was set to symbol
+            if df.index.name == "symbol":
+                df = df.reset_index()
+
         else:
-            logger.info("Requesting actively trading list")
-            data = actively_trading_list_api(api_key)
+            # Traditional listing mode
+            if sectors_list_flag:
+                logger.info("Requesting sector list")
+                data = sector_list_api(api_key)
+            elif industries_list_flag:
+                logger.info("Requesting industry list")
+                data = industry_list_api(api_key)
+            else:
+                logger.info("Requesting actively trading list")
+                data = actively_trading_list_api(api_key)
+
+            if not data:
+                logger.warning("No data returned")
+                if not quiet:
+                    click.echo("No data found")
+                sys.exit(0)
+
+            logger.info(f"Retrieved {len(data)} records")
+
+            # Process data based on list type
+            if sectors_list_flag:
+                df = process_sectors(data)
+            elif industries_list_flag:
+                df = process_industries(data)
+            else:
+                # Convert to DataFrame for actively trading list
+                df = pd.DataFrame(data)
+                # Filter to expected columns
+                expected_cols = ["symbol", "name"]
+                available_cols = [col for col in expected_cols if col in df.columns]
+                if available_cols:
+                    df = df[available_cols]
+
+            # Apply limit if specified
+            if limit is not None and limit > 0:
+                df = df.head(limit)
+                logger.debug(f"Limiting to {limit} records")
+
+    except ValueError as e:
+        logger.error(f"Invalid parameter value: {e}")
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
     except Exception as e:
         logger.error(f"Failed to fetch list data: {e}")
         click.echo(f"Error: Failed to fetch list data: {e}", err=True)
         sys.exit(1)
-
-    if not data:
-        logger.warning("No data returned")
-        if not quiet:
-            click.echo("No data found")
-        sys.exit(0)
-
-    logger.info(f"Retrieved {len(data)} records")
-
-    # Process data based on list type
-    if sectors:
-        df = process_sectors(data)
-    elif industries:
-        df = process_industries(data)
-    else:
-        # Convert to DataFrame for actively trading list
-        df = pd.DataFrame(data)
-        # Filter to expected columns
-        expected_cols = ["symbol", "name"]
-        available_cols = [col for col in expected_cols if col in df.columns]
-        if available_cols:
-            df = df[available_cols]
-
-    # Apply limit if specified
-    if limit is not None and limit > 0:
-        df = df.head(limit)
-        logger.debug(f"Limiting to {limit} records")
 
     # Handle output to file
     if output:
