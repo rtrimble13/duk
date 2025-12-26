@@ -487,17 +487,25 @@ def yc(
 @click.option("-n", "--limit", type=int, help="Limit number of records to return")
 @click.option(
     "--sectors",
-    "sectors",
-    flag_value="__LIST_ALL__",
-    default=None,
-    help="List all market sectors or screen by sectors (comma-separated)",
+    "sectors_list_flag",
+    is_flag=True,
+    help="List all market sectors",
 )
 @click.option(
     "--industries",
-    "industries",
-    flag_value="__LIST_ALL__",
-    default=None,
-    help="List all industries or screen by industries (comma-separated)",
+    "industries_list_flag",
+    is_flag=True,
+    help="List all industries",
+)
+@click.option(
+    "--sector",
+    "sectors_filter",
+    help="Screen by sectors (comma-separated values)",
+)
+@click.option(
+    "--industry",
+    "industries_filter",
+    help="Screen by industries (comma-separated values)",
 )
 @click.option(
     "--market-cap",
@@ -556,8 +564,10 @@ def ls(
     verbose,
     quiet,
     limit,
-    sectors,
-    industries,
+    sectors_list_flag,
+    industries_list_flag,
+    sectors_filter,
+    industries_filter,
     market_cap,
     price,
     volume,
@@ -576,8 +586,8 @@ def ls(
     List company and market information.
 
     By default, returns actively trading securities with symbol and name.
-    Use --sectors to list market sectors or --sectors="Tech,Healthcare" to screen.
-    Use --industries to list industries or --industries="Software,Banking" to screen.
+    Use --sectors to list market sectors or --sector="Tech,Healthcare" to screen.
+    Use --industries to list industries or --industry="Software,Banking" to screen.
 
     Screening supports comparison operators:
     - Use > for greater than (e.g., --price=">50")
@@ -658,18 +668,16 @@ def ls(
     # Parse sectors and industries
     sectors_list = None
     industries_list = None
-    is_sectors_flag = sectors == "__LIST_ALL__"  # Flag mode
-    is_industries_flag = industries == "__LIST_ALL__"  # Flag mode
 
-    if sectors and not is_sectors_flag:
+    if sectors_filter:
         # Sectors with values - use for screening
-        sectors_list = [s.strip() for s in sectors.split(",")]
-    if industries and not is_industries_flag:
+        sectors_list = [s.strip() for s in sectors_filter.split(",")]
+    if industries_filter:
         # Industries with values - use for screening
-        industries_list = [i.strip() for i in industries.split(",")]
+        industries_list = [i.strip() for i in industries_filter.split(",")]
 
     # Check for mutually exclusive options in list mode
-    if is_sectors_flag and is_industries_flag:
+    if sectors_list_flag and industries_list_flag:
         logger.error("Only one list type option can be specified")
         click.echo(
             "Error: Only one of --sectors or --industries can be specified",
@@ -677,12 +685,19 @@ def ls(
         )
         sys.exit(1)
 
-    # Check if screening with both sectors and industries values
-    if sectors_list and industries_list and not has_screening_params:
-        logger.error("Cannot use both --sectors and --industries values without screening parameters")
+    # Check if mixing list and filter flags
+    if sectors_list_flag and sectors_filter:
+        logger.error("Cannot use both --sectors and --sector")
         click.echo(
-            "Error: When providing values for --sectors and --industries, "
-            "at least one screening parameter must be specified",
+            "Error: Cannot use both --sectors (list flag) and --sector (filter)",
+            err=True,
+        )
+        sys.exit(1)
+
+    if industries_list_flag and industries_filter:
+        logger.error("Cannot use both --industries and --industry")
+        click.echo(
+            "Error: Cannot use both --industries (list flag) and --industry (filter)",
             err=True,
         )
         sys.exit(1)
@@ -700,11 +715,7 @@ def ls(
     output_format = "json" if output_json else "csv"
 
     # Decide between listing and screening
-    use_screening = (
-        (sectors_list or industries_list or has_screening_params)
-        and not is_sectors_flag
-        and not is_industries_flag
-    )
+    use_screening = sectors_list or industries_list or has_screening_params
 
     try:
         if use_screening:
@@ -762,10 +773,10 @@ def ls(
 
         else:
             # Traditional listing mode
-            if is_sectors_flag:
+            if sectors_list_flag:
                 logger.info("Requesting sector list")
                 data = sector_list_api(api_key)
-            elif is_industries_flag:
+            elif industries_list_flag:
                 logger.info("Requesting industry list")
                 data = industry_list_api(api_key)
             else:
@@ -781,9 +792,9 @@ def ls(
             logger.info(f"Retrieved {len(data)} records")
 
             # Process data based on list type
-            if is_sectors_flag:
+            if sectors_list_flag:
                 df = process_sectors(data)
-            elif is_industries_flag:
+            elif industries_list_flag:
                 df = process_industries(data)
             else:
                 # Convert to DataFrame for actively trading list

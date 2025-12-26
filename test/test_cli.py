@@ -328,13 +328,17 @@ class TestLSCommand:
 class TestLSCommandScreening:
     """Test cases for ls command screening functionality."""
 
-    @mock.patch("duk.ls_utils.screener_api")
+    @mock.patch("duk.fmp_api.screener_api")
     def test_ls_screen_by_sector(self, mock_api):
-        """Test ls command with --sectors=value for screening."""
+        """Test ls command with --sector=value for screening."""
         # Mock API response
         mock_api.return_value = [
             {"symbol": "AAPL", "companyName": "Apple Inc.", "sector": "Technology"},
-            {"symbol": "MSFT", "companyName": "Microsoft Corporation", "sector": "Technology"},
+            {
+                "symbol": "MSFT",
+                "companyName": "Microsoft Corporation",
+                "sector": "Technology",
+            },
         ]
 
         runner = CliRunner()
@@ -350,7 +354,7 @@ class TestLSCommandScreening:
                 f.write('log_level = "error"\n')
 
             result = runner.invoke(
-                main, ["--config", config_path, "ls", "--sectors=Technology"]
+                main, ["--config", config_path, "ls", "--sector=Technology"]
             )
 
             assert result.exit_code == 0
@@ -361,9 +365,9 @@ class TestLSCommandScreening:
             call_kwargs = mock_api.call_args[1]
             assert call_kwargs["sector"] == "Technology"
 
-    @mock.patch("duk.ls_utils.screener_api")
+    @mock.patch("duk.fmp_api.screener_api")
     def test_ls_screen_by_multiple_sectors(self, mock_api):
-        """Test ls command with --sectors with multiple values."""
+        """Test ls command with --sector with multiple values."""
         # Mock API response
         mock_api.return_value = [
             {"symbol": "AAPL", "companyName": "Apple Inc.", "sector": "Technology"},
@@ -382,19 +386,23 @@ class TestLSCommandScreening:
                 f.write('log_level = "error"\n')
 
             result = runner.invoke(
-                main, ["--config", config_path, "ls", "--sectors=Technology,Healthcare"]
+                main, ["--config", config_path, "ls", "--sector=Technology,Healthcare"]
             )
 
             assert result.exit_code == 0
             # Should call screener_api twice (once per sector)
             assert mock_api.call_count == 2
 
-    @mock.patch("duk.ls_utils.screener_api")
+    @mock.patch("duk.fmp_api.screener_api")
     def test_ls_screen_by_industry(self, mock_api):
-        """Test ls command with --industries=value for screening."""
+        """Test ls command with --industry=value for screening."""
         # Mock API response
         mock_api.return_value = [
-            {"symbol": "MSFT", "companyName": "Microsoft Corporation", "industry": "Software"},
+            {
+                "symbol": "MSFT",
+                "companyName": "Microsoft Corporation",
+                "industry": "Software",
+            },
         ]
 
         runner = CliRunner()
@@ -410,7 +418,7 @@ class TestLSCommandScreening:
                 f.write('log_level = "error"\n')
 
             result = runner.invoke(
-                main, ["--config", config_path, "ls", "--industries=Software"]
+                main, ["--config", config_path, "ls", "--industry=Software"]
             )
 
             assert result.exit_code == 0
@@ -420,7 +428,7 @@ class TestLSCommandScreening:
             call_kwargs = mock_api.call_args[1]
             assert call_kwargs["industry"] == "Software"
 
-    @mock.patch("duk.ls_utils.screener_api")
+    @mock.patch("duk.fmp_api.screener_api")
     def test_ls_screen_with_price_greater_than(self, mock_api):
         """Test ls command with --price=>value syntax."""
         # Mock API response
@@ -451,7 +459,7 @@ class TestLSCommandScreening:
             call_kwargs = mock_api.call_args[1]
             assert call_kwargs["priceMoreThan"] == 100.0
 
-    @mock.patch("duk.ls_utils.screener_api")
+    @mock.patch("duk.fmp_api.screener_api")
     def test_ls_screen_with_price_less_than(self, mock_api):
         """Test ls command with --price=<value syntax."""
         # Mock API response
@@ -471,9 +479,7 @@ class TestLSCommandScreening:
                 f.write("[general]\n")
                 f.write('log_level = "error"\n')
 
-            result = runner.invoke(
-                main, ["--config", config_path, "ls", "--price=<50"]
-            )
+            result = runner.invoke(main, ["--config", config_path, "ls", "--price=<50"])
 
             assert result.exit_code == 0
             assert "XYZ" in result.output
@@ -482,7 +488,7 @@ class TestLSCommandScreening:
             call_kwargs = mock_api.call_args[1]
             assert call_kwargs["priceLowerThan"] == 50.0
 
-    @mock.patch("duk.ls_utils.screener_api")
+    @mock.patch("duk.fmp_api.screener_api")
     def test_ls_screen_with_market_cap(self, mock_api):
         """Test ls command with --market-cap filter."""
         # Mock API response
@@ -513,12 +519,17 @@ class TestLSCommandScreening:
             call_kwargs = mock_api.call_args[1]
             assert call_kwargs["marketCapMoreThan"] == 1000000000000.0
 
-    @mock.patch("duk.ls_utils.screener_api")
+    @mock.patch("duk.fmp_api.screener_api")
     def test_ls_screen_combined_filters(self, mock_api):
         """Test ls command with multiple screening filters."""
         # Mock API response
         mock_api.return_value = [
-            {"symbol": "AAPL", "companyName": "Apple Inc.", "sector": "Technology", "price": 150.0},
+            {
+                "symbol": "AAPL",
+                "companyName": "Apple Inc.",
+                "sector": "Technology",
+                "price": 150.0,
+            },
         ]
 
         runner = CliRunner()
@@ -534,12 +545,15 @@ class TestLSCommandScreening:
                 f.write('log_level = "error"\n')
 
             result = runner.invoke(
-                main, [
-                    "--config", config_path, "ls",
-                    "--sectors=Technology",
+                main,
+                [
+                    "--config",
+                    config_path,
+                    "ls",
+                    "--sector=Technology",
                     "--price=>100",
-                    "--market-cap=>1000000000"
-                ]
+                    "--market-cap=>1000000000",
+                ],
             )
 
             assert result.exit_code == 0
@@ -623,9 +637,7 @@ class TestLSCommandScreening:
                 f.write("[general]\n")
                 f.write('log_level = "error"\n')
 
-            result = runner.invoke(
-                main, ["--config", config_path, "ls", "--price=100"]
-            )
+            result = runner.invoke(main, ["--config", config_path, "ls", "--price=100"])
 
             assert result.exit_code == 1
             assert "must start with > or <" in result.output

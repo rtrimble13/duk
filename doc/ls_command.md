@@ -16,12 +16,14 @@ duk ls [options]
 
 These options control what type of list is returned or enable screening mode.
 
-- `--sectors[=VALUE]`: List all market sectors (without value) or screen by sectors (with comma-separated values)
-- `--industries[=VALUE]`: List all industries (without value) or screen by industries (with comma-separated values)
+- `--sectors`: List all market sectors (flag, no value)
+- `--industries`: List all industries (flag, no value)
+- `--sector=VALUE`: Screen by sectors (comma-separated values)
+- `--industry=VALUE`: Screen by industries (comma-separated values)
 
 If no list type option is specified, the command returns actively trading securities.
 
-**Important**: When values are provided to `--sectors` or `--industries`, the command switches to screening mode. In screening mode, you can combine these with other screening parameters.
+**Important**: Use `--sectors` or `--industries` without a value to list all sectors/industries. Use `--sector` or `--industry` with values to screen by specific sectors/industries.
 
 ### Screening Filter Options
 
@@ -135,7 +137,7 @@ Retrieves all securities in the Technology sector.
 #### Example 8: Screen by Multiple Sectors
 
 ```bash
-duk ls --sectors="Technology,Healthcare"
+duk ls --sector="Technology,Healthcare"
 ```
 
 Retrieves all securities in either Technology or Healthcare sectors.
@@ -151,7 +153,7 @@ Retrieves all securities in the Software industry.
 #### Example 10: Screen by Multiple Industries
 
 ```bash
-duk ls --industries="Software,Pharmaceuticals,Banking"
+duk ls --industry="Software,Pharmaceuticals,Banking"
 ```
 
 Retrieves all securities in Software, Pharmaceuticals, or Banking industries.
@@ -209,7 +211,7 @@ Retrieves Technology sector securities with beta greater than 1.5.
 #### Example 16: Screen for Dividend Stocks
 
 ```bash
-duk ls --dividend=>3.0 --sectors="Utilities,Real Estate"
+duk ls --dividend=>3.0 --sector="Utilities,Real Estate"
 ```
 
 Retrieves Utilities and Real Estate securities with dividend greater than 3.0.
@@ -465,7 +467,7 @@ No data found
 
 7. **Screening Multiple Sectors or Industries**: When you want to screen across multiple sectors or industries, use comma-separated values:
    ```bash
-   duk ls --sectors="Technology,Healthcare,Financial Services" --market-cap=>5000000000
+   duk ls --sector="Technology,Healthcare,Financial Services" --market-cap=>5000000000
    ```
 
 8. **Understanding Comparison Operators**: Always use `>` or `<` prefix for numeric filters:
