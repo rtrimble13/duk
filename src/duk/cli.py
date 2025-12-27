@@ -20,6 +20,7 @@ from duk.fmp_api import (
     industry_list_api,
     sector_list_api,
 )
+from duk.indicators import calculate_ema, calculate_sma
 from duk.logging_config import setup_logging
 from duk.ls_utils import process_industries, process_sectors, screen_securities
 from duk.return_utils import (
@@ -30,7 +31,6 @@ from duk.return_utils import (
     price_difference,
     simple_return,
 )
-from duk.indicators import calculate_sma, calculate_ema
 
 # Key rate tenors for yield curve analysis
 KEY_RATE_TENORS = ["year1", "year5", "year10", "year20", "year30"]

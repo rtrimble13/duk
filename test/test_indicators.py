@@ -293,7 +293,7 @@ class TestCalculateEMA:
         )
 
 
-class TestCompareSmaaEma:
+class TestCompareSmaAndEma:
     """Tests comparing SMA and EMA behavior."""
 
     def test_ema_more_responsive_than_sma(self):
