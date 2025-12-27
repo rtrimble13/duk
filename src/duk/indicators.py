@@ -259,30 +259,35 @@ def calculate_rsi(
     # Calculate RSI for each column
     for col in columns_to_process:
         rsi_col_name = f"{col}_rsi_{window}"
-        
+
         # Calculate price changes
         delta = df[col].diff()
-        
+
         # Separate gains and losses
         gain = delta.clip(lower=0)
         loss = -delta.clip(upper=0)
-        
-        # Calculate average gain and loss using Wilder's smoothing (EMA with alpha = 1/window)
+
+        # Calculate average gain and loss using Wilder's smoothing
+        # (EMA with alpha = 1/window)
         # Wilder's smoothing uses adjust=False for recursive calculation
-        avg_gain = gain.ewm(alpha=1/window, adjust=False, min_periods=window).mean()
-        avg_loss = loss.ewm(alpha=1/window, adjust=False, min_periods=window).mean()
-        
+        avg_gain = gain.ewm(
+            alpha=1 / window, adjust=False, min_periods=window
+        ).mean()
+        avg_loss = loss.ewm(
+            alpha=1 / window, adjust=False, min_periods=window
+        ).mean()
+
         # Calculate RS and RSI
         # Handle division by zero - when avg_loss is 0, RS is undefined
         # We need to handle this case: if avg_loss is 0 and avg_gain > 0, RSI = 100
         # If both are 0, RSI is undefined (NaN)
         rs = avg_gain / avg_loss
         rsi = 100 - (100 / (1 + rs))
-        
+
         # When avg_loss is 0 and avg_gain > 0 (all gains), RSI should be 100
         # When both avg_loss and avg_gain are 0, RSI should remain NaN
         rsi = rsi.where(~((avg_loss == 0) & (avg_gain > 0)), 100)
-        
+
         df[rsi_col_name] = rsi
 
     logger.info(f"Calculated RSI with window={window}")

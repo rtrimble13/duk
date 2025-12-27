@@ -300,7 +300,9 @@ class TestCalculateRSI:
     def test_rsi_basic_series(self):
         """Test RSI calculation with a Series."""
         # Create a series with upward trend
-        prices = pd.Series([100, 102, 104, 103, 105, 107, 106, 108, 110, 109, 111, 113, 112, 114, 116])
+        prices = pd.Series(
+            [100, 102, 104, 103, 105, 107, 106, 108, 110, 109, 111, 113, 112, 114, 116]
+        )
         result = calculate_rsi(prices, window=14)
 
         assert "value" in result.columns
@@ -309,11 +311,14 @@ class TestCalculateRSI:
 
         # First value should be NaN (no previous value for diff)
         assert pd.isna(result["value_rsi_14"].iloc[0])
-        
-        # Values before window should be NaN (not enough data for EMA with min_periods=window)
+
+        # Values before window should be NaN
+        # (not enough data for EMA with min_periods=window)
         for i in range(1, 14):
-            assert pd.isna(result["value_rsi_14"].iloc[i]), f"Expected NaN at index {i}"
-        
+            assert pd.isna(
+                result["value_rsi_14"].iloc[i]
+            ), f"Expected NaN at index {i}"
+
         # After window period, RSI should have values
         # RSI should be between 0 and 100
         valid_rsi = result["value_rsi_14"].dropna()
@@ -325,8 +330,40 @@ class TestCalculateRSI:
         """Test RSI calculation with DataFrame and specific column."""
         df = pd.DataFrame(
             {
-                "close": [100, 102, 104, 103, 105, 107, 106, 108, 110, 109, 111, 113, 112, 114, 116],
-                "volume": [1000, 1100, 1050, 1200, 1150, 1300, 1250, 1400, 1350, 1500, 1450, 1600, 1550, 1700, 1650],
+                "close": [
+                    100,
+                    102,
+                    104,
+                    103,
+                    105,
+                    107,
+                    106,
+                    108,
+                    110,
+                    109,
+                    111,
+                    113,
+                    112,
+                    114,
+                    116,
+                ],
+                "volume": [
+                    1000,
+                    1100,
+                    1050,
+                    1200,
+                    1150,
+                    1300,
+                    1250,
+                    1400,
+                    1350,
+                    1500,
+                    1450,
+                    1600,
+                    1550,
+                    1700,
+                    1650,
+                ],
             }
         )
         result = calculate_rsi(df, column="close", window=14)
@@ -343,10 +380,12 @@ class TestCalculateRSI:
 
     def test_rsi_dataframe_without_column(self):
         """Test RSI calculation with DataFrame on all numeric columns."""
-        df = pd.DataFrame({
-            "close": [100, 102, 104, 103, 105, 107, 106, 108, 110],
-            "volume": [1000, 1100, 1050, 1200, 1150, 1300, 1250, 1400, 1350]
-        })
+        df = pd.DataFrame(
+            {
+                "close": [100, 102, 104, 103, 105, 107, 106, 108, 110],
+                "volume": [1000, 1100, 1050, 1200, 1150, 1300, 1250, 1400, 1350],
+            }
+        )
         result = calculate_rsi(df, window=5)
 
         assert "close_rsi_5" in result.columns
@@ -363,7 +402,26 @@ class TestCalculateRSI:
     def test_rsi_uptrend(self):
         """Test RSI with strong uptrend - should be high (>70)."""
         # Create strong uptrend
-        prices = pd.Series([100, 102, 104, 106, 108, 110, 112, 114, 116, 118, 120, 122, 124, 126, 128, 130])
+        prices = pd.Series(
+            [
+                100,
+                102,
+                104,
+                106,
+                108,
+                110,
+                112,
+                114,
+                116,
+                118,
+                120,
+                122,
+                124,
+                126,
+                128,
+                130,
+            ]
+        )
         result = calculate_rsi(prices, window=14)
 
         # Last RSI value should be high (overbought)
@@ -373,7 +431,26 @@ class TestCalculateRSI:
     def test_rsi_downtrend(self):
         """Test RSI with strong downtrend - should be low (<30)."""
         # Create strong downtrend
-        prices = pd.Series([130, 128, 126, 124, 122, 120, 118, 116, 114, 112, 110, 108, 106, 104, 102, 100])
+        prices = pd.Series(
+            [
+                130,
+                128,
+                126,
+                124,
+                122,
+                120,
+                118,
+                116,
+                114,
+                112,
+                110,
+                108,
+                106,
+                104,
+                102,
+                100,
+            ]
+        )
         result = calculate_rsi(prices, window=14)
 
         # Last RSI value should be low (oversold)
@@ -383,29 +460,78 @@ class TestCalculateRSI:
     def test_rsi_all_gains(self):
         """Test RSI when all price changes are gains - should be 100."""
         # Constant upward movement
-        prices = pd.Series([100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115])
+        prices = pd.Series(
+            [
+                100,
+                101,
+                102,
+                103,
+                104,
+                105,
+                106,
+                107,
+                108,
+                109,
+                110,
+                111,
+                112,
+                113,
+                114,
+                115,
+            ]
+        )
         result = calculate_rsi(prices, window=14)
 
         # RSI should be 100 (all gains, no losses)
         last_rsi = result["value_rsi_14"].iloc[-1]
-        assert np.isclose(last_rsi, 100, rtol=0.01), f"Expected RSI ~100 for all gains, got {last_rsi}"
+        assert np.isclose(
+            last_rsi, 100, rtol=0.01
+        ), f"Expected RSI ~100 for all gains, got {last_rsi}"
 
     def test_rsi_neutral_market(self):
         """Test RSI in neutral market - should be around 50."""
         # Create a more balanced oscillating pattern with equal gains and losses
-        # Pattern that ends with both gain and loss to balance: +5, -5, +5, -5, etc. ending with -5
-        prices = pd.Series([100, 105, 100, 105, 100, 105, 100, 105, 100, 105, 100, 105, 100, 105, 100, 105, 100, 105, 100])
+        # Pattern that ends with both gain and loss to balance:
+        # +5, -5, +5, -5, etc. ending with -5
+        prices = pd.Series(
+            [
+                100,
+                105,
+                100,
+                105,
+                100,
+                105,
+                100,
+                105,
+                100,
+                105,
+                100,
+                105,
+                100,
+                105,
+                100,
+                105,
+                100,
+                105,
+                100,
+            ]
+        )
         result = calculate_rsi(prices, window=14)
 
         # RSI should be near 50 (balanced gains and losses)
         last_rsi = result["value_rsi_14"].iloc[-1]
-        # With equal alternating gains and losses that ends on a loss, RSI should be around 36-50
+        # With equal alternating gains and losses that ends on a loss,
+        # RSI should be around 36-50
         # Since recent price movement affects RSI, we allow a wider range
-        assert 30 < last_rsi < 65, f"Expected RSI in reasonable range for oscillating market, got {last_rsi}"
+        assert (
+            30 < last_rsi < 65
+        ), f"Expected RSI in reasonable range for oscillating market, got {last_rsi}"
 
     def test_rsi_window_equals_data_length(self):
         """Test RSI when window equals data length."""
-        prices = pd.Series([100, 102, 104, 103, 105, 107, 106, 108, 110, 109, 111, 113, 112, 114, 116])
+        prices = pd.Series(
+            [100, 102, 104, 103, 105, 107, 106, 108, 110, 109, 111, 113, 112, 114, 116]
+        )
         result = calculate_rsi(prices, window=14)
 
         # First value should be NaN (diff of first value is NaN)
@@ -427,7 +553,25 @@ class TestCalculateRSI:
 
     def test_rsi_with_nan_values(self):
         """Test RSI calculation with NaN values in data."""
-        prices = pd.Series([100, np.nan, 103, 108, 110, 107, 112, 115, 113, 118, 120, 119, 122, 124, 123])
+        prices = pd.Series(
+            [
+                100,
+                np.nan,
+                103,
+                108,
+                110,
+                107,
+                112,
+                115,
+                113,
+                118,
+                120,
+                119,
+                122,
+                124,
+                123,
+            ]
+        )
         result = calculate_rsi(prices, window=14)
 
         # NaN values should affect RSI calculation
@@ -467,21 +611,91 @@ class TestCalculateRSI:
     def test_rsi_preserves_index(self):
         """Test that RSI preserves the original index."""
         index = pd.date_range("2023-01-01", periods=20)
-        prices = pd.Series([100, 102, 104, 103, 105, 107, 106, 108, 110, 109, 111, 113, 112, 114, 116, 115, 117, 119, 118, 120], index=index)
+        prices = pd.Series(
+            [
+                100,
+                102,
+                104,
+                103,
+                105,
+                107,
+                106,
+                108,
+                110,
+                109,
+                111,
+                113,
+                112,
+                114,
+                116,
+                115,
+                117,
+                119,
+                118,
+                120,
+            ],
+            index=index,
+        )
         result = calculate_rsi(prices, window=14)
 
         assert result.index.equals(index)
 
     def test_rsi_default_window(self):
         """Test RSI with default window of 14."""
-        prices = pd.Series([100, 102, 104, 103, 105, 107, 106, 108, 110, 109, 111, 113, 112, 114, 116, 115, 117, 119, 118, 120])
+        prices = pd.Series(
+            [
+                100,
+                102,
+                104,
+                103,
+                105,
+                107,
+                106,
+                108,
+                110,
+                109,
+                111,
+                113,
+                112,
+                114,
+                116,
+                115,
+                117,
+                119,
+                118,
+                120,
+            ]
+        )
         result = calculate_rsi(prices)  # Should use default window=14
 
         assert "value_rsi_14" in result.columns
 
     def test_rsi_different_windows(self):
         """Test RSI with different window sizes."""
-        prices = pd.Series([100, 102, 104, 103, 105, 107, 106, 108, 110, 109, 111, 113, 112, 114, 116, 115, 117, 119, 118, 120])
+        prices = pd.Series(
+            [
+                100,
+                102,
+                104,
+                103,
+                105,
+                107,
+                106,
+                108,
+                110,
+                109,
+                111,
+                113,
+                112,
+                114,
+                116,
+                115,
+                117,
+                119,
+                118,
+                120,
+            ]
+        )
         result_7 = calculate_rsi(prices, window=7)
         result_14 = calculate_rsi(prices, window=14)
         result_21 = calculate_rsi(prices, window=21)
