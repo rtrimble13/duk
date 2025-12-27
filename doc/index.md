@@ -45,6 +45,17 @@ The duk CLI provides several subcommands for interacting with financial data API
 - Get historical yield curve for a specific date
 - Export yield curve data
 
+### rc - Return Calculations
+
+- [rc Command Documentation](rc_command.md) - Compute returns from price data
+
+**Usage**: `duk rc -i INPUT_FILE [OPTIONS]`
+
+**Examples**:
+- Compute simple and log returns
+- Calculate cumulative and annualized returns
+- Apply multi-period lookback analysis
+
 ## Python Library API
 
 The duk library can be used programmatically in Python applications:

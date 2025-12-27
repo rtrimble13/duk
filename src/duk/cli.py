@@ -22,6 +22,14 @@ from duk.fmp_api import (
 )
 from duk.logging_config import setup_logging
 from duk.ls_utils import process_industries, process_sectors, screen_securities
+from duk.return_utils import (
+    annualized_return,
+    cumulative_log_return,
+    cumulative_simple_return,
+    log_return,
+    price_difference,
+    simple_return,
+)
 
 # Key rate tenors for yield curve analysis
 KEY_RATE_TENORS = ["year1", "year5", "year10", "year20", "year30"]
@@ -886,6 +894,379 @@ def ls(
             click.echo(df.to_json(orient="records", date_format="iso"))
         else:
             click.echo(df.to_csv(index=False))
+
+
+@main.command()
+@click.option("-v", "--verbose", is_flag=True, help="Print all logging to stdout")
+@click.option(
+    "-q", "--quiet", is_flag=True, help="Suppress printing return data to stdout"
+)
+@click.option(
+    "-i",
+    "--input",
+    "input_file",
+    type=click.Path(exists=True),
+    required=True,
+    help="Input file containing price data (CSV or JSON)",
+)
+@click.option(
+    "-a",
+    "--append",
+    is_flag=True,
+    help="Include input price data in the output",
+)
+@click.option(
+    "--simple",
+    is_flag=True,
+    help="Compute arithmetic (simple) returns",
+)
+@click.option(
+    "--log",
+    "log_returns",
+    is_flag=True,
+    help="Compute log returns",
+)
+@click.option(
+    "--diff",
+    is_flag=True,
+    help="Compute differenced prices",
+)
+@click.option(
+    "--cum-simple",
+    is_flag=True,
+    help="Compute cumulative simple returns",
+)
+@click.option(
+    "--cum-log",
+    is_flag=True,
+    help="Compute cumulative log returns",
+)
+@click.option(
+    "--annual-simple",
+    is_flag=True,
+    help="Compute annualized simple returns (infers annual multiplier from date index)",
+)
+@click.option(
+    "--annual-log",
+    is_flag=True,
+    help="Compute annualized log returns (infers annual multiplier from date index)",
+)
+@click.option(
+    "-l",
+    "--lookback",
+    type=int,
+    default=1,
+    help=(
+        "Number of periods to lookback for computing multi-period returns "
+        "(default: 1)"
+    ),
+)
+@click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
+@click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(),
+    help="Write data to file",
+)
+@click.pass_context
+def rc(
+    ctx,
+    verbose,
+    quiet,
+    input_file,
+    append,
+    simple,
+    log_returns,
+    diff,
+    cum_simple,
+    cum_log,
+    annual_simple,
+    annual_log,
+    lookback,
+    output_csv,
+    output_json,
+    output,
+):
+    """
+    Compute returns from price data.
+
+    Reads price data from a file and computes various types of returns
+    including simple returns, log returns, differenced prices, cumulative returns,
+    and annualized returns.
+    """
+    # Get logger from context
+    logger = ctx.obj.get("logger", logging.getLogger("duk"))
+
+    # Adjust logging based on verbose flag
+    if verbose:
+        logger.setLevel(logging.INFO)
+        # Enable console output for all handlers
+        for handler in logger.handlers:
+            if isinstance(handler, logging.StreamHandler) and not isinstance(
+                handler, logging.FileHandler
+            ):
+                handler.setLevel(logging.DEBUG)
+
+    logger.info(f"Computing returns from {input_file}")
+
+    # Determine output format
+    if output_csv and output_json:
+        logger.error("Only one output format can be specified")
+        click.echo(
+            "Error: Only one of --csv or --json can be specified",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Default to CSV if neither is specified
+    output_format = "json" if output_json else "csv"
+
+    # Check that at least one return calculation option is specified
+    return_options = [
+        simple,
+        log_returns,
+        diff,
+        cum_simple,
+        cum_log,
+        annual_simple,
+        annual_log,
+    ]
+    if not any(return_options):
+        logger.error("At least one return calculation option must be specified")
+        click.echo(
+            "Error: At least one return calculation option must be specified "
+            "(--simple, --log, --diff, --cum-simple, --cum-log, "
+            "--annual-simple, --annual-log)",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Read input file
+    try:
+        input_path = Path(input_file)
+        if input_path.suffix.lower() == ".json":
+            df = pd.read_json(input_file)
+        else:
+            # Default to CSV
+            df = pd.read_csv(input_file)
+
+        logger.info(f"Read {len(df)} records from {input_file}")
+    except Exception as e:
+        logger.error(f"Failed to read input file: {e}")
+        click.echo(f"Error: Failed to read input file: {e}", err=True)
+        sys.exit(1)
+
+    if df.empty:
+        logger.warning("Input file contains no data")
+        click.echo("Error: Input file contains no data", err=True)
+        sys.exit(1)
+
+    # Identify date column
+    date_col = None
+    for col in ["date", "Date", "DATE"]:
+        if col in df.columns:
+            date_col = col
+            break
+
+    if date_col is None:
+        logger.error("No date column found in input data")
+        click.echo(
+            "Error: Input data must contain a 'date' column",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Convert date column to datetime and set as index
+    try:
+        df[date_col] = pd.to_datetime(df[date_col])
+        df = df.set_index(date_col)
+        df = df.sort_index()
+        logger.debug(f"Set '{date_col}' as index and sorted by date")
+    except Exception as e:
+        logger.error(f"Failed to process date column: {e}")
+        click.echo(f"Error: Failed to process date column: {e}", err=True)
+        sys.exit(1)
+
+    # Extract price columns (numeric columns only)
+    price_columns = df.select_dtypes(include=["number"]).columns.tolist()
+    if not price_columns:
+        logger.error("No numeric price columns found in input data")
+        click.echo(
+            "Error: Input data must contain at least one numeric price column",
+            err=True,
+        )
+        sys.exit(1)
+
+    logger.info(f"Found price columns: {price_columns}")
+    prices = df[price_columns]
+
+    # Infer periods_per_year for annualized returns if needed
+    periods_per_year = None
+    if annual_simple or annual_log:
+        # Infer from date index
+        try:
+            date_index = prices.index
+            if len(date_index) >= 2:
+                # Calculate average time difference
+                time_diffs = date_index[1:] - date_index[:-1]
+                avg_diff = time_diffs.mean()
+                days_diff = avg_diff.days
+
+                # Map to periods_per_year
+                if days_diff <= 1.5:  # Daily
+                    periods_per_year = 252
+                elif days_diff <= 5:  # Weekly
+                    periods_per_year = 52
+                elif days_diff <= 20:  # Monthly
+                    periods_per_year = 12
+                elif days_diff <= 70:  # Quarterly
+                    periods_per_year = 4
+                elif days_diff <= 150:  # Semi-annual
+                    periods_per_year = 2
+                else:  # Annual
+                    periods_per_year = 1
+
+                logger.info(
+                    f"Inferred periods_per_year={periods_per_year} from date index "
+                    f"(avg days between observations: {days_diff})"
+                )
+            else:
+                logger.error("Need at least 2 observations to infer periods_per_year")
+                click.echo(
+                    "Error: Need at least 2 observations to infer periods_per_year",
+                    err=True,
+                )
+                sys.exit(1)
+        except Exception as e:
+            logger.error(f"Failed to infer periods_per_year: {e}")
+            click.echo(f"Error: Failed to infer periods_per_year: {e}", err=True)
+            sys.exit(1)
+
+    # Compute returns
+    result_df = pd.DataFrame(index=prices.index)
+
+    # Add original prices if append flag is set
+    if append:
+        for col in price_columns:
+            result_df[col] = prices[col]
+
+    try:
+        # Simple returns
+        if simple:
+            simple_ret = simple_return(prices, periods=lookback)
+            for col in price_columns:
+                suffix = f"_simple_ret_l{lookback}" if lookback != 1 else "_simple_ret"
+                result_df[f"{col}{suffix}"] = simple_ret[col]
+            logger.info(f"Computed simple returns with lookback={lookback}")
+
+        # Log returns
+        if log_returns:
+            log_ret = log_return(prices, periods=lookback)
+            for col in price_columns:
+                suffix = f"_log_ret_l{lookback}" if lookback != 1 else "_log_ret"
+                result_df[f"{col}{suffix}"] = log_ret[col]
+            logger.info(f"Computed log returns with lookback={lookback}")
+
+        # Price differences
+        if diff:
+            price_diff = price_difference(prices, periods=lookback)
+            for col in price_columns:
+                suffix = f"_diff_l{lookback}" if lookback != 1 else "_diff"
+                result_df[f"{col}{suffix}"] = price_diff[col]
+            logger.info(f"Computed price differences with lookback={lookback}")
+
+        # Cumulative simple returns
+        if cum_simple:
+            # First compute simple returns, then cumulative
+            simple_ret = simple_return(prices, periods=lookback)
+            cum_simple_ret = cumulative_simple_return(simple_ret)
+            for col in price_columns:
+                suffix = f"_cum_simple_l{lookback}" if lookback != 1 else "_cum_simple"
+                result_df[f"{col}{suffix}"] = cum_simple_ret[col]
+            logger.info(f"Computed cumulative simple returns with lookback={lookback}")
+
+        # Cumulative log returns
+        if cum_log:
+            # First compute log returns, then cumulative
+            log_ret = log_return(prices, periods=lookback)
+            cum_log_ret = cumulative_log_return(log_ret)
+            for col in price_columns:
+                suffix = f"_cum_log_l{lookback}" if lookback != 1 else "_cum_log"
+                result_df[f"{col}{suffix}"] = cum_log_ret[col]
+            logger.info(f"Computed cumulative log returns with lookback={lookback}")
+
+        # Annualized simple returns
+        if annual_simple:
+            # First compute simple returns, then annualize
+            simple_ret = simple_return(prices, periods=lookback)
+            annual_ret = annualized_return(
+                simple_ret, periods_per_year=periods_per_year, return_type="simple"
+            )
+            for col in price_columns:
+                suffix = (
+                    f"_annual_simple_l{lookback}" if lookback != 1 else "_annual_simple"
+                )
+                result_df[f"{col}{suffix}"] = annual_ret[col]
+            logger.info(
+                f"Computed annualized simple returns with lookback={lookback}, "
+                f"periods_per_year={periods_per_year}"
+            )
+
+        # Annualized log returns
+        if annual_log:
+            # First compute log returns, then annualize
+            log_ret = log_return(prices, periods=lookback)
+            annual_ret = annualized_return(
+                log_ret, periods_per_year=periods_per_year, return_type="log"
+            )
+            for col in price_columns:
+                suffix = f"_annual_log_l{lookback}" if lookback != 1 else "_annual_log"
+                result_df[f"{col}{suffix}"] = annual_ret[col]
+            logger.info(
+                f"Computed annualized log returns with lookback={lookback}, "
+                f"periods_per_year={periods_per_year}"
+            )
+
+    except Exception as e:
+        logger.error(f"Failed to compute returns: {e}")
+        click.echo(f"Error: Failed to compute returns: {e}", err=True)
+        sys.exit(1)
+
+    logger.info(f"Computed returns for {len(result_df)} records")
+
+    # Prepare output - reset index to include date as a column
+    output_df = result_df.reset_index()
+
+    # Handle output to file
+    if output:
+        output_path = Path(output)
+
+        # Ensure parent directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write to file based on format
+        try:
+            if output_format == "json":
+                output_df.to_json(output_path, orient="records", date_format="iso")
+            else:
+                output_df.to_csv(output_path, index=False)
+
+            logger.info(f"Data written to {output_path}")
+
+            if not quiet:
+                click.echo(f"Data written to {output_path}")
+        except Exception as e:
+            logger.error(f"Failed to write output file: {e}")
+            click.echo(f"Error: Failed to write output file: {e}", err=True)
+            sys.exit(1)
+
+    # Print to stdout unless quiet flag is set
+    if not quiet:
+        if output_format == "json":
+            click.echo(output_df.to_json(orient="records", date_format="iso"))
+        else:
+            click.echo(output_df.to_csv(index=False))
 
 
 if __name__ == "__main__":
