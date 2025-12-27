@@ -280,64 +280,6 @@ def cumulative_log_return(
     return cumulative
 
 
-def multi_period_return(
-    prices: Union[pd.Series, pd.DataFrame], periods: int
-) -> Union[pd.Series, pd.DataFrame]:
-    """
-    Calculate multi-period returns from a price series.
-
-    Multi-period return is calculated as: R_{t,k} = P_t / P_{t-k} - 1
-
-    This is equivalent to simple_return with specified periods, but named
-    to emphasize the multi-period nature of the calculation.
-
-    Args:
-        prices: Price series or DataFrame. If DataFrame, returns are calculated
-            for each column independently.
-        periods: Number of periods to look back (k). Must be positive.
-
-    Returns:
-        Series or DataFrame of multi-period returns with the same structure as input.
-        First 'periods' observations will be NaN.
-
-    Raises:
-        ReturnCalculationError: If prices contain invalid values or are empty.
-        ValueError: If periods is not positive.
-
-    Examples:
-        >>> prices = pd.Series([100, 105, 103, 108, 110])
-        >>> multi_period_return(prices, periods=2)
-        0         NaN
-        1         NaN
-        2    0.030000
-        3    0.028571
-        4    0.067961
-        dtype: float64
-
-        >>> # 3-period return
-        >>> multi_period_return(prices, periods=3)
-        0         NaN
-        1         NaN
-        2         NaN
-        3    0.080000
-        4    0.047619
-        dtype: float64
-    """
-    if periods <= 0:
-        raise ValueError("periods must be positive")
-
-    if isinstance(prices, (pd.Series, pd.DataFrame)):
-        if prices.empty:
-            raise ReturnCalculationError("Price series is empty")
-    else:
-        raise ReturnCalculationError("prices must be a pandas Series or DataFrame")
-
-    logger.debug(f"Calculating multi-period return with periods={periods}")
-
-    # Multi-period return is the same as simple return with k periods
-    return simple_return(prices, periods=periods)
-
-
 def dividend_adjusted_return(
     prices: Union[pd.Series, pd.DataFrame],
     dividends: Union[pd.Series, pd.DataFrame],

@@ -5,11 +5,10 @@ The `return_utils` module provides comprehensive functions for calculating vario
 ## Overview
 
 The module includes functions for:
-- Simple returns
+- Simple returns (including multi-period)
 - Log returns
 - Price differences
 - Cumulative returns
-- Multi-period returns
 - Dividend-adjusted returns
 - Excess returns
 - Annualized returns
@@ -20,7 +19,7 @@ The module includes functions for:
 
 Calculate simple returns from a price series.
 
-**Formula**: `(P_t - P_{t-1}) / P_{t-1}`
+**Formula**: `(P_t - P_{t-1}) / P_{t-1}` for single period, or `(P_t - P_{t-k}) / P_{t-k}` for multi-period
 
 **Parameters**:
 - `prices` (pd.Series | pd.DataFrame): Price series or DataFrame
@@ -33,6 +32,7 @@ Calculate simple returns from a price series.
 import pandas as pd
 from duk.return_utils import simple_return
 
+# Single-period returns
 prices = pd.Series([100, 105, 103, 108])
 returns = simple_return(prices)
 print(returns)
@@ -41,12 +41,23 @@ print(returns)
 # 1    0.050000
 # 2   -0.019048
 # 3    0.048544
+
+# Multi-period returns (2 periods)
+returns_2p = simple_return(prices, periods=2)
+print(returns_2p)
+# Output:
+# 0         NaN
+# 1         NaN
+# 2    0.030000
+# 3    0.028571
 ```
 
 **Use Cases**:
 - Daily, weekly, or monthly return calculations
+- Multi-period or overlapping returns
 - Portfolio performance tracking
 - Comparing asset performance
+- Momentum indicators
 
 ---
 
@@ -175,42 +186,6 @@ print(f"Total log return: {cumulative:.4f}")
 - Continuously compounded returns
 - Statistical modeling
 - Time-series analysis
-
----
-
-### `multi_period_return(prices, periods)`
-
-Calculate multi-period returns from a price series.
-
-**Formula**: `R_{t,k} = P_t / P_{t-k} - 1`
-
-**Parameters**:
-- `prices` (pd.Series | pd.DataFrame): Price series or DataFrame
-- `periods` (int): Number of periods to look back
-
-**Returns**: Series or DataFrame of multi-period returns
-
-**Example**:
-```python
-import pandas as pd
-from duk.return_utils import multi_period_return
-
-prices = pd.Series([100, 105, 103, 108, 110])
-# Calculate 2-period returns
-returns_2p = multi_period_return(prices, periods=2)
-print(returns_2p)
-# Output:
-# 0         NaN
-# 1         NaN
-# 2    0.030000
-# 3    0.028571
-# 4    0.067961
-```
-
-**Use Cases**:
-- Rolling window performance
-- Overlapping period analysis
-- Momentum indicators
 
 ---
 

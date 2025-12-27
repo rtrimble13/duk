@@ -14,7 +14,6 @@ from duk.return_utils import (
     dividend_adjusted_return,
     excess_return,
     log_return,
-    multi_period_return,
     price_difference,
     simple_return,
 )
@@ -317,57 +316,6 @@ class TestCumulativeLogReturn:
         # Should equal sum of individual returns
         expected = returns.sum()
         assert np.isclose(result, expected)
-
-
-class TestMultiPeriodReturn:
-    """Tests for multi_period_return function."""
-
-    def test_basic_multi_period_return(self):
-        """Test basic multi-period return calculation."""
-        prices = pd.Series([100, 105, 103, 108, 110])
-        result = multi_period_return(prices, periods=2)
-
-        assert pd.isna(result.iloc[0])
-        assert pd.isna(result.iloc[1])
-        assert np.isclose(result.iloc[2], 0.03)
-        assert np.isclose(result.iloc[3], 0.028571, atol=1e-5)
-        assert np.isclose(result.iloc[4], 0.067961, atol=1e-5)
-
-    def test_multi_period_return_three_periods(self):
-        """Test multi-period return with 3 periods."""
-        prices = pd.Series([100, 105, 103, 108, 110])
-        result = multi_period_return(prices, periods=3)
-
-        assert pd.isna(result.iloc[0])
-        assert pd.isna(result.iloc[1])
-        assert pd.isna(result.iloc[2])
-        assert np.isclose(result.iloc[3], 0.08)
-        assert np.isclose(result.iloc[4], 0.047619, atol=1e-5)
-
-    def test_multi_period_return_invalid_periods_raises_error(self):
-        """Test that non-positive periods raises error."""
-        prices = pd.Series([100, 105, 103, 108])
-        with pytest.raises(ValueError, match="periods must be positive"):
-            multi_period_return(prices, periods=0)
-
-        with pytest.raises(ValueError, match="periods must be positive"):
-            multi_period_return(prices, periods=-1)
-
-    def test_multi_period_return_with_dataframe(self):
-        """Test multi-period return with DataFrame input."""
-        prices = pd.DataFrame({"A": [100, 105, 103, 108], "B": [50, 52, 51, 53]})
-        result = multi_period_return(prices, periods=2)
-
-        assert result.shape == prices.shape
-        assert pd.isna(result.iloc[0, 0])
-        assert pd.isna(result.iloc[1, 0])
-        assert np.isclose(result.iloc[2, 0], 0.03)
-
-    def test_multi_period_return_empty_raises_error(self):
-        """Test that empty series raises error."""
-        prices = pd.Series([])
-        with pytest.raises(ReturnCalculationError, match="Price series is empty"):
-            multi_period_return(prices, periods=2)
 
 
 class TestDividendAdjustedReturn:
