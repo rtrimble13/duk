@@ -68,6 +68,17 @@ The duk library can be used programmatically in Python applications:
 - Treasury data for various maturities
 - DataFrame output format
 
+### return_utils Module
+
+- [return_utils Documentation](return_utils.md) - Comprehensive return calculation utilities
+
+**Key Features**:
+- Simple and log returns
+- Cumulative and annualized returns
+- Dividend-adjusted and excess returns
+- Multi-period return calculations
+- Full support for pandas Series and DataFrame
+
 ## Configuration
 
 ### Configuration File
