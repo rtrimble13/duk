@@ -211,36 +211,48 @@ class TestCumulativeSimpleReturn:
         returns = pd.Series([0.05, -0.02, 0.03, 0.01])
         result = cumulative_simple_return(returns)
 
-        # Calculate expected: (1.05 * 0.98 * 1.03 * 1.01) - 1 = 0.0701006
-        expected = 1.05 * 0.98 * 1.03 * 1.01 - 1
-        assert np.isclose(result, expected)
+        # Calculate expected at each observation
+        assert isinstance(result, pd.Series)
+        assert len(result) == 4
+        assert np.isclose(result.iloc[0], 0.05)
+        assert np.isclose(result.iloc[1], 1.05 * 0.98 - 1)
+        assert np.isclose(result.iloc[2], 1.05 * 0.98 * 1.03 - 1)
+        assert np.isclose(result.iloc[3], 1.05 * 0.98 * 1.03 * 1.01 - 1)
 
     def test_cumulative_simple_return_with_dataframe(self):
         """Test cumulative simple return with DataFrame input."""
         returns = pd.DataFrame({"A": [0.05, 0.03], "B": [0.02, -0.01]})
         result = cumulative_simple_return(returns)
 
-        assert isinstance(result, pd.Series)
-        assert len(result) == 2
-        assert np.isclose(result["A"], 1.05 * 1.03 - 1)
-        assert np.isclose(result["B"], 1.02 * 0.99 - 1)
+        assert isinstance(result, pd.DataFrame)
+        assert result.shape == (2, 2)
+        assert np.isclose(result.loc[0, "A"], 0.05)
+        assert np.isclose(result.loc[1, "A"], 1.05 * 1.03 - 1)
+        assert np.isclose(result.loc[0, "B"], 0.02)
+        assert np.isclose(result.loc[1, "B"], 1.02 * 0.99 - 1)
 
     def test_cumulative_simple_return_all_positive(self):
         """Test cumulative simple return with all positive returns."""
         returns = pd.Series([0.1, 0.1, 0.1])
         result = cumulative_simple_return(returns)
 
-        expected = 1.1 * 1.1 * 1.1 - 1
-        assert np.isclose(result, expected)
+        assert isinstance(result, pd.Series)
+        assert len(result) == 3
+        assert np.isclose(result.iloc[0], 0.1)
+        assert np.isclose(result.iloc[1], 1.1 * 1.1 - 1)
+        assert np.isclose(result.iloc[2], 1.1 * 1.1 * 1.1 - 1)
 
     def test_cumulative_simple_return_all_negative(self):
         """Test cumulative simple return with all negative returns."""
         returns = pd.Series([-0.05, -0.05, -0.05])
         result = cumulative_simple_return(returns)
 
-        expected = 0.95 * 0.95 * 0.95 - 1
-        assert np.isclose(result, expected)
-        assert result < 0
+        assert isinstance(result, pd.Series)
+        assert len(result) == 3
+        assert np.isclose(result.iloc[0], -0.05)
+        assert np.isclose(result.iloc[1], 0.95 * 0.95 - 1)
+        assert np.isclose(result.iloc[2], 0.95 * 0.95 * 0.95 - 1)
+        assert result.iloc[2] < 0
 
     def test_cumulative_simple_return_empty_raises_error(self):
         """Test that empty series raises error."""
@@ -253,19 +265,23 @@ class TestCumulativeSimpleReturn:
         returns = pd.Series([0.05, np.nan, 0.03, 0.01])
         result = cumulative_simple_return(returns)
 
-        # pandas prod() skips NaN by default, so result is not NaN
-        # This is the expected behavior for financial calculations
-        assert not pd.isna(result)
-        # Check it equals product of non-NaN values
-        expected = 1.05 * 1.03 * 1.01 - 1
-        assert np.isclose(result, expected)
+        # cumprod() produces NaN at the NaN position but continues calculating
+        assert isinstance(result, pd.Series)
+        assert len(result) == 4
+        assert np.isclose(result.iloc[0], 0.05)
+        assert pd.isna(result.iloc[1])
+        # After NaN, it continues from the last valid value
+        assert np.isclose(result.iloc[2], 1.05 * 1.03 - 1)
+        assert np.isclose(result.iloc[3], 1.05 * 1.03 * 1.01 - 1)
 
     def test_cumulative_simple_return_single_value(self):
         """Test cumulative simple return with single value."""
         returns = pd.Series([0.05])
         result = cumulative_simple_return(returns)
 
-        assert np.isclose(result, 0.05)
+        assert isinstance(result, pd.Series)
+        assert len(result) == 1
+        assert np.isclose(result.iloc[0], 0.05)
 
 
 class TestCumulativeLogReturn:
@@ -276,19 +292,25 @@ class TestCumulativeLogReturn:
         returns = pd.Series([0.0488, -0.0192, 0.0296, 0.0099])
         result = cumulative_log_return(returns)
 
-        # Sum of log returns
-        expected = 0.0488 - 0.0192 + 0.0296 + 0.0099
-        assert np.isclose(result, expected, atol=1e-4)
+        # Calculate cumulative sum at each observation
+        assert isinstance(result, pd.Series)
+        assert len(result) == 4
+        assert np.isclose(result.iloc[0], 0.0488, atol=1e-4)
+        assert np.isclose(result.iloc[1], 0.0488 - 0.0192, atol=1e-4)
+        assert np.isclose(result.iloc[2], 0.0488 - 0.0192 + 0.0296, atol=1e-4)
+        assert np.isclose(result.iloc[3], 0.0488 - 0.0192 + 0.0296 + 0.0099, atol=1e-4)
 
     def test_cumulative_log_return_with_dataframe(self):
         """Test cumulative log return with DataFrame input."""
         returns = pd.DataFrame({"A": [0.05, 0.03], "B": [0.02, -0.01]})
         result = cumulative_log_return(returns)
 
-        assert isinstance(result, pd.Series)
-        assert len(result) == 2
-        assert np.isclose(result["A"], 0.08)
-        assert np.isclose(result["B"], 0.01)
+        assert isinstance(result, pd.DataFrame)
+        assert result.shape == (2, 2)
+        assert np.isclose(result.loc[0, "A"], 0.05)
+        assert np.isclose(result.loc[1, "A"], 0.08)
+        assert np.isclose(result.loc[0, "B"], 0.02)
+        assert np.isclose(result.loc[1, "B"], 0.01)
 
     def test_cumulative_log_return_empty_raises_error(self):
         """Test that empty series raises error."""
@@ -301,21 +323,26 @@ class TestCumulativeLogReturn:
         returns = pd.Series([0.05, np.nan, 0.03, 0.01])
         result = cumulative_log_return(returns)
 
-        # pandas sum() skips NaN by default, so result is not NaN
-        # This is the expected behavior for financial calculations
-        assert not pd.isna(result)
-        # Check it equals sum of non-NaN values
-        expected = 0.05 + 0.03 + 0.01
-        assert np.isclose(result, expected)
+        # cumsum() produces NaN at the NaN position but continues calculating
+        assert isinstance(result, pd.Series)
+        assert len(result) == 4
+        assert np.isclose(result.iloc[0], 0.05)
+        assert pd.isna(result.iloc[1])
+        # After NaN, it continues from the last valid value
+        assert np.isclose(result.iloc[2], 0.05 + 0.03)
+        assert np.isclose(result.iloc[3], 0.05 + 0.03 + 0.01)
 
     def test_cumulative_log_return_additive_property(self):
         """Test that log returns are additive."""
         returns = pd.Series([0.1, 0.05, -0.02])
         result = cumulative_log_return(returns)
 
-        # Should equal sum of individual returns
-        expected = returns.sum()
-        assert np.isclose(result, expected)
+        # Should return cumulative sum at each observation
+        assert isinstance(result, pd.Series)
+        assert len(result) == 3
+        assert np.isclose(result.iloc[0], 0.1)
+        assert np.isclose(result.iloc[1], 0.15)
+        assert np.isclose(result.iloc[2], 0.13)
 
 
 class TestDividendAdjustedReturn:
@@ -495,9 +522,12 @@ class TestAnnualizedReturn:
         returns = pd.Series([0.001] * 252)
         result = annualized_return(returns, periods_per_year=252, return_type="simple")
 
-        # (1.001^252) - 1 ≈ 0.2874
-        expected = (1.001**252) - 1
-        assert np.isclose(result, expected, atol=1e-4)
+        # Result should be a Series with annualized returns at each observation
+        assert isinstance(result, pd.Series)
+        assert len(result) == 252
+        # Final value should be (1.001^252) - 1 ≈ 0.2874
+        expected_final = (1.001**252) - 1
+        assert np.isclose(result.iloc[-1], expected_final, atol=1e-4)
 
     def test_annualized_log_return_monthly(self):
         """Test annualized log return with monthly data."""
@@ -505,9 +535,12 @@ class TestAnnualizedReturn:
         log_returns = pd.Series([0.01] * 12)
         result = annualized_return(log_returns, periods_per_year=12, return_type="log")
 
-        # Sum of log returns
-        expected = 0.12
-        assert np.isclose(result, expected)
+        # Result should be a Series with annualized returns at each observation
+        assert isinstance(result, pd.Series)
+        assert len(result) == 12
+        # Final value should be sum of log returns (0.12)
+        expected_final = 0.12
+        assert np.isclose(result.iloc[-1], expected_final)
 
     def test_annualized_return_with_dataframe(self):
         """Test annualized return with DataFrame input."""
@@ -516,35 +549,44 @@ class TestAnnualizedReturn:
             returns_df, periods_per_year=252, return_type="simple"
         )
 
-        assert isinstance(result, pd.Series)
-        assert len(result) == 2
-        assert np.isclose(result["A"], (1.001**252) - 1, atol=1e-4)
-        assert np.isclose(result["B"], (1.002**252) - 1, atol=1e-4)
+        # Result should be a DataFrame with annualized returns at each observation
+        assert isinstance(result, pd.DataFrame)
+        assert result.shape == (252, 2)
+        # Check final values
+        assert np.isclose(result.iloc[-1]["A"], (1.001**252) - 1, atol=1e-4)
+        assert np.isclose(result.iloc[-1]["B"], (1.002**252) - 1, atol=1e-4)
 
     def test_annualized_return_negative_returns(self):
         """Test annualized return with negative returns."""
         returns = pd.Series([-0.001] * 252)
         result = annualized_return(returns, periods_per_year=252, return_type="simple")
 
-        expected = (0.999**252) - 1
-        assert np.isclose(result, expected, atol=1e-4)
-        assert result < 0
+        # Result should be a Series
+        assert isinstance(result, pd.Series)
+        assert len(result) == 252
+        expected_final = (0.999**252) - 1
+        assert np.isclose(result.iloc[-1], expected_final, atol=1e-4)
+        assert result.iloc[-1] < 0
 
     def test_annualized_return_mixed_returns(self):
         """Test annualized return with mixed positive and negative returns."""
         returns = pd.Series([0.01, -0.005, 0.02, -0.01] * 63)  # 252 observations
         result = annualized_return(returns, periods_per_year=252, return_type="simple")
 
-        # Should calculate cumulative return then annualize
-        assert isinstance(result, float)
+        # Result should be a Series with annualized returns
+        assert isinstance(result, pd.Series)
+        assert len(result) == 252
 
     def test_annualized_return_weekly_data(self):
         """Test annualized return with weekly data."""
         returns = pd.Series([0.005] * 52)  # 52 weeks
         result = annualized_return(returns, periods_per_year=52, return_type="simple")
 
-        expected = (1.005**52) - 1
-        assert np.isclose(result, expected, atol=1e-4)
+        # Result should be a Series
+        assert isinstance(result, pd.Series)
+        assert len(result) == 52
+        expected_final = (1.005**52) - 1
+        assert np.isclose(result.iloc[-1], expected_final, atol=1e-4)
 
     def test_annualized_return_invalid_type_raises_error(self):
         """Test that invalid return type raises error."""
@@ -581,8 +623,8 @@ class TestAnnualizedReturn:
             small_returns, periods_per_year=252, return_type="log"
         )
 
-        # For small returns, they should be relatively close (within 2%)
-        assert np.isclose(simple_ann, log_ann, rtol=0.02)
+        # For small returns, final values should be relatively close (within 2%)
+        assert np.isclose(simple_ann.iloc[-1], log_ann.iloc[-1], rtol=0.02)
 
     def test_annualized_simple_return_formula_verification(self):
         """Test annualized simple return formula."""
@@ -590,11 +632,14 @@ class TestAnnualizedReturn:
         returns = pd.Series([0.02, 0.03, 0.01, -0.01])  # 4 quarters
         result = annualized_return(returns, periods_per_year=4, return_type="simple")
 
-        # Manual calculation
-        cumulative = (1.02 * 1.03 * 1.01 * 0.99) - 1
-        expected = (1 + cumulative) ** (4 / 4) - 1  # periods_per_year / n_periods
+        # Result should be a Series
+        assert isinstance(result, pd.Series)
+        assert len(result) == 4
 
-        assert np.isclose(result, expected)
+        # Check final value manually
+        cumulative = (1.02 * 1.03 * 1.01 * 0.99) - 1
+        expected_final = (1 + cumulative) ** (4 / 4) - 1  # periods_per_year / n_periods
+        assert np.isclose(result.iloc[-1], expected_final)
 
     def test_annualized_log_return_formula_verification(self):
         """Test annualized log return formula."""
@@ -602,7 +647,10 @@ class TestAnnualizedReturn:
         log_returns = pd.Series([0.02, 0.03, 0.01, -0.01])  # 4 quarters
         result = annualized_return(log_returns, periods_per_year=4, return_type="log")
 
-        # Manual calculation: sum * (periods_per_year / n_periods)
-        expected = (0.02 + 0.03 + 0.01 - 0.01) * (4 / 4)
+        # Result should be a Series
+        assert isinstance(result, pd.Series)
+        assert len(result) == 4
 
-        assert np.isclose(result, expected)
+        # Check final value manually: sum * (periods_per_year / n_periods)
+        expected_final = (0.02 + 0.03 + 0.01 - 0.01) * (4 / 4)
+        assert np.isclose(result.iloc[-1], expected_final)

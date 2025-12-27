@@ -135,12 +135,14 @@ print(diffs)
 
 Calculate cumulative simple return from a series of simple returns.
 
-**Formula**: `R_T = ∏(1 + r_t) - 1`
+**Formula**: `R_t = ∏(1 + r_i) - 1` for i=1 to t
+
+This function is vectorized and returns the cumulative return at each observation.
 
 **Parameters**:
 - `returns` (pd.Series | pd.DataFrame): Series or DataFrame of simple returns
 
-**Returns**: Float (for Series) or Series (for DataFrame) representing total cumulative return
+**Returns**: Series or DataFrame of cumulative returns at each observation, with the same structure as input
 
 **Example**:
 ```python
@@ -149,14 +151,24 @@ from duk.return_utils import cumulative_simple_return
 
 returns = pd.Series([0.05, -0.02, 0.03, 0.01])
 cumulative = cumulative_simple_return(returns)
-print(f"Total return: {cumulative:.4f}")
-# Output: Total return: 0.0705
+print(cumulative)
+# Output:
+# 0    0.050000
+# 1    0.029000
+# 2    0.059870
+# 3    0.070147
+# dtype: float64
+
+# Get total return (final value)
+print(f"Total return: {cumulative.iloc[-1]:.4f}")
+# Output: Total return: 0.0701
 ```
 
 **Use Cases**:
-- Total return over a period
-- Portfolio value growth calculation
-- Comparing investment alternatives
+- Track cumulative return over time
+- Visualize portfolio growth
+- Calculate rolling performance metrics
+- Performance attribution at each point in time
 
 ---
 
@@ -164,12 +176,14 @@ print(f"Total return: {cumulative:.4f}")
 
 Calculate cumulative log return from a series of log returns.
 
-**Formula**: `R_T = ∑r_t`
+**Formula**: `R_t = ∑r_i` for i=1 to t
+
+This function is vectorized and returns the cumulative log return at each observation.
 
 **Parameters**:
 - `returns` (pd.Series | pd.DataFrame): Series or DataFrame of log returns
 
-**Returns**: Float (for Series) or Series (for DataFrame) representing total cumulative log return
+**Returns**: Series or DataFrame of cumulative log returns at each observation, with the same structure as input
 
 **Example**:
 ```python
@@ -178,13 +192,23 @@ from duk.return_utils import cumulative_log_return
 
 log_returns = pd.Series([0.0488, -0.0192, 0.0296, 0.0099])
 cumulative = cumulative_log_return(log_returns)
-print(f"Total log return: {cumulative:.4f}")
+print(cumulative)
+# Output:
+# 0    0.0488
+# 1    0.0296
+# 2    0.0592
+# 3    0.0691
+# dtype: float64
+
+# Get total log return (final value)
+print(f"Total log return: {cumulative.iloc[-1]:.4f}")
 # Output: Total log return: 0.0691
 ```
 
 **Use Cases**:
-- Continuously compounded returns
-- Statistical modeling
+- Track cumulative log return over time
+- Continuously compounded return analysis
+- Statistical modeling with additive properties
 - Time-series analysis
 
 ---
@@ -268,15 +292,17 @@ print(excess)
 Calculate annualized return from a series of returns.
 
 **Formulas**:
-- Simple: `(1 + R_total)^(periods_per_year / N) - 1`
-- Log: `R_total * (periods_per_year / N)`
+- Simple: `(1 + R_cumulative)^(periods_per_year / N) - 1`
+- Log: `R_cumulative * (periods_per_year / N)`
+
+This function is vectorized and returns the annualized return at each observation, where N is the count of observations from the start to that point.
 
 **Parameters**:
 - `returns` (pd.Series | pd.DataFrame): Series or DataFrame of returns
 - `periods_per_year` (int): Number of periods in a year (default: 252 trading days)
 - `return_type` (str): Either 'simple' or 'log' (default: 'simple')
 
-**Returns**: Float (for Series) or Series (for DataFrame) representing annualized return
+**Returns**: Series or DataFrame of annualized returns at each observation, with the same structure as input
 
 **Example**:
 ```python
@@ -286,22 +312,28 @@ from duk.return_utils import annualized_return
 # Daily returns for 252 trading days
 daily_returns = pd.Series([0.001] * 252)
 
-# Annualize simple returns
+# Annualize simple returns (returns Series)
 ann_simple = annualized_return(daily_returns, periods_per_year=252, return_type='simple')
-print(f"Annualized simple return: {ann_simple:.4f}")
-# Output: Annualized simple return: 0.2864
+print(f"Final annualized return: {ann_simple.iloc[-1]:.4f}")
+# Output: Final annualized return: 0.2864
+
+# Can plot the annualized return over time
+print(ann_simple.head())
+# Shows how annualized return evolves as more data accumulates
 
 # For monthly data, use periods_per_year=12
 monthly_returns = pd.Series([0.01] * 12)
 ann_monthly = annualized_return(monthly_returns, periods_per_year=12, return_type='simple')
-print(f"Annualized return from monthly data: {ann_monthly:.4f}")
-# Output: Annualized return from monthly data: 0.1268
+print(f"Final annualized return from monthly data: {ann_monthly.iloc[-1]:.4f}")
+# Output: Final annualized return from monthly data: 0.1268
 ```
 
 **Use Cases**:
+- Track annualized performance over time
+- Visualize how performance stabilizes with more data
 - Standardizing returns across different time periods
 - Comparing strategies with different data frequencies
-- Annual performance reporting
+- Annual performance reporting and monitoring
 
 **Common `periods_per_year` values**:
 - 252: Daily data (trading days)

@@ -180,20 +180,21 @@ def price_difference(
 
 def cumulative_simple_return(
     returns: Union[pd.Series, pd.DataFrame],
-) -> Union[float, pd.Series]:
+) -> Union[pd.Series, pd.DataFrame]:
     """
     Calculate cumulative simple return from a series of simple returns.
 
-    Cumulative simple return is calculated as: R_T = prod(1 + r_t) - 1
+    Cumulative simple return is calculated as: R_t = prod(1 + r_i) - 1 for i=1 to t
+
+    This function is vectorized and returns the cumulative return at each observation.
 
     Args:
         returns: Series or DataFrame of simple returns. If DataFrame, cumulative
             returns are calculated for each column independently.
 
     Returns:
-        If input is a Series, returns a float representing the total
-        cumulative return. If input is a DataFrame, returns a Series with
-        cumulative return for each column.
+        Series or DataFrame of cumulative returns at each observation, with the
+        same structure as the input.
 
     Raises:
         ReturnCalculationError: If returns contain invalid values or are empty.
@@ -201,14 +202,18 @@ def cumulative_simple_return(
     Examples:
         >>> returns = pd.Series([0.05, -0.02, 0.03, 0.01])
         >>> cumulative_simple_return(returns)
-        0.0701006
+        0    0.050000
+        1    0.029000
+        2    0.059870
+        3    0.070147
+        dtype: float64
 
         >>> # With DataFrame input
         >>> returns_df = pd.DataFrame({'A': [0.05, 0.03], 'B': [0.02, -0.01]})
         >>> cumulative_simple_return(returns_df)
-        A    0.0815
-        B    0.0098
-        dtype: float64
+             A         B
+        0  0.05  0.020000
+        1  0.0815  0.009800
     """
     if isinstance(returns, (pd.Series, pd.DataFrame)):
         if returns.empty:
@@ -216,35 +221,39 @@ def cumulative_simple_return(
     else:
         raise ReturnCalculationError("returns must be a pandas Series or DataFrame")
 
-    logger.debug("Calculating cumulative simple return")
+    logger.debug("Calculating cumulative simple return at each observation")
 
-    # Calculate cumulative return: prod(1 + r_t) - 1
-    cumulative = (1 + returns).prod() - 1
+    # Calculate cumulative return: cumprod(1 + r_t) - 1
+    cumulative = (1 + returns).cumprod() - 1
 
     if isinstance(returns, pd.Series):
-        logger.debug(f"Cumulative simple return: {cumulative:.6f}")
+        logger.debug(f"Calculated {cumulative.notna().sum()} cumulative return values")
     else:
-        logger.debug(f"Calculated cumulative returns for {len(cumulative)} columns")
+        logger.debug(
+            f"Calculated cumulative returns for {len(cumulative.columns)} columns"
+        )
 
     return cumulative
 
 
 def cumulative_log_return(
     returns: Union[pd.Series, pd.DataFrame],
-) -> Union[float, pd.Series]:
+) -> Union[pd.Series, pd.DataFrame]:
     """
     Calculate cumulative log return from a series of log returns.
 
-    Cumulative log return is calculated as: R_T = sum(r_t)
+    Cumulative log return is calculated as: R_t = sum(r_i) for i=1 to t
+
+    This function is vectorized and returns the cumulative log return at
+    each observation.
 
     Args:
         returns: Series or DataFrame of log returns. If DataFrame, cumulative
             returns are calculated for each column independently.
 
     Returns:
-        If input is a Series, returns a float representing the total
-        cumulative log return. If input is a DataFrame, returns a Series
-        with cumulative log return for each column.
+        Series or DataFrame of cumulative log returns at each observation, with
+        the same structure as the input.
 
     Raises:
         ReturnCalculationError: If returns contain invalid values or are empty.
@@ -252,14 +261,18 @@ def cumulative_log_return(
     Examples:
         >>> returns = pd.Series([0.0488, -0.0192, 0.0296, 0.0099])
         >>> cumulative_log_return(returns)
-        0.0691
+        0    0.0488
+        1    0.0296
+        2    0.0592
+        3    0.0691
+        dtype: float64
 
         >>> # With DataFrame input
         >>> returns_df = pd.DataFrame({'A': [0.05, 0.03], 'B': [0.02, -0.01]})
         >>> cumulative_log_return(returns_df)
-        A    0.08
-        B    0.01
-        dtype: float64
+              A     B
+        0  0.05  0.02
+        1  0.08  0.01
     """
     if isinstance(returns, (pd.Series, pd.DataFrame)):
         if returns.empty:
@@ -267,15 +280,19 @@ def cumulative_log_return(
     else:
         raise ReturnCalculationError("returns must be a pandas Series or DataFrame")
 
-    logger.debug("Calculating cumulative log return")
+    logger.debug("Calculating cumulative log return at each observation")
 
-    # Calculate cumulative log return: sum(r_t)
-    cumulative = returns.sum()
+    # Calculate cumulative log return: cumsum(r_t)
+    cumulative = returns.cumsum()
 
     if isinstance(returns, pd.Series):
-        logger.debug(f"Cumulative log return: {cumulative:.6f}")
+        logger.debug(
+            f"Calculated {cumulative.notna().sum()} cumulative log return values"
+        )
     else:
-        logger.debug(f"Calculated cumulative log returns for {len(cumulative)} columns")
+        logger.debug(
+            f"Calculated cumulative log returns for {len(cumulative.columns)} columns"
+        )
 
     return cumulative
 
@@ -437,14 +454,15 @@ def annualized_return(
     returns: Union[pd.Series, pd.DataFrame],
     periods_per_year: int = 252,
     return_type: str = "simple",
-) -> Union[float, pd.Series]:
+) -> Union[pd.Series, pd.DataFrame]:
     """
     Calculate annualized return from a series of returns.
 
-    For simple returns: (1 + R_total)^(periods_per_year / N) - 1
-    For log returns: R_total * (periods_per_year / N)
+    For simple returns: (1 + R_cumulative)^(periods_per_year / N) - 1
+    For log returns: R_cumulative * (periods_per_year / N)
 
-    where R_total is the cumulative return and N is the number of periods.
+    This function is vectorized and returns the annualized return at each observation,
+    where N is the count of observations from the start to that point.
 
     Args:
         returns: Series or DataFrame of returns. If DataFrame, annualized
@@ -455,9 +473,8 @@ def annualized_return(
             Default is 'simple'.
 
     Returns:
-        If input is a Series, returns a float representing the annualized
-        return. If input is a DataFrame, returns a Series with annualized
-        return for each column.
+        Series or DataFrame of annualized returns at each observation, with
+        the same structure as the input.
 
     Raises:
         ReturnCalculationError: If returns contain invalid values or are empty.
@@ -466,12 +483,18 @@ def annualized_return(
     Examples:
         >>> # Simple returns over 252 trading days
         >>> returns = pd.Series([0.001] * 252)  # 0.1% daily return
-        >>> annualized_return(returns, periods_per_year=252, return_type='simple')
+        >>> ann_ret = annualized_return(
+        ...     returns, periods_per_year=252, return_type='simple'
+        ... )
+        >>> ann_ret.iloc[-1]  # Final annualized return
         0.287417
 
         >>> # Log returns over 12 months
         >>> log_returns = pd.Series([0.01] * 12)  # 1% monthly log return
-        >>> annualized_return(log_returns, periods_per_year=12, return_type='log')
+        >>> ann_ret = annualized_return(
+        ...     log_returns, periods_per_year=12, return_type='log'
+        ... )
+        >>> ann_ret.iloc[-1]  # Final annualized return
         0.12
 
         >>> # DataFrame with multiple assets
@@ -479,10 +502,13 @@ def annualized_return(
         ...     'A': [0.001] * 252,
         ...     'B': [0.002] * 252
         ... })
-        >>> annualized_return(returns_df, periods_per_year=252, return_type='simple')
+        >>> ann_ret = annualized_return(
+        ...     returns_df, periods_per_year=252, return_type='simple'
+        ... )
+        >>> ann_ret.iloc[-1]  # Final annualized returns
         A    0.287417
         B    0.650612
-        dtype: float64
+        Name: 251, dtype: float64
     """
     if return_type not in ["simple", "log"]:
         raise ValueError("return_type must be 'simple' or 'log'")
@@ -494,42 +520,56 @@ def annualized_return(
         raise ReturnCalculationError("returns must be a pandas Series or DataFrame")
 
     logger.debug(
-        f"Calculating annualized {return_type} return "
+        f"Calculating annualized {return_type} return at each observation "
         f"(periods_per_year={periods_per_year})"
     )
 
-    # Count non-null observations
-    if isinstance(returns, pd.Series):
-        n_periods = returns.notna().sum()
-    else:
-        n_periods = returns.notna().sum()
-
-    if isinstance(returns, pd.Series) and n_periods == 0:
-        raise ReturnCalculationError("No valid return observations")
-    elif isinstance(returns, pd.DataFrame) and (n_periods == 0).all():
-        raise ReturnCalculationError("No valid return observations")
-
+    # Get cumulative returns at each observation
     if return_type == "simple":
-        # For simple returns: (1 + R_total)^(periods_per_year / N) - 1
         cumulative = cumulative_simple_return(returns)
-        if isinstance(returns, pd.Series):
-            annualized = (1 + cumulative) ** (periods_per_year / n_periods) - 1
-            logger.debug(f"Annualized simple return: {annualized:.6f}")
-        else:
-            annualized = (1 + cumulative) ** (periods_per_year / n_periods) - 1
-            logger.debug(
-                f"Calculated annualized simple returns for {len(annualized)} columns"
-            )
     else:  # log returns
-        # For log returns: R_total * (periods_per_year / N)
         cumulative = cumulative_log_return(returns)
-        if isinstance(returns, pd.Series):
-            annualized = cumulative * (periods_per_year / n_periods)
-            logger.debug(f"Annualized log return: {annualized:.6f}")
-        else:
+
+    # Create a count of non-null observations up to each point
+    if isinstance(returns, pd.Series):
+        # For Series, create expanding count
+        n_periods = returns.notna().cumsum()
+
+        if n_periods.sum() == 0:
+            raise ReturnCalculationError("No valid return observations")
+
+        if return_type == "simple":
+            # For simple returns: (1 + R_cumulative)^(periods_per_year / N) - 1
+            annualized = (1 + cumulative) ** (periods_per_year / n_periods) - 1
+            logger.debug(
+                f"Calculated {annualized.notna().sum()} annualized simple return values"
+            )
+        else:  # log returns
+            # For log returns: R_cumulative * (periods_per_year / N)
             annualized = cumulative * (periods_per_year / n_periods)
             logger.debug(
-                f"Calculated annualized log returns for {len(annualized)} columns"
+                f"Calculated {annualized.notna().sum()} annualized log return values"
+            )
+    else:
+        # For DataFrame, calculate for each column
+        n_periods = returns.notna().cumsum()
+
+        if (n_periods.sum() == 0).all():
+            raise ReturnCalculationError("No valid return observations")
+
+        if return_type == "simple":
+            # For simple returns: (1 + R_cumulative)^(periods_per_year / N) - 1
+            annualized = (1 + cumulative) ** (periods_per_year / n_periods) - 1
+            logger.debug(
+                f"Calculated annualized simple returns for "
+                f"{len(annualized.columns)} columns"
+            )
+        else:  # log returns
+            # For log returns: R_cumulative * (periods_per_year / N)
+            annualized = cumulative * (periods_per_year / n_periods)
+            logger.debug(
+                f"Calculated annualized log returns for "
+                f"{len(annualized.columns)} columns"
             )
 
     return annualized
