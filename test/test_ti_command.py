@@ -313,10 +313,16 @@ class TestSmaCommand:
             )
 
             assert result.exit_code == 0
-            # Output should only contain the file written message, not the data
+            # In quiet mode with file output, should only show file confirmation
             assert "Data written to" in result.output
-            # Should not contain the CSV data
-            assert "close," not in result.output or result.output.count("close") <= 1
+            # Should not contain CSV headers (which would indicate data was printed)
+            lines = result.output.strip().split("\n")
+            # Filter out log lines (they start with date/timestamp or don't contain commas)
+            csv_lines = [
+                line for line in lines if "," in line and not line.startswith("20")
+            ]
+            # Should have no CSV data lines in output
+            assert len(csv_lines) == 0
 
 
 class TestEmaCommand:
@@ -606,7 +612,13 @@ class TestEmaCommand:
             )
 
             assert result.exit_code == 0
-            # Output should only contain the file written message, not the data
+            # In quiet mode with file output, should only show file confirmation
             assert "Data written to" in result.output
-            # Should not contain the CSV data
-            assert "close," not in result.output or result.output.count("close") <= 1
+            # Should not contain CSV headers (which would indicate data was printed)
+            lines = result.output.strip().split("\n")
+            # Filter out log lines (they start with date/timestamp or don't contain commas)
+            csv_lines = [
+                line for line in lines if "," in line and not line.startswith("20")
+            ]
+            # Should have no CSV data lines in output
+            assert len(csv_lines) == 0
