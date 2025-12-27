@@ -20,7 +20,7 @@ from duk.fmp_api import (
     industry_list_api,
     sector_list_api,
 )
-from duk.indicators import calculate_ema, calculate_sma
+from duk.indicators import calculate_ema, calculate_rsi, calculate_sma
 from duk.logging_config import setup_logging
 from duk.ls_utils import process_industries, process_sectors, screen_securities
 from duk.return_utils import (
@@ -1591,6 +1591,183 @@ def ema(
     except Exception as e:
         logger.error(f"Failed to calculate EMA: {e}")
         click.echo(f"Error: Failed to calculate EMA: {e}", err=True)
+        sys.exit(1)
+
+    # Handle output to file
+    if output:
+        output_path = Path(output)
+
+        # Ensure parent directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write to file based on format
+        try:
+            if output_format == "json":
+                result_df.to_json(output_path, orient="records", date_format="iso")
+            else:
+                result_df.to_csv(output_path, index=False)
+
+            logger.info(f"Data written to {output_path}")
+
+            if not quiet:
+                click.echo(f"Data written to {output_path}")
+        except Exception as e:
+            logger.error(f"Failed to write output file: {e}")
+            click.echo(f"Error: Failed to write output file: {e}", err=True)
+            sys.exit(1)
+
+    # Print to stdout unless quiet flag is set
+    if not quiet:
+        if output_format == "json":
+            click.echo(result_df.to_json(orient="records", date_format="iso"))
+        else:
+            click.echo(result_df.to_csv(index=False))
+
+
+@ti.command()
+@click.option("-v", "--verbose", is_flag=True, help="Print all logging to stdout")
+@click.option(
+    "-q", "--quiet", is_flag=True, help="Suppress printing indicator data to stdout"
+)
+@click.option(
+    "-i",
+    "--input",
+    "input_file",
+    type=click.Path(exists=True),
+    required=True,
+    help="Input file containing price data (CSV or JSON)",
+)
+@click.option(
+    "-c",
+    "--column",
+    required=True,
+    help="Column name to calculate RSI on (e.g., 'close', 'high', 'low')",
+)
+@click.option(
+    "-w",
+    "--window",
+    type=int,
+    default=14,
+    help="Window size for RSI calculation (number of periods, default: 14)",
+)
+@click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
+@click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(),
+    help="Write data to file",
+)
+@click.pass_context
+def rsi(
+    ctx,
+    verbose,
+    quiet,
+    input_file,
+    column,
+    window,
+    output_csv,
+    output_json,
+    output,
+):
+    """
+    Calculate Relative Strength Index (RSI) on input data.
+
+    The RSI is a momentum oscillator that measures the speed and magnitude
+    of recent price changes to evaluate overbought or oversold conditions.
+    RSI values range from 0 to 100, with values above 70 typically indicating
+    overbought conditions and values below 30 indicating oversold conditions.
+
+    The RSI uses Wilder's smoothing method (exponential moving average) to
+    calculate average gains and losses over the specified window period.
+
+    Example:
+        duk ti rsi --input prices.csv --column close --window 14 --output rsi_result.csv
+    """
+    # Get logger from context
+    logger = ctx.obj.get("logger", logging.getLogger("duk"))
+
+    # Adjust logging based on verbose flag
+    if verbose:
+        logger.setLevel(logging.INFO)
+        # Enable console output for all handlers
+        for handler in logger.handlers:
+            if isinstance(handler, logging.StreamHandler) and not isinstance(
+                handler, logging.FileHandler
+            ):
+                handler.setLevel(logging.DEBUG)
+
+    logger.info(f"Computing RSI from {input_file}")
+
+    # Validate window
+    if window <= 0:
+        logger.error("Window must be greater than 0")
+        click.echo("Error: Window must be greater than 0", err=True)
+        sys.exit(1)
+
+    # Determine output format
+    if output_csv and output_json:
+        logger.error("Only one output format can be specified")
+        click.echo(
+            "Error: Only one of --csv or --json can be specified",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Default to CSV if neither is specified
+    output_format = "json" if output_json else "csv"
+
+    # Read input file
+    try:
+        input_path = Path(input_file)
+        if input_path.suffix.lower() == ".json":
+            df = pd.read_json(input_file)
+        else:
+            # Default to CSV
+            df = pd.read_csv(input_file)
+
+        logger.info(f"Read {len(df)} records from {input_file}")
+    except Exception as e:
+        logger.error(f"Failed to read input file: {e}")
+        click.echo(f"Error: Failed to read input file: {e}", err=True)
+        sys.exit(1)
+
+    if df.empty:
+        logger.warning("Input file contains no data")
+        click.echo("Error: Input file contains no data", err=True)
+        sys.exit(1)
+
+    # Validate column exists
+    if column not in df.columns:
+        logger.error(f"Column '{column}' not found in input data")
+        click.echo(
+            f"Error: Column '{column}' not found in input data. "
+            f"Available columns: {list(df.columns)}",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Validate column is numeric
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        logger.error(f"Column '{column}' is not numeric")
+        click.echo(f"Error: Column '{column}' must be numeric", err=True)
+        sys.exit(1)
+
+    # Check if we have enough data points
+    if len(df) < window + 1:
+        logger.warning(
+            f"Input data has {len(df)} records, but RSI requires at least {window + 1} records "
+            f"(window size + 1 for price difference calculation). "
+            f"RSI will be NaN for all records."
+        )
+
+    # Calculate RSI
+    try:
+        result_df = calculate_rsi(df, column=column, window=window)
+        logger.info(f"Calculated RSI with window={window} on column '{column}'")
+    except Exception as e:
+        logger.error(f"Failed to calculate RSI: {e}")
+        click.echo(f"Error: Failed to calculate RSI: {e}", err=True)
         sys.exit(1)
 
     # Handle output to file
