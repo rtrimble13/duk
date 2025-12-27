@@ -1332,7 +1332,7 @@ def sma(
     Calculate Simple Moving Average (SMA) on input data.
 
     Computes the arithmetic mean of data points over a specified window period.
-    The SMA is calculated as the average of the last N periods, where N is the window size.
+    The SMA is the average of the last N periods, where N is the window size.
 
     Example:
         duk ti sma --input prices.csv --column close --window 20 --output sma_result.csv
