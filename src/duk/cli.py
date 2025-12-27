@@ -1754,11 +1754,12 @@ def rsi(
         sys.exit(1)
 
     # Check if we have enough data points
+    # RSI needs window+1 records (window periods + 1 for price difference)
     if len(df) < window + 1:
         logger.warning(
-            f"Input data has {len(df)} records, but RSI requires at least "
-            f"{window + 1} records (window size + 1 for price difference "
-            f"calculation). RSI will be NaN for all records."
+            f"Input data has {len(df)} records, but window size is {window}. "
+            f"RSI requires at least {window + 1} records. "
+            f"RSI will be NaN for all records."
         )
 
     # Calculate RSI
