@@ -40,7 +40,9 @@ def calculate_sma(
 
     Returns:
         DataFrame with original data and SMA column(s). SMA columns are named
-        as '{column}_sma_{window}' or 'sma_{window}' for Series input.
+        as '{column}_sma_{window}'. When input is a Series, the series is
+        converted to a DataFrame with column name 'value', so the SMA column
+        will be 'value_sma_{window}'.
 
     Raises:
         IndicatorCalculationError: If window is invalid, column doesn't exist,
@@ -49,7 +51,7 @@ def calculate_sma(
     Examples:
         >>> prices = pd.Series([100, 105, 103, 108, 110])
         >>> df = calculate_sma(prices, window=3)
-        >>> # Returns DataFrame with 'value' and 'sma_3' columns
+        >>> # Returns DataFrame with 'value' and 'value_sma_3' columns
 
         >>> df = pd.DataFrame({'close': [100, 105, 103, 108, 110]})
         >>> result = calculate_sma(df, column='close', window=3)
@@ -119,7 +121,9 @@ def calculate_ema(
 
     Returns:
         DataFrame with original data and EMA column(s). EMA columns are named
-        as '{column}_ema_{window}' or 'ema_{window}' for Series input.
+        as '{column}_ema_{window}'. When input is a Series, the series is
+        converted to a DataFrame with column name 'value', so the EMA column
+        will be 'value_ema_{window}'.
 
     Raises:
         IndicatorCalculationError: If window is invalid, column doesn't exist,
@@ -128,7 +132,7 @@ def calculate_ema(
     Examples:
         >>> prices = pd.Series([100, 105, 103, 108, 110])
         >>> df = calculate_ema(prices, window=3)
-        >>> # Returns DataFrame with 'value' and 'ema_3' columns
+        >>> # Returns DataFrame with 'value' and 'value_ema_3' columns
 
         >>> df = pd.DataFrame({'close': [100, 105, 103, 108, 110]})
         >>> result = calculate_ema(df, column='close', window=3)
