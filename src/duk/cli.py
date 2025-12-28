@@ -965,6 +965,13 @@ def ls(
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
+    "-p",
+    "--precision",
+    type=int,
+    default=3,
+    help="Decimal precision for output values (default: 3)",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(),
@@ -987,6 +994,7 @@ def rc(
     lookback,
     output_csv,
     output_json,
+    precision,
     output,
 ):
     """
@@ -1239,6 +1247,12 @@ def rc(
     # Prepare output - reset index to include date as a column
     output_df = result_df.reset_index()
 
+    # Apply precision to numeric columns
+    numeric_columns = output_df.select_dtypes(include=["float", "int"]).columns
+    # Exclude non-numeric columns like 'date' if necessary
+    numeric_columns = [col for col in numeric_columns if col not in ["date"]]
+    output_df[numeric_columns] = output_df[numeric_columns].round(precision)
+
     # Handle output to file
     if output:
         output_path = Path(output)
@@ -1311,6 +1325,13 @@ def ti(ctx):
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
+    "-p",
+    "--precision",
+    type=int,
+    default=3,
+    help="Decimal precision for output values (default: 3)",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(),
@@ -1326,6 +1347,7 @@ def sma(
     window,
     output_csv,
     output_json,
+    precision,
     output,
 ):
     """
@@ -1422,6 +1444,12 @@ def sma(
         click.echo(f"Error: Failed to calculate SMA: {e}", err=True)
         sys.exit(1)
 
+    # Apply precision to numeric columns
+    numeric_columns = result_df.select_dtypes(include=["float", "int"]).columns
+    # Exclude non-numeric columns like 'date' if necessary
+    numeric_columns = [col for col in numeric_columns if col not in ["date"]]
+    result_df[numeric_columns] = result_df[numeric_columns].round(precision)
+
     # Handle output to file
     if output:
         output_path = Path(output)
@@ -1482,6 +1510,13 @@ def sma(
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
+    "-p",
+    "--precision",
+    type=int,
+    default=3,
+    help="Decimal precision for output values (default: 3)",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(),
@@ -1497,6 +1532,7 @@ def ema(
     window,
     output_csv,
     output_json,
+    precision,
     output,
 ):
     """
@@ -1593,6 +1629,12 @@ def ema(
         click.echo(f"Error: Failed to calculate EMA: {e}", err=True)
         sys.exit(1)
 
+    # Apply precision to numeric columns
+    numeric_columns = result_df.select_dtypes(include=["float", "int"]).columns
+    # Exclude non-numeric columns like 'date' if necessary
+    numeric_columns = [col for col in numeric_columns if col not in ["date"]]
+    result_df[numeric_columns] = result_df[numeric_columns].round(precision)
+
     # Handle output to file
     if output:
         output_path = Path(output)
@@ -1653,6 +1695,13 @@ def ema(
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
+    "-p",
+    "--precision",
+    type=int,
+    default=3,
+    help="Decimal precision for output values (default: 3)",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(),
@@ -1668,6 +1717,7 @@ def rsi(
     window,
     output_csv,
     output_json,
+    precision,
     output,
 ):
     """
@@ -1770,6 +1820,12 @@ def rsi(
         logger.error(f"Failed to calculate RSI: {e}")
         click.echo(f"Error: Failed to calculate RSI: {e}", err=True)
         sys.exit(1)
+
+    # Apply precision to numeric columns
+    numeric_columns = result_df.select_dtypes(include=["float", "int"]).columns
+    # Exclude non-numeric columns like 'date' if necessary
+    numeric_columns = [col for col in numeric_columns if col not in ["date"]]
+    result_df[numeric_columns] = result_df[numeric_columns].round(precision)
 
     # Handle output to file
     if output:
