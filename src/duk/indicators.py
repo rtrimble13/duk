@@ -270,12 +270,8 @@ def calculate_rsi(
         # Calculate average gain and loss using Wilder's smoothing
         # (EMA with alpha = 1/window)
         # Wilder's smoothing uses adjust=False for recursive calculation
-        avg_gain = gain.ewm(
-            alpha=1 / window, adjust=False, min_periods=window
-        ).mean()
-        avg_loss = loss.ewm(
-            alpha=1 / window, adjust=False, min_periods=window
-        ).mean()
+        avg_gain = gain.ewm(alpha=1 / window, adjust=False, min_periods=window).mean()
+        avg_loss = loss.ewm(alpha=1 / window, adjust=False, min_periods=window).mean()
 
         # Calculate RS and RSI
         # Handle division by zero - when avg_loss is 0, RS is undefined

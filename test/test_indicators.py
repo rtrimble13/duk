@@ -315,9 +315,7 @@ class TestCalculateRSI:
         # Values before window should be NaN
         # (not enough data for EMA with min_periods=window)
         for i in range(1, 14):
-            assert pd.isna(
-                result["value_rsi_14"].iloc[i]
-            ), f"Expected NaN at index {i}"
+            assert pd.isna(result["value_rsi_14"].iloc[i]), f"Expected NaN at index {i}"
 
         # After window period, RSI should have values
         # RSI should be between 0 and 100
