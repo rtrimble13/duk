@@ -41,7 +41,7 @@ jobs:
       # Install the package with dev dependencies to run tests
       - name: Install project dependencies
         run: |
-          python -m pip install -e .[dev]
+          python -m pip install .[dev]
       
       # Step 5: Run tests to verify the build
       # Ensure the tagged version passes all tests before creating release
@@ -90,7 +90,7 @@ jobs:
           
           See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/CHANGELOG.md) for detailed changes.
           
-          **Full Changelog**: https://github.com/${{ github.repository }}/compare/v${{ steps.version.outputs.version }}...HEAD
+          **Full Changelog**: https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}
           EOF
       
       # Step 10: Create GitHub Release
