@@ -36,6 +36,31 @@ from duk.return_utils import (
 KEY_RATE_TENORS = ["year1", "year5", "year10", "year20", "year30"]
 
 
+def apply_precision_to_dataframe(df, precision, exclude_columns=None):
+    """
+    Apply precision rounding to numeric columns in a DataFrame.
+
+    Args:
+        df: pandas DataFrame to apply precision to
+        precision: Number of decimal places to round to
+        exclude_columns: List of column names to exclude from rounding
+            (default: ['date'])
+
+    Returns:
+        The modified DataFrame with precision applied
+    """
+    if exclude_columns is None:
+        exclude_columns = ["date"]
+
+    # Select numeric columns
+    numeric_columns = df.select_dtypes(include=["float", "int"]).columns
+    # Exclude specified columns
+    numeric_columns = [col for col in numeric_columns if col not in exclude_columns]
+    # Apply rounding
+    df[numeric_columns] = df[numeric_columns].round(precision)
+    return df
+
+
 @click.group()
 @click.version_option(version=__version__, message="%(version)s")
 @click.option(
@@ -965,6 +990,13 @@ def ls(
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
+    "-p",
+    "--precision",
+    type=int,
+    default=3,
+    help="Decimal precision for output values (default: 3)",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(),
@@ -987,6 +1019,7 @@ def rc(
     lookback,
     output_csv,
     output_json,
+    precision,
     output,
 ):
     """
@@ -1239,6 +1272,9 @@ def rc(
     # Prepare output - reset index to include date as a column
     output_df = result_df.reset_index()
 
+    # Apply precision to numeric columns
+    output_df = apply_precision_to_dataframe(output_df, precision)
+
     # Handle output to file
     if output:
         output_path = Path(output)
@@ -1311,6 +1347,13 @@ def ti(ctx):
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
+    "-p",
+    "--precision",
+    type=int,
+    default=3,
+    help="Decimal precision for output values (default: 3)",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(),
@@ -1326,6 +1369,7 @@ def sma(
     window,
     output_csv,
     output_json,
+    precision,
     output,
 ):
     """
@@ -1422,6 +1466,9 @@ def sma(
         click.echo(f"Error: Failed to calculate SMA: {e}", err=True)
         sys.exit(1)
 
+    # Apply precision to numeric columns
+    result_df = apply_precision_to_dataframe(result_df, precision)
+
     # Handle output to file
     if output:
         output_path = Path(output)
@@ -1482,6 +1529,13 @@ def sma(
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
+    "-p",
+    "--precision",
+    type=int,
+    default=3,
+    help="Decimal precision for output values (default: 3)",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(),
@@ -1497,6 +1551,7 @@ def ema(
     window,
     output_csv,
     output_json,
+    precision,
     output,
 ):
     """
@@ -1593,6 +1648,9 @@ def ema(
         click.echo(f"Error: Failed to calculate EMA: {e}", err=True)
         sys.exit(1)
 
+    # Apply precision to numeric columns
+    result_df = apply_precision_to_dataframe(result_df, precision)
+
     # Handle output to file
     if output:
         output_path = Path(output)
@@ -1653,6 +1711,13 @@ def ema(
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
+    "-p",
+    "--precision",
+    type=int,
+    default=3,
+    help="Decimal precision for output values (default: 3)",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(),
@@ -1668,6 +1733,7 @@ def rsi(
     window,
     output_csv,
     output_json,
+    precision,
     output,
 ):
     """
@@ -1770,6 +1836,9 @@ def rsi(
         logger.error(f"Failed to calculate RSI: {e}")
         click.echo(f"Error: Failed to calculate RSI: {e}", err=True)
         sys.exit(1)
+
+    # Apply precision to numeric columns
+    result_df = apply_precision_to_dataframe(result_df, precision)
 
     # Handle output to file
     if output:

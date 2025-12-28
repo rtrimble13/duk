@@ -5,6 +5,7 @@ Unit tests for rc command.
 import json
 import os
 import tempfile
+from test.test_utils import verify_dataframe_precision
 
 import pandas as pd
 from click.testing import CliRunner
@@ -640,3 +641,88 @@ class TestRcCommand:
 
             assert result.exit_code == 0
             assert "close_simple_ret" in result.output
+
+    def test_rc_precision_default(self):
+        """Test default precision (3 decimal places) for rc command."""
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create input with values that will generate many decimal places
+            input_file = os.path.join(tmpdir, "prices.csv")
+            df = pd.DataFrame(
+                {
+                    "date": pd.to_datetime(["2023-01-02", "2023-01-03", "2023-01-04"]),
+                    "close": [100.123456789, 105.987654321, 103.456789012],
+                }
+            )
+            df.to_csv(input_file, index=False)
+
+            # Run without specifying precision (should use default of 3)
+            result = runner.invoke(main, ["rc", "-i", input_file, "--simple"])
+
+            assert result.exit_code == 0
+            # Check that output has 3 decimal places max
+            # The return values should be rounded to 3 decimals
+            # Parse CSV output to check precision
+            import csv
+            from io import StringIO
+
+            csv_data = StringIO(result.output.strip())
+            reader = csv.DictReader(csv_data)
+            for row in reader:
+                if "close_simple_ret" in row and row["close_simple_ret"] != "":
+                    value = float(row["close_simple_ret"])
+                    # Check that the value has at most 3 decimal places
+                    # by verifying round(value, 3) == value
+                    assert round(value, 3) == value
+
+    def test_rc_precision_custom(self):
+        """Test custom precision for rc command."""
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create input with values that will generate many decimal places
+            input_file = os.path.join(tmpdir, "prices.csv")
+            output_file = os.path.join(tmpdir, "output.csv")
+            df = pd.DataFrame(
+                {
+                    "date": pd.to_datetime(["2023-01-02", "2023-01-03", "2023-01-04"]),
+                    "close": [100.123456789, 105.987654321, 103.456789012],
+                }
+            )
+            df.to_csv(input_file, index=False)
+
+            # Run with precision=2
+            result = runner.invoke(
+                main, ["rc", "-i", input_file, "--simple", "-p", "2", "-o", output_file]
+            )
+
+            assert result.exit_code == 0
+
+            # Read output file and verify precision
+            output_df = pd.read_csv(output_file)
+            verify_dataframe_precision(output_df, 2)
+
+    def test_rc_precision_zero(self):
+        """Test precision=0 for rc command (integer rounding)."""
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create input
+            input_file = os.path.join(tmpdir, "prices.csv")
+            output_file = os.path.join(tmpdir, "output.csv")
+            df = pd.DataFrame(
+                {
+                    "date": pd.to_datetime(["2023-01-02", "2023-01-03", "2023-01-04"]),
+                    "close": [100.5, 105.7, 103.3],
+                }
+            )
+            df.to_csv(input_file, index=False)
+
+            # Run with precision=0
+            result = runner.invoke(
+                main, ["rc", "-i", input_file, "--simple", "-p", "0", "-o", output_file]
+            )
+
+            assert result.exit_code == 0
+
+            # Read output file and verify precision
+            output_df = pd.read_csv(output_file)
+            verify_dataframe_precision(output_df, 0)

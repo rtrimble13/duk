@@ -5,6 +5,7 @@ Unit tests for ti command group (technical indicators).
 import json
 import os
 import tempfile
+from test.test_utils import verify_dataframe_precision
 
 import pandas as pd
 from click.testing import CliRunner
@@ -325,6 +326,95 @@ class TestSmaCommand:
             # Should have no CSV data lines in output
             assert len(csv_lines) == 0
 
+    def test_sma_precision_default(self):
+        """Test default precision (3 decimal places) for sma command."""
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_file = os.path.join(tmpdir, "prices.csv")
+            output_file = os.path.join(tmpdir, "output.csv")
+            df = pd.DataFrame(
+                {
+                    "date": pd.to_datetime(
+                        ["2023-01-01", "2023-01-02", "2023-01-03", "2023-01-04"]
+                    ),
+                    "close": [
+                        100.123456789,
+                        105.987654321,
+                        103.456789012,
+                        108.111111111,
+                    ],
+                }
+            )
+            df.to_csv(input_file, index=False)
+
+            result = runner.invoke(
+                main,
+                [
+                    "ti",
+                    "sma",
+                    "-i",
+                    input_file,
+                    "-c",
+                    "close",
+                    "-w",
+                    "2",
+                    "-o",
+                    output_file,
+                ],
+            )
+
+            assert result.exit_code == 0
+
+            # Read output file and verify precision
+            output_df = pd.read_csv(output_file)
+            verify_dataframe_precision(output_df, 3)
+
+    def test_sma_precision_custom(self):
+        """Test custom precision for sma command."""
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_file = os.path.join(tmpdir, "prices.csv")
+            output_file = os.path.join(tmpdir, "output.csv")
+            df = pd.DataFrame(
+                {
+                    "date": pd.to_datetime(
+                        ["2023-01-01", "2023-01-02", "2023-01-03", "2023-01-04"]
+                    ),
+                    "close": [
+                        100.123456789,
+                        105.987654321,
+                        103.456789012,
+                        108.111111111,
+                    ],
+                }
+            )
+            df.to_csv(input_file, index=False)
+
+            # Use precision=5
+            result = runner.invoke(
+                main,
+                [
+                    "ti",
+                    "sma",
+                    "-i",
+                    input_file,
+                    "-c",
+                    "close",
+                    "-w",
+                    "2",
+                    "-p",
+                    "5",
+                    "-o",
+                    output_file,
+                ],
+            )
+
+            assert result.exit_code == 0
+
+            # Read output file and verify precision
+            output_df = pd.read_csv(output_file)
+            verify_dataframe_precision(output_df, 5)
+
 
 class TestEmaCommand:
     """Test cases for ema command functionality."""
@@ -623,6 +713,95 @@ class TestEmaCommand:
             ]
             # Should have no CSV data lines in output
             assert len(csv_lines) == 0
+
+    def test_ema_precision_default(self):
+        """Test default precision (3 decimal places) for ema command."""
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_file = os.path.join(tmpdir, "prices.csv")
+            output_file = os.path.join(tmpdir, "output.csv")
+            df = pd.DataFrame(
+                {
+                    "date": pd.to_datetime(
+                        ["2023-01-01", "2023-01-02", "2023-01-03", "2023-01-04"]
+                    ),
+                    "close": [
+                        100.123456789,
+                        105.987654321,
+                        103.456789012,
+                        108.111111111,
+                    ],
+                }
+            )
+            df.to_csv(input_file, index=False)
+
+            result = runner.invoke(
+                main,
+                [
+                    "ti",
+                    "ema",
+                    "-i",
+                    input_file,
+                    "-c",
+                    "close",
+                    "-w",
+                    "2",
+                    "-o",
+                    output_file,
+                ],
+            )
+
+            assert result.exit_code == 0
+
+            # Read output file and verify precision
+            output_df = pd.read_csv(output_file)
+            verify_dataframe_precision(output_df, 3)
+
+    def test_ema_precision_custom(self):
+        """Test custom precision for ema command."""
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_file = os.path.join(tmpdir, "prices.csv")
+            output_file = os.path.join(tmpdir, "output.csv")
+            df = pd.DataFrame(
+                {
+                    "date": pd.to_datetime(
+                        ["2023-01-01", "2023-01-02", "2023-01-03", "2023-01-04"]
+                    ),
+                    "close": [
+                        100.123456789,
+                        105.987654321,
+                        103.456789012,
+                        108.111111111,
+                    ],
+                }
+            )
+            df.to_csv(input_file, index=False)
+
+            # Use precision=1
+            result = runner.invoke(
+                main,
+                [
+                    "ti",
+                    "ema",
+                    "-i",
+                    input_file,
+                    "-c",
+                    "close",
+                    "-w",
+                    "2",
+                    "-p",
+                    "1",
+                    "-o",
+                    output_file,
+                ],
+            )
+
+            assert result.exit_code == 0
+
+            # Read output file and verify precision
+            output_df = pd.read_csv(output_file)
+            verify_dataframe_precision(output_df, 1)
 
 
 class TestRsiCommand:
@@ -1128,3 +1307,74 @@ class TestRsiCommand:
             ]
             # Should have no CSV data lines in output
             assert len(csv_lines) == 0
+
+    def test_rsi_precision_default(self):
+        """Test default precision (3 decimal places) for rsi command."""
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_file = os.path.join(tmpdir, "prices.csv")
+            output_file = os.path.join(tmpdir, "output.csv")
+            # Create data with enough points for RSI calculation
+            dates = pd.date_range("2023-01-01", periods=20, freq="D")
+            closes = [100.123 + i * 1.456 for i in range(20)]
+            df = pd.DataFrame({"date": dates, "close": closes})
+            df.to_csv(input_file, index=False)
+
+            result = runner.invoke(
+                main,
+                [
+                    "ti",
+                    "rsi",
+                    "-i",
+                    input_file,
+                    "-c",
+                    "close",
+                    "-w",
+                    "14",
+                    "-o",
+                    output_file,
+                ],
+            )
+
+            assert result.exit_code == 0
+
+            # Read output file and verify precision
+            output_df = pd.read_csv(output_file)
+            verify_dataframe_precision(output_df, 3)
+
+    def test_rsi_precision_custom(self):
+        """Test custom precision for rsi command."""
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_file = os.path.join(tmpdir, "prices.csv")
+            output_file = os.path.join(tmpdir, "output.csv")
+            # Create data with enough points for RSI calculation
+            dates = pd.date_range("2023-01-01", periods=20, freq="D")
+            closes = [100.123 + i * 1.456 for i in range(20)]
+            df = pd.DataFrame({"date": dates, "close": closes})
+            df.to_csv(input_file, index=False)
+
+            # Use precision=2
+            result = runner.invoke(
+                main,
+                [
+                    "ti",
+                    "rsi",
+                    "-i",
+                    input_file,
+                    "-c",
+                    "close",
+                    "-w",
+                    "14",
+                    "-p",
+                    "2",
+                    "-o",
+                    output_file,
+                ],
+            )
+
+            assert result.exit_code == 0
+
+            # Read output file and verify precision
+            output_df = pd.read_csv(output_file)
+            verify_dataframe_precision(output_df, 2)
