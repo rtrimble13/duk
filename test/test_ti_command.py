@@ -5,34 +5,12 @@ Unit tests for ti command group (technical indicators).
 import json
 import os
 import tempfile
+from test.test_utils import verify_dataframe_precision
 
 import pandas as pd
 from click.testing import CliRunner
 
 from duk.cli import main
-
-
-def verify_dataframe_precision(df, precision, exclude_columns=None):
-    """
-    Helper function to verify that all numeric columns in a DataFrame
-    have values rounded to the specified precision.
-
-    Args:
-        df: pandas DataFrame to verify
-        precision: Expected number of decimal places
-        exclude_columns: List of column names to exclude from verification
-            (default: ['date'])
-    """
-    if exclude_columns is None:
-        exclude_columns = ["date"]
-
-    for col in df.select_dtypes(include=["float"]).columns:
-        if col not in exclude_columns:
-            for val in df[col].dropna():
-                # Check that the value has at most the specified decimal places
-                assert (
-                    round(val, precision) == val
-                ), f"Column '{col}' value {val} does not match precision {precision}"
 
 
 class TestTiCommand:
