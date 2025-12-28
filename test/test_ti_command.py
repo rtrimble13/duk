@@ -12,6 +12,29 @@ from click.testing import CliRunner
 from duk.cli import main
 
 
+def verify_dataframe_precision(df, precision, exclude_columns=None):
+    """
+    Helper function to verify that all numeric columns in a DataFrame
+    have values rounded to the specified precision.
+
+    Args:
+        df: pandas DataFrame to verify
+        precision: Expected number of decimal places
+        exclude_columns: List of column names to exclude from verification
+            (default: ['date'])
+    """
+    if exclude_columns is None:
+        exclude_columns = ["date"]
+
+    for col in df.select_dtypes(include=["float"]).columns:
+        if col not in exclude_columns:
+            for val in df[col].dropna():
+                # Check that the value has at most the specified decimal places
+                assert (
+                    round(val, precision) == val
+                ), f"Column '{col}' value {val} does not match precision {precision}"
+
+
 class TestTiCommand:
     """Test cases for ti command group."""
 
@@ -366,11 +389,7 @@ class TestSmaCommand:
 
             # Read output file and verify precision
             output_df = pd.read_csv(output_file)
-            for col in output_df.select_dtypes(include=["float"]).columns:
-                if col != "date":
-                    for val in output_df[col].dropna():
-                        # Check that the value has at most 3 decimal places
-                        assert round(val, 3) == val
+            verify_dataframe_precision(output_df, 3)
 
     def test_sma_precision_custom(self):
         """Test custom precision for sma command."""
@@ -416,11 +435,7 @@ class TestSmaCommand:
 
             # Read output file and verify precision
             output_df = pd.read_csv(output_file)
-            for col in output_df.select_dtypes(include=["float"]).columns:
-                if col != "date":
-                    for val in output_df[col].dropna():
-                        # Check that the value has at most 5 decimal places
-                        assert round(val, 5) == val
+            verify_dataframe_precision(output_df, 5)
 
 
 class TestEmaCommand:
@@ -762,11 +777,7 @@ class TestEmaCommand:
 
             # Read output file and verify precision
             output_df = pd.read_csv(output_file)
-            for col in output_df.select_dtypes(include=["float"]).columns:
-                if col != "date":
-                    for val in output_df[col].dropna():
-                        # Check that the value has at most 3 decimal places
-                        assert round(val, 3) == val
+            verify_dataframe_precision(output_df, 3)
 
     def test_ema_precision_custom(self):
         """Test custom precision for ema command."""
@@ -812,11 +823,7 @@ class TestEmaCommand:
 
             # Read output file and verify precision
             output_df = pd.read_csv(output_file)
-            for col in output_df.select_dtypes(include=["float"]).columns:
-                if col != "date":
-                    for val in output_df[col].dropna():
-                        # Check that the value has at most 1 decimal place
-                        assert round(val, 1) == val
+            verify_dataframe_precision(output_df, 1)
 
 
 class TestRsiCommand:
@@ -1355,11 +1362,7 @@ class TestRsiCommand:
 
             # Read output file and verify precision
             output_df = pd.read_csv(output_file)
-            for col in output_df.select_dtypes(include=["float"]).columns:
-                if col != "date":
-                    for val in output_df[col].dropna():
-                        # Check that the value has at most 3 decimal places
-                        assert round(val, 3) == val
+            verify_dataframe_precision(output_df, 3)
 
     def test_rsi_precision_custom(self):
         """Test custom precision for rsi command."""
@@ -1396,8 +1399,4 @@ class TestRsiCommand:
 
             # Read output file and verify precision
             output_df = pd.read_csv(output_file)
-            for col in output_df.select_dtypes(include=["float"]).columns:
-                if col != "date":
-                    for val in output_df[col].dropna():
-                        # Check that the value has at most 2 decimal places
-                        assert round(val, 2) == val
+            verify_dataframe_precision(output_df, 2)

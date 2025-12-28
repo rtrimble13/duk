@@ -36,6 +36,31 @@ from duk.return_utils import (
 KEY_RATE_TENORS = ["year1", "year5", "year10", "year20", "year30"]
 
 
+def apply_precision_to_dataframe(df, precision, exclude_columns=None):
+    """
+    Apply precision rounding to numeric columns in a DataFrame.
+
+    Args:
+        df: pandas DataFrame to apply precision to
+        precision: Number of decimal places to round to
+        exclude_columns: List of column names to exclude from rounding
+            (default: ['date'])
+
+    Returns:
+        The modified DataFrame with precision applied
+    """
+    if exclude_columns is None:
+        exclude_columns = ["date"]
+
+    # Select numeric columns
+    numeric_columns = df.select_dtypes(include=["float", "int"]).columns
+    # Exclude specified columns
+    numeric_columns = [col for col in numeric_columns if col not in exclude_columns]
+    # Apply rounding
+    df[numeric_columns] = df[numeric_columns].round(precision)
+    return df
+
+
 @click.group()
 @click.version_option(version=__version__, message="%(version)s")
 @click.option(
@@ -1248,10 +1273,7 @@ def rc(
     output_df = result_df.reset_index()
 
     # Apply precision to numeric columns
-    numeric_columns = output_df.select_dtypes(include=["float", "int"]).columns
-    # Exclude non-numeric columns like 'date' if necessary
-    numeric_columns = [col for col in numeric_columns if col not in ["date"]]
-    output_df[numeric_columns] = output_df[numeric_columns].round(precision)
+    output_df = apply_precision_to_dataframe(output_df, precision)
 
     # Handle output to file
     if output:
@@ -1445,10 +1467,7 @@ def sma(
         sys.exit(1)
 
     # Apply precision to numeric columns
-    numeric_columns = result_df.select_dtypes(include=["float", "int"]).columns
-    # Exclude non-numeric columns like 'date' if necessary
-    numeric_columns = [col for col in numeric_columns if col not in ["date"]]
-    result_df[numeric_columns] = result_df[numeric_columns].round(precision)
+    result_df = apply_precision_to_dataframe(result_df, precision)
 
     # Handle output to file
     if output:
@@ -1630,10 +1649,7 @@ def ema(
         sys.exit(1)
 
     # Apply precision to numeric columns
-    numeric_columns = result_df.select_dtypes(include=["float", "int"]).columns
-    # Exclude non-numeric columns like 'date' if necessary
-    numeric_columns = [col for col in numeric_columns if col not in ["date"]]
-    result_df[numeric_columns] = result_df[numeric_columns].round(precision)
+    result_df = apply_precision_to_dataframe(result_df, precision)
 
     # Handle output to file
     if output:
@@ -1822,10 +1838,7 @@ def rsi(
         sys.exit(1)
 
     # Apply precision to numeric columns
-    numeric_columns = result_df.select_dtypes(include=["float", "int"]).columns
-    # Exclude non-numeric columns like 'date' if necessary
-    numeric_columns = [col for col in numeric_columns if col not in ["date"]]
-    result_df[numeric_columns] = result_df[numeric_columns].round(precision)
+    result_df = apply_precision_to_dataframe(result_df, precision)
 
     # Handle output to file
     if output:
