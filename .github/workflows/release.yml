@@ -23,11 +23,11 @@ jobs:
         uses: actions/checkout@v6
       
       # Step 2: Set up Python environment
-      # Using Python 3.13 as it's the latest supported version in pyproject.toml
+      # Using Python 3.12 for stable build environment
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
+          python-version: '3.12'
           cache: 'pip'    # Cache pip dependencies for faster builds
       
       # Step 3: Install build dependencies
@@ -95,7 +95,6 @@ jobs:
       
       # Step 10: Create GitHub Release
       # Uses gh CLI to create a release with the built artifacts
-      # The release is created as a draft initially for review
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
