@@ -336,14 +336,30 @@ class TestSmaCommand:
                     "date": pd.to_datetime(
                         ["2023-01-01", "2023-01-02", "2023-01-03", "2023-01-04"]
                     ),
-                    "close": [100.123456789, 105.987654321, 103.456789012, 108.111111111],
+                    "close": [
+                        100.123456789,
+                        105.987654321,
+                        103.456789012,
+                        108.111111111,
+                    ],
                 }
             )
             df.to_csv(input_file, index=False)
 
             result = runner.invoke(
                 main,
-                ["ti", "sma", "-i", input_file, "-c", "close", "-w", "2", "-o", output_file],
+                [
+                    "ti",
+                    "sma",
+                    "-i",
+                    input_file,
+                    "-c",
+                    "close",
+                    "-w",
+                    "2",
+                    "-o",
+                    output_file,
+                ],
             )
 
             assert result.exit_code == 0
@@ -367,7 +383,12 @@ class TestSmaCommand:
                     "date": pd.to_datetime(
                         ["2023-01-01", "2023-01-02", "2023-01-03", "2023-01-04"]
                     ),
-                    "close": [100.123456789, 105.987654321, 103.456789012, 108.111111111],
+                    "close": [
+                        100.123456789,
+                        105.987654321,
+                        103.456789012,
+                        108.111111111,
+                    ],
                 }
             )
             df.to_csv(input_file, index=False)
@@ -711,14 +732,30 @@ class TestEmaCommand:
                     "date": pd.to_datetime(
                         ["2023-01-01", "2023-01-02", "2023-01-03", "2023-01-04"]
                     ),
-                    "close": [100.123456789, 105.987654321, 103.456789012, 108.111111111],
+                    "close": [
+                        100.123456789,
+                        105.987654321,
+                        103.456789012,
+                        108.111111111,
+                    ],
                 }
             )
             df.to_csv(input_file, index=False)
 
             result = runner.invoke(
                 main,
-                ["ti", "ema", "-i", input_file, "-c", "close", "-w", "2", "-o", output_file],
+                [
+                    "ti",
+                    "ema",
+                    "-i",
+                    input_file,
+                    "-c",
+                    "close",
+                    "-w",
+                    "2",
+                    "-o",
+                    output_file,
+                ],
             )
 
             assert result.exit_code == 0
@@ -742,7 +779,12 @@ class TestEmaCommand:
                     "date": pd.to_datetime(
                         ["2023-01-01", "2023-01-02", "2023-01-03", "2023-01-04"]
                     ),
-                    "close": [100.123456789, 105.987654321, 103.456789012, 108.111111111],
+                    "close": [
+                        100.123456789,
+                        105.987654321,
+                        103.456789012,
+                        108.111111111,
+                    ],
                 }
             )
             df.to_csv(input_file, index=False)
@@ -1359,4 +1401,3 @@ class TestRsiCommand:
                     for val in output_df[col].dropna():
                         # Check that the value has at most 2 decimal places
                         assert round(val, 2) == val
-

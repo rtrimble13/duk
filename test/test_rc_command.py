@@ -661,7 +661,6 @@ class TestRcCommand:
             assert result.exit_code == 0
             # Check that output has 3 decimal places max
             # The return values should be rounded to 3 decimals
-            output_lines = result.output.strip().split("\n")
             # Parse CSV output to check precision
             import csv
             from io import StringIO
@@ -734,4 +733,3 @@ class TestRcCommand:
                     for val in output_df[col].dropna():
                         # Check that the value is an integer (no decimal places)
                         assert round(val, 0) == val
-
