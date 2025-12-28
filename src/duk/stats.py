@@ -26,16 +26,16 @@ def compute_summary_stats(df, date_column="date"):
             - column_stats: Dict of column-level statistics
     """
     logger = logging.getLogger("duk")
-    
+
     if df.empty:
         logger.warning("Cannot compute statistics on empty DataFrame")
         return None
 
     stats = {}
-    
+
     # Number of observations
     stats["n_observations"] = len(df)
-    
+
     # Date range statistics
     if date_column in df.columns:
         date_col = df[date_column]
@@ -48,11 +48,11 @@ def compute_summary_stats(df, date_column="date"):
             if pd.api.types.is_datetime64_any_dtype(df[col]):
                 date_col = df[col]
                 break
-        
+
         # If still not found, check index
         if date_col is None and pd.api.types.is_datetime64_any_dtype(df.index):
             date_col = df.index
-    
+
     if date_col is not None:
         try:
             stats["min_date"] = pd.to_datetime(date_col).min()
@@ -64,14 +64,14 @@ def compute_summary_stats(df, date_column="date"):
     else:
         stats["min_date"] = None
         stats["max_date"] = None
-    
+
     # Column-level statistics
     numeric_columns = df.select_dtypes(include=["number"]).columns
     column_stats = {}
-    
+
     for col in numeric_columns:
         col_data = df[col].dropna()  # Remove NaN values for statistics
-        
+
         if len(col_data) > 0:
             column_stats[col] = {
                 "min": col_data.min(),
@@ -90,9 +90,9 @@ def compute_summary_stats(df, date_column="date"):
                 "p25": None,
                 "p75": None,
             }
-    
+
     stats["column_stats"] = column_stats
-    
+
     return stats
 
 
@@ -109,29 +109,29 @@ def format_summary_stats(stats, precision=4):
     """
     if stats is None:
         return "No statistics available"
-    
+
     lines = []
     lines.append("=" * 60)
     lines.append("SUMMARY STATISTICS")
     lines.append("=" * 60)
     lines.append("")
-    
+
     # General statistics
     lines.append(f"Number of observations: {stats['n_observations']}")
-    
+
     if stats["min_date"] is not None and stats["max_date"] is not None:
         lines.append(f"Date range: {stats['min_date']} to {stats['max_date']}")
-    
+
     lines.append("")
-    
+
     # Column statistics
     if stats["column_stats"]:
         lines.append("Column Statistics:")
         lines.append("-" * 60)
-        
+
         for col_name, col_stats in stats["column_stats"].items():
             lines.append(f"\n{col_name}:")
-            
+
             if col_stats["min"] is not None:
                 lines.append(f"  Min:        {col_stats['min']:.{precision}f}")
                 lines.append(f"  25th pctl:  {col_stats['p25']:.{precision}f}")
@@ -141,8 +141,8 @@ def format_summary_stats(stats, precision=4):
                 lines.append(f"  Max:        {col_stats['max']:.{precision}f}")
             else:
                 lines.append("  No data available")
-    
+
     lines.append("")
     lines.append("=" * 60)
-    
+
     return "\n".join(lines)

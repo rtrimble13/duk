@@ -3,7 +3,6 @@ Unit tests for stats module.
 """
 
 import pandas as pd
-import pytest
 
 from duk.stats import compute_summary_stats, format_summary_stats
 
