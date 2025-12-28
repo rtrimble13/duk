@@ -934,9 +934,8 @@ def ls(
     # If summary flag is set, compute and print summary statistics instead
     if summary:
         if not quiet:
-            stats = compute_summary_stats(df)
-            output_text = format_summary_stats(stats)
-            click.echo(output_text)
+            # For ls command, only show the number of search results
+            click.echo(f"Number of results: {len(df)}")
         sys.exit(0)
 
     # Handle output to file
