@@ -31,6 +31,7 @@ from duk.return_utils import (
     price_difference,
     simple_return,
 )
+from duk.stats import compute_summary_stats, format_summary_stats
 
 # Key rate tenors for yield curve analysis
 KEY_RATE_TENORS = ["year1", "year5", "year10", "year20", "year30"]
@@ -126,6 +127,11 @@ def main(ctx, config):
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
+    "--summary",
+    is_flag=True,
+    help="Print summary statistics instead of data observations",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(),
@@ -152,6 +158,7 @@ def ph(
     adj,
     output_csv,
     output_json,
+    summary,
     output,
 ):
     """
@@ -249,6 +256,14 @@ def ph(
 
     logger.info(f"Retrieved {len(df)} records for {symbol}")
 
+    # If summary flag is set, compute and print summary statistics instead
+    if summary:
+        if not quiet:
+            stats = compute_summary_stats(df.reset_index())
+            output_text = format_summary_stats(stats)
+            click.echo(output_text)
+        sys.exit(0)
+
     # Prepare output
     # Reset index to include date as a column in output
     output_df = df.reset_index()
@@ -325,6 +340,11 @@ def ph(
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
+    "--summary",
+    is_flag=True,
+    help="Print summary statistics instead of data observations",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(),
@@ -354,6 +374,7 @@ def yc(
     interval,
     output_csv,
     output_json,
+    summary,
     output,
     precision,
 ):
@@ -474,6 +495,14 @@ def yc(
             df = df[available_key_tenors]
 
     logger.info(f"Retrieved yield curve data with {len(df)} records")
+
+    # If summary flag is set, compute and print summary statistics instead
+    if summary:
+        if not quiet:
+            stats = compute_summary_stats(df.reset_index())
+            output_text = format_summary_stats(stats, precision=precision)
+            click.echo(output_text)
+        sys.exit(0)
 
     # Prepare output
     # Reset index to include date/tenor as a column in output
@@ -607,6 +636,11 @@ def yc(
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
+    "--summary",
+    is_flag=True,
+    help="Print summary statistics instead of data observations",
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(),
@@ -634,6 +668,7 @@ def ls(
     is_actively_trading,
     output_csv,
     output_json,
+    summary,
     output,
 ):
     """
@@ -896,6 +931,13 @@ def ls(
         click.echo(f"Error: Failed to fetch list data: {e}", err=True)
         sys.exit(1)
 
+    # If summary flag is set, compute and print summary statistics instead
+    if summary:
+        if not quiet:
+            # For ls command, only show the number of search results
+            click.echo(f"Number of results: {len(df)}")
+        sys.exit(0)
+
     # Handle output to file
     if output:
         output_path = Path(output)
@@ -990,6 +1032,11 @@ def ls(
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
+    "--summary",
+    is_flag=True,
+    help="Print summary statistics instead of data observations",
+)
+@click.option(
     "-p",
     "--precision",
     type=int,
@@ -1019,6 +1066,7 @@ def rc(
     lookback,
     output_csv,
     output_json,
+    summary,
     precision,
     output,
 ):
@@ -1275,6 +1323,14 @@ def rc(
     # Apply precision to numeric columns
     output_df = apply_precision_to_dataframe(output_df, precision)
 
+    # If summary flag is set, compute and print summary statistics instead
+    if summary:
+        if not quiet:
+            stats = compute_summary_stats(output_df)
+            output_text = format_summary_stats(stats, precision=precision)
+            click.echo(output_text)
+        sys.exit(0)
+
     # Handle output to file
     if output:
         output_path = Path(output)
@@ -1347,6 +1403,11 @@ def ti(ctx):
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
+    "--summary",
+    is_flag=True,
+    help="Print summary statistics instead of data observations",
+)
+@click.option(
     "-p",
     "--precision",
     type=int,
@@ -1369,6 +1430,7 @@ def sma(
     window,
     output_csv,
     output_json,
+    summary,
     precision,
     output,
 ):
@@ -1469,6 +1531,14 @@ def sma(
     # Apply precision to numeric columns
     result_df = apply_precision_to_dataframe(result_df, precision)
 
+    # If summary flag is set, compute and print summary statistics instead
+    if summary:
+        if not quiet:
+            stats = compute_summary_stats(result_df)
+            output_text = format_summary_stats(stats, precision=precision)
+            click.echo(output_text)
+        sys.exit(0)
+
     # Handle output to file
     if output:
         output_path = Path(output)
@@ -1529,6 +1599,11 @@ def sma(
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
+    "--summary",
+    is_flag=True,
+    help="Print summary statistics instead of data observations",
+)
+@click.option(
     "-p",
     "--precision",
     type=int,
@@ -1551,6 +1626,7 @@ def ema(
     window,
     output_csv,
     output_json,
+    summary,
     precision,
     output,
 ):
@@ -1651,6 +1727,14 @@ def ema(
     # Apply precision to numeric columns
     result_df = apply_precision_to_dataframe(result_df, precision)
 
+    # If summary flag is set, compute and print summary statistics instead
+    if summary:
+        if not quiet:
+            stats = compute_summary_stats(result_df)
+            output_text = format_summary_stats(stats, precision=precision)
+            click.echo(output_text)
+        sys.exit(0)
+
     # Handle output to file
     if output:
         output_path = Path(output)
@@ -1711,6 +1795,11 @@ def ema(
 @click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
 @click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
 @click.option(
+    "--summary",
+    is_flag=True,
+    help="Print summary statistics instead of data observations",
+)
+@click.option(
     "-p",
     "--precision",
     type=int,
@@ -1733,6 +1822,7 @@ def rsi(
     window,
     output_csv,
     output_json,
+    summary,
     precision,
     output,
 ):
@@ -1839,6 +1929,14 @@ def rsi(
 
     # Apply precision to numeric columns
     result_df = apply_precision_to_dataframe(result_df, precision)
+
+    # If summary flag is set, compute and print summary statistics instead
+    if summary:
+        if not quiet:
+            stats = compute_summary_stats(result_df)
+            output_text = format_summary_stats(stats, precision=precision)
+            click.echo(output_text)
+        sys.exit(0)
 
     # Handle output to file
     if output:

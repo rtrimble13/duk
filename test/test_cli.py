@@ -813,3 +813,62 @@ class TestLSCommandScreening:
 
             assert result.exit_code == 1
             assert "Cannot specify multiple '<' values" in result.output
+
+    def test_ls_summary_flag(self):
+        """Test ls command with --summary flag shows only count."""
+        mock_data = [
+            {"symbol": "AAPL", "name": "Apple Inc."},
+            {"symbol": "MSFT", "name": "Microsoft Corporation"},
+            {"symbol": "GOOGL", "name": "Alphabet Inc."},
+        ]
+
+        with mock.patch("duk.cli.actively_trading_list_api") as mock_api:
+            mock_api.return_value = mock_data
+
+            runner = CliRunner()
+            with tempfile.TemporaryDirectory() as tmpdir:
+                config_path = os.path.join(tmpdir, "test.toml")
+
+                # Create a test config file with API key
+                with open(config_path, "w") as f:
+                    f.write("[api]\n")
+                    f.write('fmp_key = "test_key"\n')
+
+                result = runner.invoke(
+                    main, ["--config", config_path, "ls", "--summary"]
+                )
+
+                assert result.exit_code == 0
+                # Should only show count, not full summary statistics
+                assert "Number of results: 3" in result.output
+                # Should NOT show full statistics
+                assert "SUMMARY STATISTICS" not in result.output
+                assert "Min:" not in result.output
+                assert "Max:" not in result.output
+
+    def test_ls_summary_with_quiet(self):
+        """Test ls command with --summary and --quiet flags."""
+        mock_data = [
+            {"symbol": "AAPL", "name": "Apple Inc."},
+            {"symbol": "MSFT", "name": "Microsoft Corporation"},
+        ]
+
+        with mock.patch("duk.cli.actively_trading_list_api") as mock_api:
+            mock_api.return_value = mock_data
+
+            runner = CliRunner()
+            with tempfile.TemporaryDirectory() as tmpdir:
+                config_path = os.path.join(tmpdir, "test.toml")
+
+                # Create a test config file with API key
+                with open(config_path, "w") as f:
+                    f.write("[api]\n")
+                    f.write('fmp_key = "test_key"\n')
+
+                result = runner.invoke(
+                    main, ["--config", config_path, "ls", "--summary", "-q"]
+                )
+
+                assert result.exit_code == 0
+                # Should not show count when quiet flag is set
+                assert "Number of results:" not in result.output

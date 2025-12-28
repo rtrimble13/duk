@@ -833,3 +833,69 @@ class TestPhCommand:
                 mock_get.assert_called_once()
                 call_kwargs = mock_get.call_args[1]
                 assert call_kwargs["adjusted"] is False
+
+    def test_ph_summary_flag(self):
+        """Test ph command with --summary flag."""
+        mock_df = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2023-01-01", "2023-01-02", "2023-01-03"]),
+                "close": [100.0, 110.0, 105.0],
+            }
+        )
+        mock_df = mock_df.set_index("date")
+
+        with mock.patch("duk.cli.get_price_history") as mock_get:
+            mock_get.return_value = mock_df
+
+            runner = CliRunner()
+            with tempfile.TemporaryDirectory() as tmpdir:
+                config_path = os.path.join(tmpdir, "test.toml")
+                with open(config_path, "w") as f:
+                    f.write("[api]\n")
+                    f.write('fmp_key = "test_key"\n')
+
+                result = runner.invoke(
+                    main, ["--config", config_path, "ph", "AAPL", "--summary"]
+                )
+
+                assert result.exit_code == 0
+                # Output should contain summary statistics
+                assert "SUMMARY STATISTICS" in result.output
+                assert "Number of observations:" in result.output
+                assert "Date range:" in result.output
+                assert "close:" in result.output
+                assert "Min:" in result.output
+                assert "Max:" in result.output
+                assert "Mean:" in result.output
+                assert "Median:" in result.output
+                # Should not contain raw data
+                assert "date,close" not in result.output
+
+    def test_ph_summary_with_quiet(self):
+        """Test ph command with --summary and --quiet flags."""
+        mock_df = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2023-01-01", "2023-01-02"]),
+                "close": [100.0, 110.0],
+            }
+        )
+        mock_df = mock_df.set_index("date")
+
+        with mock.patch("duk.cli.get_price_history") as mock_get:
+            mock_get.return_value = mock_df
+
+            runner = CliRunner()
+            with tempfile.TemporaryDirectory() as tmpdir:
+                config_path = os.path.join(tmpdir, "test.toml")
+                with open(config_path, "w") as f:
+                    f.write("[api]\n")
+                    f.write('fmp_key = "test_key"\n')
+
+                result = runner.invoke(
+                    main, ["--config", config_path, "ph", "AAPL", "--summary", "-q"]
+                )
+
+                assert result.exit_code == 0
+                # Output should not contain summary statistics when quiet flag is set
+                assert "SUMMARY STATISTICS" not in result.output
+                assert "Number of observations:" not in result.output
