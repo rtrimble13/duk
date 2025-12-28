@@ -57,7 +57,7 @@ def compute_summary_stats(df, date_column="date"):
         try:
             stats["min_date"] = pd.to_datetime(date_col).min()
             stats["max_date"] = pd.to_datetime(date_col).max()
-        except Exception as e:
+        except (ValueError, TypeError) as e:
             logger.debug(f"Could not compute date range: {e}")
             stats["min_date"] = None
             stats["max_date"] = None
