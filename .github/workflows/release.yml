@@ -1,0 +1,115 @@
+name: Release
+
+# Trigger on semantic version tags (e.g., v1.2.3, v0.1.0, v2.0.0-beta.1)
+# This workflow creates GitHub Releases with distribution artifacts
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'        # Matches v1.2.3
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'      # Matches v1.2.3-beta.1, v1.2.3-rc.1, etc.
+
+# Minimal permissions required for this workflow
+permissions:
+  contents: write    # Required to create releases and upload assets
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Check out the repository at the tagged commit
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      
+      # Step 2: Set up Python environment
+      # Using Python 3.12 for stable build environment
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'    # Cache pip dependencies for faster builds
+      
+      # Step 3: Install build dependencies
+      # Upgrade pip and install the build package for creating distributions
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install build
+      
+      # Step 4: Install project dependencies
+      # Install the package with dev dependencies to run tests
+      - name: Install project dependencies
+        run: |
+          python -m pip install .[dev]
+      
+      # Step 5: Run tests to verify the build
+      # Ensure the tagged version passes all tests before creating release
+      - name: Run tests
+        run: |
+          python -m pytest test/ -v
+      
+      # Step 6: Verify CLI functionality
+      # Quick smoke test to ensure the CLI tool works
+      - name: Test CLI functionality
+        run: |
+          duk --help
+      
+      # Step 7: Build distribution packages
+      # Creates both wheel (.whl) and source distribution (.tar.gz)
+      - name: Build distribution packages
+        run: |
+          python -m build
+      
+      # Step 8: Extract version from tag
+      # Remove 'v' prefix from tag name for use in release notes
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Release version: ${VERSION}"
+      
+      # Step 9: Generate release notes
+      # Create a temporary file with release information
+      - name: Generate release notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## Release ${{ steps.version.outputs.version }}
+          
+          ### Installation
+          
+          Install via pip:
+          ```bash
+          pip install duk==${{ steps.version.outputs.version }}
+          ```
+          
+          Or download the distribution files below and install locally.
+          
+          ### What's Changed
+          
+          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/CHANGELOG.md) for detailed changes.
+          
+          **Full Changelog**: https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}
+          EOF
+      
+      # Step 10: Create GitHub Release
+      # Uses gh CLI to create a release with the built artifacts
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "Release ${{ steps.version.outputs.version }}" \
+            --notes-file release_notes.md \
+            dist/*.whl \
+            dist/*.tar.gz
+      
+      # Step 11: Upload build artifacts to workflow
+      # Keep artifacts available in the workflow for 30 days
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-packages
+          path: dist/
+          retention-days: 30
