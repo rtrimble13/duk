@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "duk"
-version = "1.0.2"
+name = "tb-duk"
+version = "1.0.3"
 description = "A CLI tool and library for downloading markets and financial data through various APIs"
 readme = "README.md"
 requires-python = ">=3.9"
