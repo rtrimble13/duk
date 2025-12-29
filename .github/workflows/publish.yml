@@ -1,8 +1,9 @@
 name: Publish Python
 
 on:
-  release:
-    types: [published]            # Trigger when a release is published
+  push:
+    tags:
+      - 'v*'
 
 jobs:
     pypi-publish:
