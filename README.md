@@ -7,7 +7,7 @@ A CLI tool and library for downloading markets and financial data through variou
 ### Using pip
 
 ```bash
-pip install duk
+pip install tb-duk
 ```
 
 ### From source
