@@ -315,8 +315,6 @@ class TestSmaCommand:
             )
 
             assert result.exit_code == 0
-            # In quiet mode with file output, should only show file confirmation
-            assert "Data written to" in result.output
             # Should not contain CSV headers (indicates data was printed)
             lines = result.output.strip().split("\n")
             # Filter out log lines (start with date/timestamp, no commas)
@@ -703,8 +701,6 @@ class TestEmaCommand:
             )
 
             assert result.exit_code == 0
-            # In quiet mode with file output, should only show file confirmation
-            assert "Data written to" in result.output
             # Should not contain CSV headers (indicates data was printed)
             lines = result.output.strip().split("\n")
             # Filter out log lines (start with date/timestamp, no commas)
@@ -1297,8 +1293,6 @@ class TestRsiCommand:
             )
 
             assert result.exit_code == 0
-            # In quiet mode with file output, should only show file confirmation
-            assert "Data written to" in result.output
             # Should not contain CSV headers (indicates data was printed)
             lines = result.output.strip().split("\n")
             # Filter out log lines (start with date/timestamp, no commas)

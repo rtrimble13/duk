@@ -256,14 +256,6 @@ def ph(
 
     logger.info(f"Retrieved {len(df)} records for {symbol}")
 
-    # If summary flag is set, compute and print summary statistics instead
-    if summary:
-        if not quiet:
-            stats = compute_summary_stats(df.reset_index())
-            output_text = format_summary_stats(stats)
-            click.echo(output_text)
-        sys.exit(0)
-
     # Prepare output
     # Reset index to include date as a column in output
     output_df = df.reset_index()
@@ -296,10 +288,17 @@ def ph(
 
     # Print to stdout unless quiet flag is set
     if not quiet:
-        if output_format == "json":
-            click.echo(output_df.to_json(orient="records", date_format="iso"))
+        # Print summary statistics if requested
+        if summary:
+            stats = compute_summary_stats(df.reset_index())
+            output_text = format_summary_stats(stats)
+            click.echo(output_text)
+        # Otherwise print data
         else:
-            click.echo(output_df.to_csv(index=False))
+            if output_format == "json":
+                click.echo(output_df.to_json(orient="records", date_format="iso"))
+            else:
+                click.echo(output_df.to_csv(index=False))
 
 
 @main.command()
@@ -496,14 +495,6 @@ def yc(
 
     logger.info(f"Retrieved yield curve data with {len(df)} records")
 
-    # If summary flag is set, compute and print summary statistics instead
-    if summary:
-        if not quiet:
-            stats = compute_summary_stats(df.reset_index())
-            output_text = format_summary_stats(stats, precision=precision)
-            click.echo(output_text)
-        sys.exit(0)
-
     # Prepare output
     # Reset index to include date/tenor as a column in output
     output_df = df.reset_index()
@@ -536,10 +527,17 @@ def yc(
 
     # Print to stdout unless quiet flag is set
     if not quiet:
-        if output_format == "json":
-            click.echo(output_df.to_json(orient="records", date_format="iso"))
+        # Print summary statistics if requested
+        if summary:
+            stats = compute_summary_stats(df.reset_index())
+            output_text = format_summary_stats(stats)
+            click.echo(output_text)
+        # Otherwise print data
         else:
-            click.echo(output_df.to_csv(index=False))
+            if output_format == "json":
+                click.echo(output_df.to_json(orient="records", date_format="iso"))
+            else:
+                click.echo(output_df.to_csv(index=False))
 
 
 @main.command()
@@ -931,13 +929,6 @@ def ls(
         click.echo(f"Error: Failed to fetch list data: {e}", err=True)
         sys.exit(1)
 
-    # If summary flag is set, compute and print summary statistics instead
-    if summary:
-        if not quiet:
-            # For ls command, only show the number of search results
-            click.echo(f"Number of results: {len(df)}")
-        sys.exit(0)
-
     # Handle output to file
     if output:
         output_path = Path(output)
@@ -958,10 +949,15 @@ def ls(
 
     # Print to stdout unless quiet flag is set
     if not quiet:
-        if output_format == "json":
-            click.echo(df.to_json(orient="records", date_format="iso"))
+        # Print summary statistics if requested
+        if summary:
+            click.echo(f"Number of results: {len(df)}")
+        # Otherwise print data
         else:
-            click.echo(df.to_csv(index=False))
+            if output_format == "json":
+                click.echo(df.to_json(orient="records", date_format="iso"))
+            else:
+                click.echo(df.to_csv(index=False))
 
 
 @main.command()
@@ -1323,14 +1319,6 @@ def rc(
     # Apply precision to numeric columns
     output_df = apply_precision_to_dataframe(output_df, precision)
 
-    # If summary flag is set, compute and print summary statistics instead
-    if summary:
-        if not quiet:
-            stats = compute_summary_stats(output_df)
-            output_text = format_summary_stats(stats, precision=precision)
-            click.echo(output_text)
-        sys.exit(0)
-
     # Handle output to file
     if output:
         output_path = Path(output)
@@ -1356,10 +1344,17 @@ def rc(
 
     # Print to stdout unless quiet flag is set
     if not quiet:
-        if output_format == "json":
-            click.echo(output_df.to_json(orient="records", date_format="iso"))
+        # Print summary statistics if requested
+        if summary:
+            stats = compute_summary_stats(output_df)
+            output_text = format_summary_stats(stats)
+            click.echo(output_text)
+        # Otherwise print data
         else:
-            click.echo(output_df.to_csv(index=False))
+            if output_format == "json":
+                click.echo(output_df.to_json(orient="records", date_format="iso"))
+            else:
+                click.echo(output_df.to_csv(index=False))
 
 
 @main.group()
@@ -1531,14 +1526,6 @@ def sma(
     # Apply precision to numeric columns
     result_df = apply_precision_to_dataframe(result_df, precision)
 
-    # If summary flag is set, compute and print summary statistics instead
-    if summary:
-        if not quiet:
-            stats = compute_summary_stats(result_df)
-            output_text = format_summary_stats(stats, precision=precision)
-            click.echo(output_text)
-        sys.exit(0)
-
     # Handle output to file
     if output:
         output_path = Path(output)
@@ -1564,10 +1551,17 @@ def sma(
 
     # Print to stdout unless quiet flag is set
     if not quiet:
-        if output_format == "json":
-            click.echo(result_df.to_json(orient="records", date_format="iso"))
+        # Print summary statistics if requested
+        if summary:
+            stats = compute_summary_stats(result_df)
+            output_text = format_summary_stats(stats)
+            click.echo(output_text)
+        # Otherwise print data
         else:
-            click.echo(result_df.to_csv(index=False))
+            if output_format == "json":
+                click.echo(result_df.to_json(orient="records", date_format="iso"))
+            else:
+                click.echo(result_df.to_csv(index=False))
 
 
 @ti.command()
@@ -1727,14 +1721,6 @@ def ema(
     # Apply precision to numeric columns
     result_df = apply_precision_to_dataframe(result_df, precision)
 
-    # If summary flag is set, compute and print summary statistics instead
-    if summary:
-        if not quiet:
-            stats = compute_summary_stats(result_df)
-            output_text = format_summary_stats(stats, precision=precision)
-            click.echo(output_text)
-        sys.exit(0)
-
     # Handle output to file
     if output:
         output_path = Path(output)
@@ -1760,10 +1746,17 @@ def ema(
 
     # Print to stdout unless quiet flag is set
     if not quiet:
-        if output_format == "json":
-            click.echo(result_df.to_json(orient="records", date_format="iso"))
+        # Print summary statistics if requested
+        if summary:
+            stats = compute_summary_stats(result_df)
+            output_text = format_summary_stats(stats)
+            click.echo(output_text)
+        # Otherwise print data
         else:
-            click.echo(result_df.to_csv(index=False))
+            if output_format == "json":
+                click.echo(result_df.to_json(orient="records", date_format="iso"))
+            else:
+                click.echo(result_df.to_csv(index=False))
 
 
 @ti.command()
@@ -1930,14 +1923,6 @@ def rsi(
     # Apply precision to numeric columns
     result_df = apply_precision_to_dataframe(result_df, precision)
 
-    # If summary flag is set, compute and print summary statistics instead
-    if summary:
-        if not quiet:
-            stats = compute_summary_stats(result_df)
-            output_text = format_summary_stats(stats, precision=precision)
-            click.echo(output_text)
-        sys.exit(0)
-
     # Handle output to file
     if output:
         output_path = Path(output)
@@ -1963,10 +1948,17 @@ def rsi(
 
     # Print to stdout unless quiet flag is set
     if not quiet:
-        if output_format == "json":
-            click.echo(result_df.to_json(orient="records", date_format="iso"))
+        # Print summary statistics if requested
+        if summary:
+            stats = compute_summary_stats(result_df)
+            output_text = format_summary_stats(stats)
+            click.echo(output_text)
+        # Otherwise print data
         else:
-            click.echo(result_df.to_csv(index=False))
+            if output_format == "json":
+                click.echo(result_df.to_json(orient="records", date_format="iso"))
+            else:
+                click.echo(result_df.to_csv(index=False))
 
 
 if __name__ == "__main__":
