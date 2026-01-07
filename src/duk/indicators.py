@@ -380,6 +380,15 @@ def calculate_macd(
             if not columns_to_process:
                 raise IndicatorCalculationError("No numeric columns found in DataFrame")
 
+    # Check if we have sufficient data for meaningful MACD calculation
+    # While the function will work with less data (producing NaN values),
+    # we log a warning to inform the user
+    if len(df) < slow_window:
+        logger.warning(
+            f"Data length ({len(df)}) is less than slow_window ({slow_window}). "
+            f"MACD line will be NaN for all records."
+        )
+
     logger.debug(
         f"Calculating MACD with fast_window={fast_window}, slow_window={slow_window}, "
         f"signal_window={signal_window} on columns: {columns_to_process}"

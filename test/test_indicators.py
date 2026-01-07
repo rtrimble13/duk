@@ -743,7 +743,15 @@ class TestCalculateMACD:
         """Test MACD calculation with a Series."""
         # Create a series with enough data points
         prices = pd.Series([100 + i for i in range(50)])
-        result = calculate_macd(prices, fast_window=12, slow_window=26, signal_window=9)
+        fast_window = 12
+        slow_window = 26
+        signal_window = 9
+        result = calculate_macd(
+            prices,
+            fast_window=fast_window,
+            slow_window=slow_window,
+            signal_window=signal_window,
+        )
 
         assert "value" in result.columns
         assert "value_macd" in result.columns
@@ -753,16 +761,17 @@ class TestCalculateMACD:
 
         # Early values should be NaN (not enough data for slow EMA)
         assert pd.isna(result["value_macd"].iloc[0])
-        assert pd.isna(result["value_macd"].iloc[24])
+        assert pd.isna(result["value_macd"].iloc[slow_window - 2])
 
         # After slow_window, MACD should have values
-        assert not pd.isna(result["value_macd"].iloc[25])
+        assert not pd.isna(result["value_macd"].iloc[slow_window - 1])
 
         # Signal line needs more data for calculation
         # Signal starts at index slow_window + signal_window - 1
-        # For slow=26, signal=9: signal starts at index 26+9-1=34
         assert pd.isna(result["value_macd_signal"].iloc[0])
-        assert not pd.isna(result["value_macd_signal"].iloc[34])
+        assert not pd.isna(
+            result["value_macd_signal"].iloc[slow_window + signal_window - 1]
+        )
 
     def test_macd_dataframe_with_column(self):
         """Test MACD calculation with DataFrame and specific column."""
