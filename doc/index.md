@@ -56,6 +56,23 @@ The duk CLI provides several subcommands for interacting with financial data API
 - Calculate cumulative and annualized returns
 - Apply multi-period lookback analysis
 
+### ti - Technical Indicators
+
+- [ti Command Documentation](ti_command.md) - Calculate technical indicators on financial data
+
+**Usage**: `duk ti <indicator> [OPTIONS]`
+
+**Available Indicators**:
+- SMA - Simple Moving Average
+- EMA - Exponential Moving Average
+- RSI - Relative Strength Index
+- MACD - Moving Average Convergence Divergence
+
+**Examples**:
+- Calculate moving averages for trend analysis
+- Compute RSI for overbought/oversold signals
+- Generate MACD for momentum analysis
+
 ## Python Library API
 
 The duk library can be used programmatically in Python applications:

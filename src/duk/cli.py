@@ -20,7 +20,7 @@ from duk.fmp_api import (
     industry_list_api,
     sector_list_api,
 )
-from duk.indicators import calculate_ema, calculate_rsi, calculate_sma
+from duk.indicators import calculate_ema, calculate_macd, calculate_rsi, calculate_sma
 from duk.logging_config import setup_logging
 from duk.ls_utils import process_industries, process_sectors, screen_securities
 from duk.return_utils import (
@@ -1918,6 +1918,247 @@ def rsi(
     except Exception as e:
         logger.error(f"Failed to calculate RSI: {e}")
         click.echo(f"Error: Failed to calculate RSI: {e}", err=True)
+        sys.exit(1)
+
+    # Apply precision to numeric columns
+    result_df = apply_precision_to_dataframe(result_df, precision)
+
+    # Handle output to file
+    if output:
+        output_path = Path(output)
+
+        # Ensure parent directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write to file based on format
+        try:
+            if output_format == "json":
+                result_df.to_json(output_path, orient="records", date_format="iso")
+            else:
+                result_df.to_csv(output_path, index=False)
+
+            logger.info(f"Data written to {output_path}")
+
+            if not quiet:
+                click.echo(f"Data written to {output_path}")
+        except Exception as e:
+            logger.error(f"Failed to write output file: {e}")
+            click.echo(f"Error: Failed to write output file: {e}", err=True)
+            sys.exit(1)
+
+    # Print to stdout unless quiet flag is set
+    if not quiet:
+        # Print summary statistics if requested
+        if summary:
+            stats = compute_summary_stats(result_df)
+            output_text = format_summary_stats(stats)
+            click.echo(output_text)
+        # Otherwise print data
+        else:
+            if output_format == "json":
+                click.echo(result_df.to_json(orient="records", date_format="iso"))
+            else:
+                click.echo(result_df.to_csv(index=False))
+
+
+@ti.command()
+@click.option("-v", "--verbose", is_flag=True, help="Print all logging to stdout")
+@click.option(
+    "-q", "--quiet", is_flag=True, help="Suppress printing indicator data to stdout"
+)
+@click.option(
+    "-i",
+    "--input",
+    "input_file",
+    type=click.Path(exists=True),
+    required=True,
+    help="Input file containing price data (CSV or JSON)",
+)
+@click.option(
+    "-c",
+    "--column",
+    required=True,
+    help="Column name to calculate MACD on (e.g., 'close', 'high', 'low')",
+)
+@click.option(
+    "--fast-window",
+    type=int,
+    default=12,
+    help="Fast EMA window size (number of periods, default: 12)",
+)
+@click.option(
+    "--slow-window",
+    type=int,
+    default=26,
+    help="Slow EMA window size (number of periods, default: 26)",
+)
+@click.option(
+    "--signal-window",
+    type=int,
+    default=9,
+    help="Signal line EMA window size (number of periods, default: 9)",
+)
+@click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
+@click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
+@click.option(
+    "--summary",
+    is_flag=True,
+    help="Print summary statistics instead of data observations",
+)
+@click.option(
+    "-p",
+    "--precision",
+    type=int,
+    default=3,
+    help="Decimal precision for output values (default: 3)",
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(),
+    help="Write data to file",
+)
+@click.pass_context
+def macd(
+    ctx,
+    verbose,
+    quiet,
+    input_file,
+    column,
+    fast_window,
+    slow_window,
+    signal_window,
+    output_csv,
+    output_json,
+    summary,
+    precision,
+    output,
+):
+    """
+    Calculate Moving Average Convergence Divergence (MACD) on input data.
+
+    The MACD is a trend-following momentum indicator that shows the relationship
+    between two exponential moving averages (EMAs). It consists of:
+    - MACD Line: Difference between fast EMA and slow EMA
+    - Signal Line: EMA of the MACD line
+    - Histogram: Difference between MACD line and signal line
+
+    The MACD is commonly used to identify trend changes and momentum. When MACD
+    crosses above the signal line, it's a bullish signal. When it crosses below,
+    it's a bearish signal.
+
+    Example:
+        duk ti macd --input prices.csv --column close --output macd_result.csv
+    """
+    # Get logger from context
+    logger = ctx.obj.get("logger", logging.getLogger("duk"))
+
+    # Adjust logging based on verbose flag
+    if verbose:
+        logger.setLevel(logging.INFO)
+        # Enable console output for all handlers
+        for handler in logger.handlers:
+            if isinstance(handler, logging.StreamHandler) and not isinstance(
+                handler, logging.FileHandler
+            ):
+                handler.setLevel(logging.DEBUG)
+
+    logger.info(f"Computing MACD from {input_file}")
+
+    # Validate windows
+    if fast_window <= 0:
+        logger.error("Fast window must be greater than 0")
+        click.echo("Error: Fast window must be greater than 0", err=True)
+        sys.exit(1)
+    if slow_window <= 0:
+        logger.error("Slow window must be greater than 0")
+        click.echo("Error: Slow window must be greater than 0", err=True)
+        sys.exit(1)
+    if signal_window <= 0:
+        logger.error("Signal window must be greater than 0")
+        click.echo("Error: Signal window must be greater than 0", err=True)
+        sys.exit(1)
+    if fast_window >= slow_window:
+        logger.error("Fast window must be less than slow window")
+        click.echo("Error: Fast window must be less than slow window", err=True)
+        sys.exit(1)
+
+    # Determine output format
+    if output_csv and output_json:
+        logger.error("Only one output format can be specified")
+        click.echo(
+            "Error: Only one of --csv or --json can be specified",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Default to CSV if neither is specified
+    output_format = "json" if output_json else "csv"
+
+    # Read input file
+    try:
+        input_path = Path(input_file)
+        if input_path.suffix.lower() == ".json":
+            df = pd.read_json(input_file)
+        else:
+            # Default to CSV
+            df = pd.read_csv(input_file)
+
+        logger.info(f"Read {len(df)} records from {input_file}")
+    except Exception as e:
+        logger.error(f"Failed to read input file: {e}")
+        click.echo(f"Error: Failed to read input file: {e}", err=True)
+        sys.exit(1)
+
+    if df.empty:
+        logger.warning("Input file contains no data")
+        click.echo("Error: Input file contains no data", err=True)
+        sys.exit(1)
+
+    # Validate column exists
+    if column not in df.columns:
+        logger.error(f"Column '{column}' not found in input data")
+        click.echo(
+            f"Error: Column '{column}' not found in input data. "
+            f"Available columns: {list(df.columns)}",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Validate column is numeric
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        logger.error(f"Column '{column}' is not numeric")
+        click.echo(f"Error: Column '{column}' must be numeric", err=True)
+        sys.exit(1)
+
+    # Check if we have enough data points
+    # MACD needs slow_window + signal_window records for full calculation
+    min_required = slow_window + signal_window
+    if len(df) < min_required:
+        logger.warning(
+            f"Input data has {len(df)} records, but MACD with "
+            f"slow_window={slow_window} and signal_window={signal_window} "
+            f"requires at least {min_required} records. "
+            f"MACD values will be NaN for early records."
+        )
+
+    # Calculate MACD
+    try:
+        result_df = calculate_macd(
+            df,
+            column=column,
+            fast_window=fast_window,
+            slow_window=slow_window,
+            signal_window=signal_window,
+        )
+        logger.info(
+            f"Calculated MACD with fast_window={fast_window}, "
+            f"slow_window={slow_window}, signal_window={signal_window} "
+            f"on column '{column}'"
+        )
+    except Exception as e:
+        logger.error(f"Failed to calculate MACD: {e}")
+        click.echo(f"Error: Failed to calculate MACD: {e}", err=True)
         sys.exit(1)
 
     # Apply precision to numeric columns

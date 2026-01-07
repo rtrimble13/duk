@@ -289,3 +289,141 @@ def calculate_rsi(
     logger.info(f"Calculated RSI with window={window}")
 
     return df
+
+
+def calculate_macd(
+    data: Union[pd.Series, pd.DataFrame],
+    column: str = None,
+    fast_window: int = 12,
+    slow_window: int = 26,
+    signal_window: int = 9,
+) -> pd.DataFrame:
+    """
+    Calculate Moving Average Convergence Divergence (MACD) on a dataset.
+
+    The MACD is a trend-following momentum indicator that shows the relationship
+    between two exponential moving averages (EMAs) of a security's price. The MACD
+    consists of three components:
+    1. MACD Line: The difference between the fast EMA and slow EMA
+    2. Signal Line: An EMA of the MACD line
+    3. Histogram: The difference between the MACD line and signal line
+
+    The MACD is commonly used to identify trend changes and momentum:
+    - When MACD crosses above the signal line, it's a bullish signal
+    - When MACD crosses below the signal line, it's a bearish signal
+    - The histogram shows the strength of the trend
+
+    Args:
+        data: Input data as Series or DataFrame. If DataFrame and column is specified,
+            MACD is calculated on that column. If column is None, MACD is calculated
+            on all numeric columns.
+        column: Name of column to calculate MACD on. Only used if data is DataFrame.
+            If None, calculates MACD on all numeric columns.
+        fast_window: Number of periods for the fast EMA. Must be > 0.
+            Default is 12.
+        slow_window: Number of periods for the slow EMA. Must be > 0.
+            Default is 26. Must be greater than fast_window.
+        signal_window: Number of periods for the signal line EMA. Must be > 0.
+            Default is 9.
+
+    Returns:
+        DataFrame with original data and MACD columns. For each processed column,
+        three new columns are added:
+        - '{column}_macd': The MACD line (fast EMA - slow EMA)
+        - '{column}_macd_signal': The signal line (EMA of MACD)
+        - '{column}_macd_hist': The histogram (MACD - signal)
+        When input is a Series, the series is converted to a DataFrame with column
+        name 'value', so the MACD columns will be 'value_macd', 'value_macd_signal',
+        and 'value_macd_hist'.
+
+    Raises:
+        IndicatorCalculationError: If windows are invalid, column doesn't exist,
+            or data contains no numeric columns.
+
+    Examples:
+        >>> prices = pd.Series([100, 105, 103, 108, 110, 107, 112, 115] * 5)
+        >>> df = calculate_macd(prices, fast_window=12, slow_window=26, signal_window=9)
+        >>> # Returns DataFrame with 'value', 'value_macd', 'value_macd_signal',
+        >>> # and 'value_macd_hist' columns
+
+        >>> df = pd.DataFrame({'close': [100, 105, 103, 108, 110] * 10})
+        >>> result = calculate_macd(df, column='close')
+        >>> # Returns DataFrame with 'close', 'close_macd', 'close_macd_signal',
+        >>> # and 'close_macd_hist' columns
+    """
+    if fast_window <= 0:
+        raise IndicatorCalculationError("Fast window must be greater than 0")
+    if slow_window <= 0:
+        raise IndicatorCalculationError("Slow window must be greater than 0")
+    if signal_window <= 0:
+        raise IndicatorCalculationError("Signal window must be greater than 0")
+    if fast_window >= slow_window:
+        raise IndicatorCalculationError("Fast window must be less than slow window")
+
+    # Convert Series to DataFrame for consistent processing
+    if isinstance(data, pd.Series):
+        df = data.to_frame(name="value")
+        columns_to_process = ["value"]
+    else:
+        df = data.copy()
+        if column is not None:
+            # Validate column exists
+            if column not in df.columns:
+                raise IndicatorCalculationError(
+                    f"Column '{column}' not found in DataFrame. "
+                    f"Available columns: {list(df.columns)}"
+                )
+            columns_to_process = [column]
+        else:
+            # Process all numeric columns
+            columns_to_process = df.select_dtypes(include=["number"]).columns.tolist()
+            if not columns_to_process:
+                raise IndicatorCalculationError("No numeric columns found in DataFrame")
+
+    # Check if we have sufficient data for meaningful MACD calculation
+    # While the function will work with less data (producing NaN values),
+    # we log a warning to inform the user
+    if len(df) < slow_window:
+        logger.warning(
+            f"Data length ({len(df)}) is less than slow_window ({slow_window}). "
+            f"MACD line will be NaN for all records."
+        )
+
+    logger.debug(
+        f"Calculating MACD with fast_window={fast_window}, slow_window={slow_window}, "
+        f"signal_window={signal_window} on columns: {columns_to_process}"
+    )
+
+    # Calculate MACD for each column
+    for col in columns_to_process:
+        # Calculate fast and slow EMAs
+        fast_ema = (
+            df[col].ewm(span=fast_window, adjust=False, min_periods=fast_window).mean()
+        )
+        slow_ema = (
+            df[col].ewm(span=slow_window, adjust=False, min_periods=slow_window).mean()
+        )
+
+        # Calculate MACD line (fast EMA - slow EMA)
+        macd_line = fast_ema - slow_ema
+        macd_col_name = f"{col}_macd"
+        df[macd_col_name] = macd_line
+
+        # Calculate signal line (EMA of MACD line)
+        signal_line = macd_line.ewm(
+            span=signal_window, adjust=False, min_periods=signal_window
+        ).mean()
+        signal_col_name = f"{col}_macd_signal"
+        df[signal_col_name] = signal_line
+
+        # Calculate histogram (MACD - signal)
+        histogram = macd_line - signal_line
+        hist_col_name = f"{col}_macd_hist"
+        df[hist_col_name] = histogram
+
+    logger.info(
+        f"Calculated MACD with fast_window={fast_window}, slow_window={slow_window}, "
+        f"signal_window={signal_window}"
+    )
+
+    return df

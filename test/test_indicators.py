@@ -9,6 +9,7 @@ import pytest
 from duk.indicators import (
     IndicatorCalculationError,
     calculate_ema,
+    calculate_macd,
     calculate_rsi,
     calculate_sma,
 )
@@ -733,3 +734,259 @@ class TestCompareSmaAndEma:
         # Check last value
         assert np.isclose(sma_result["value_sma_10"].iloc[-1], 100)
         assert np.isclose(ema_result["value_ema_10"].iloc[-1], 100, rtol=0.01)
+
+
+class TestCalculateMACD:
+    """Tests for calculate_macd function."""
+
+    def test_macd_basic_series(self):
+        """Test MACD calculation with a Series."""
+        # Create a series with enough data points
+        prices = pd.Series([100 + i for i in range(50)])
+        fast_window = 12
+        slow_window = 26
+        signal_window = 9
+        result = calculate_macd(
+            prices,
+            fast_window=fast_window,
+            slow_window=slow_window,
+            signal_window=signal_window,
+        )
+
+        assert "value" in result.columns
+        assert "value_macd" in result.columns
+        assert "value_macd_signal" in result.columns
+        assert "value_macd_hist" in result.columns
+        assert len(result) == 50
+
+        # Early values should be NaN (not enough data for slow EMA)
+        assert pd.isna(result["value_macd"].iloc[0])
+        assert pd.isna(result["value_macd"].iloc[slow_window - 2])
+
+        # After slow_window, MACD should have values
+        assert not pd.isna(result["value_macd"].iloc[slow_window - 1])
+
+        # Signal line needs more data for calculation
+        # Signal starts at index slow_window + signal_window - 1
+        assert pd.isna(result["value_macd_signal"].iloc[0])
+        assert not pd.isna(
+            result["value_macd_signal"].iloc[slow_window + signal_window - 1]
+        )
+
+    def test_macd_dataframe_with_column(self):
+        """Test MACD calculation with DataFrame and specific column."""
+        df = pd.DataFrame(
+            {
+                "close": [100 + i for i in range(50)],
+                "volume": [1000 + i * 10 for i in range(50)],
+            }
+        )
+        result = calculate_macd(df, column="close", fast_window=12, slow_window=26)
+
+        assert "close" in result.columns
+        assert "close_macd" in result.columns
+        assert "close_macd_signal" in result.columns
+        assert "close_macd_hist" in result.columns
+        assert "volume" in result.columns
+        # Volume should not have MACD columns
+        assert "volume_macd" not in result.columns
+
+    def test_macd_dataframe_without_column(self):
+        """Test MACD calculation with DataFrame on all numeric columns."""
+        df = pd.DataFrame(
+            {
+                "close": [100 + i for i in range(50)],
+                "volume": [1000 + i * 10 for i in range(50)],
+            }
+        )
+        result = calculate_macd(df, fast_window=12, slow_window=26, signal_window=9)
+
+        assert "close_macd" in result.columns
+        assert "close_macd_signal" in result.columns
+        assert "close_macd_hist" in result.columns
+        assert "volume_macd" in result.columns
+        assert "volume_macd_signal" in result.columns
+        assert "volume_macd_hist" in result.columns
+
+    def test_macd_uptrend(self):
+        """Test MACD with strong uptrend - MACD should be positive."""
+        # Create strong uptrend
+        prices = pd.Series([100 + i * 2 for i in range(50)])
+        result = calculate_macd(prices, fast_window=12, slow_window=26, signal_window=9)
+
+        # In an uptrend, MACD (fast EMA - slow EMA) should be positive
+        # since fast EMA responds more quickly to rising prices
+        valid_macd = result["value_macd"].dropna()
+        assert len(valid_macd) > 0
+        # Most MACD values in uptrend should be positive
+        assert (valid_macd > 0).sum() > len(valid_macd) * 0.7
+
+    def test_macd_downtrend(self):
+        """Test MACD with strong downtrend - MACD should be negative."""
+        # Create strong downtrend
+        prices = pd.Series([200 - i * 2 for i in range(50)])
+        result = calculate_macd(prices, fast_window=12, slow_window=26, signal_window=9)
+
+        # In a downtrend, MACD should be negative
+        valid_macd = result["value_macd"].dropna()
+        assert len(valid_macd) > 0
+        # Most MACD values in downtrend should be negative
+        assert (valid_macd < 0).sum() > len(valid_macd) * 0.7
+
+    def test_macd_histogram_calculation(self):
+        """Test that histogram is correctly calculated as MACD - signal."""
+        prices = pd.Series([100 + i for i in range(50)])
+        result = calculate_macd(prices, fast_window=12, slow_window=26, signal_window=9)
+
+        # Drop NaN values
+        valid_rows = result.dropna(subset=["value_macd_hist"])
+
+        # Verify histogram = MACD - signal
+        for idx in valid_rows.index:
+            expected_hist = (
+                result.loc[idx, "value_macd"] - result.loc[idx, "value_macd_signal"]
+            )
+            actual_hist = result.loc[idx, "value_macd_hist"]
+            assert np.isclose(actual_hist, expected_hist, rtol=1e-5)
+
+    def test_macd_with_custom_windows(self):
+        """Test MACD with custom window parameters."""
+        prices = pd.Series([100 + i for i in range(50)])
+        result = calculate_macd(prices, fast_window=5, slow_window=10, signal_window=3)
+
+        assert "value_macd" in result.columns
+        assert "value_macd_signal" in result.columns
+        assert "value_macd_hist" in result.columns
+
+        # With smaller windows, we should have more valid values earlier
+        # After slow_window (10), MACD should exist
+        assert not pd.isna(result["value_macd"].iloc[9])
+
+    def test_macd_with_nan_values(self):
+        """Test MACD calculation with NaN values in data."""
+        prices = pd.Series([100 + i if i != 10 else np.nan for i in range(50)])
+        result = calculate_macd(prices, fast_window=12, slow_window=26, signal_window=9)
+
+        # NaN should propagate through the calculation
+        assert pd.isna(result["value_macd"].iloc[10])
+
+    def test_macd_invalid_fast_window_zero(self):
+        """Test MACD with fast_window=0."""
+        prices = pd.Series([100, 105, 103])
+        with pytest.raises(
+            IndicatorCalculationError, match="Fast window must be greater than 0"
+        ):
+            calculate_macd(prices, fast_window=0, slow_window=26, signal_window=9)
+
+    def test_macd_invalid_slow_window_zero(self):
+        """Test MACD with slow_window=0."""
+        prices = pd.Series([100, 105, 103])
+        with pytest.raises(
+            IndicatorCalculationError, match="Slow window must be greater than 0"
+        ):
+            calculate_macd(prices, fast_window=12, slow_window=0, signal_window=9)
+
+    def test_macd_invalid_signal_window_zero(self):
+        """Test MACD with signal_window=0."""
+        prices = pd.Series([100, 105, 103])
+        with pytest.raises(
+            IndicatorCalculationError, match="Signal window must be greater than 0"
+        ):
+            calculate_macd(prices, fast_window=12, slow_window=26, signal_window=0)
+
+    def test_macd_invalid_fast_window_negative(self):
+        """Test MACD with negative fast_window."""
+        prices = pd.Series([100, 105, 103])
+        with pytest.raises(
+            IndicatorCalculationError, match="Fast window must be greater than 0"
+        ):
+            calculate_macd(prices, fast_window=-1, slow_window=26, signal_window=9)
+
+    def test_macd_fast_greater_than_slow(self):
+        """Test MACD when fast_window >= slow_window."""
+        prices = pd.Series([100, 105, 103])
+        with pytest.raises(
+            IndicatorCalculationError, match="Fast window must be less than slow window"
+        ):
+            calculate_macd(prices, fast_window=26, slow_window=12, signal_window=9)
+
+    def test_macd_fast_equals_slow(self):
+        """Test MACD when fast_window equals slow_window."""
+        prices = pd.Series([100, 105, 103])
+        with pytest.raises(
+            IndicatorCalculationError, match="Fast window must be less than slow window"
+        ):
+            calculate_macd(prices, fast_window=12, slow_window=12, signal_window=9)
+
+    def test_macd_column_not_found(self):
+        """Test MACD when specified column doesn't exist."""
+        df = pd.DataFrame({"close": [100 + i for i in range(50)]})
+        with pytest.raises(IndicatorCalculationError, match="Column 'price' not found"):
+            calculate_macd(df, column="price", fast_window=12, slow_window=26)
+
+    def test_macd_no_numeric_columns(self):
+        """Test MACD when DataFrame has no numeric columns."""
+        df = pd.DataFrame({"symbol": ["AAPL", "MSFT", "GOOG"]})
+        with pytest.raises(IndicatorCalculationError, match="No numeric columns found"):
+            calculate_macd(df, fast_window=12, slow_window=26)
+
+    def test_macd_preserves_index(self):
+        """Test that MACD preserves the original index."""
+        index = pd.date_range("2023-01-01", periods=50)
+        prices = pd.Series([100 + i for i in range(50)], index=index)
+        result = calculate_macd(prices, fast_window=12, slow_window=26, signal_window=9)
+
+        assert result.index.equals(index)
+
+    def test_macd_default_parameters(self):
+        """Test MACD with default parameters (12, 26, 9)."""
+        prices = pd.Series([100 + i for i in range(50)])
+        result = calculate_macd(prices)
+
+        # Should use default windows: fast=12, slow=26, signal=9
+        assert "value_macd" in result.columns
+        assert "value_macd_signal" in result.columns
+        assert "value_macd_hist" in result.columns
+
+    def test_macd_window_larger_than_data(self):
+        """Test MACD when slow_window is larger than data length."""
+        prices = pd.Series([100, 105, 103, 108, 110])
+        result = calculate_macd(prices, fast_window=3, slow_window=10, signal_window=2)
+
+        # All MACD values should be NaN (not enough data for slow EMA)
+        assert all(pd.isna(result["value_macd"]))
+
+    def test_macd_sufficient_data_for_macd_only(self):
+        """Test MACD with enough data for MACD line but not signal."""
+        # 30 data points: enough for slow_window=26, not enough for signal (26+9=35)
+        prices = pd.Series([100 + i * 0.5 for i in range(30)])
+        result = calculate_macd(prices, fast_window=12, slow_window=26, signal_window=9)
+
+        # MACD should have some valid values
+        valid_macd = result["value_macd"].dropna()
+        assert len(valid_macd) > 0
+
+        # Signal should be all NaN (not enough data)
+        assert all(pd.isna(result["value_macd_signal"]))
+
+    def test_macd_different_window_combinations(self):
+        """Test MACD with various window combinations."""
+        prices = pd.Series([100 + i * 0.5 for i in range(100)])
+
+        # Test common window combinations
+        result1 = calculate_macd(
+            prices, fast_window=12, slow_window=26, signal_window=9
+        )
+        result2 = calculate_macd(prices, fast_window=5, slow_window=35, signal_window=5)
+        result3 = calculate_macd(prices, fast_window=8, slow_window=17, signal_window=9)
+
+        # All should produce valid results
+        assert len(result1["value_macd"].dropna()) > 0
+        assert len(result2["value_macd"].dropna()) > 0
+        assert len(result3["value_macd"].dropna()) > 0
+
+        # Results should differ based on parameters
+        # Compare last 10 valid values
+        valid1 = result1["value_macd"].dropna().iloc[-10:]
+        valid2 = result2["value_macd"].dropna().iloc[-10:]
+        assert not np.allclose(valid1.values, valid2.values)
