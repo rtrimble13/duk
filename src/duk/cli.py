@@ -1360,9 +1360,7 @@ def rc(
 
 @main.command()
 @click.option("-v", "--verbose", is_flag=True, help="Print all logging to stdout")
-@click.option(
-    "-q", "--quiet", is_flag=True, help="Suppress printing data to stdout"
-)
+@click.option("-q", "--quiet", is_flag=True, help="Suppress printing data to stdout")
 @click.option(
     "-i",
     "--input",
@@ -1370,7 +1368,10 @@ def rc(
     type=click.Path(exists=True),
     multiple=True,
     required=True,
-    help="Input file(s) containing data (CSV or JSON)",
+    help=(
+        "Input file(s) containing data (CSV or JSON). "
+        "Multiple files require --join flag."
+    ),
 )
 @click.option(
     "--grab",
@@ -1454,7 +1455,8 @@ def plier(
     if not any([grab, strip, join_flag, cut]):
         logger.error("At least one operation must be specified")
         click.echo(
-            "Error: At least one operation (--grab, --strip, --join, --cut) must be specified",
+            "Error: At least one operation (--grab, --strip, --join, --cut) "
+            "must be specified",
             err=True,
         )
         sys.exit(1)
@@ -1479,6 +1481,13 @@ def plier(
 
     # Default to CSV if neither is specified
     output_format = "json" if output_json else "csv"
+
+    # Validate that multiple input files require --join flag
+    if len(input_files) > 1 and not join_flag:
+        logger.warning(
+            f"Multiple input files provided ({len(input_files)}), "
+            "but --join flag not specified. Only the first file will be processed."
+        )
 
     # Read input files
     dataframes = []
@@ -1522,7 +1531,10 @@ def plier(
         click.echo(f"Error: Failed to perform data manipulation: {e}", err=True)
         sys.exit(1)
 
-    logger.info(f"Data manipulation complete: {len(result_df)} rows, {len(result_df.columns)} columns")
+    logger.info(
+        f"Data manipulation complete: "
+        f"{len(result_df)} rows, {len(result_df.columns)} columns"
+    )
 
     # Prepare output
     output_df = result_df.copy()

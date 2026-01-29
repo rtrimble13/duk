@@ -46,12 +46,15 @@ def parse_column_spec(spec: str, df: pd.DataFrame) -> List[str]:
                 )
             columns.append(df.columns[idx])
         except ValueError as e:
-            if "out of range" in str(e) or "invalid literal" not in str(e):
-                raise e
-            # Not a number, treat as column name
-            if part not in df.columns:
-                raise ValueError(f"Column '{part}' not found in dataframe")
-            columns.append(part)
+            # Check if this is a parsing error (not a number) vs a range error
+            if "invalid literal" in str(e):
+                # Not a number, treat as column name
+                if part not in df.columns:
+                    raise ValueError(f"Column '{part}' not found in dataframe")
+                columns.append(part)
+            else:
+                # Re-raise other ValueErrors (e.g., out of range)
+                raise
 
     return columns
 
@@ -163,8 +166,8 @@ def join_datasets(dataframes: List[pd.DataFrame]) -> pd.DataFrame:
         )
         logger.debug(f"Merged dataset {i + 1}")
 
-    # Sort by date
-    result_df = result_df.sort_values("date")
+    # Sort by date and reset index
+    result_df = result_df.sort_values("date").reset_index(drop=True)
     logger.info(
         f"Join complete: {len(result_df)} rows, {len(result_df.columns)} columns"
     )
@@ -179,13 +182,17 @@ def cut_rows(df: pd.DataFrame, cut_value: int) -> pd.DataFrame:
     Args:
         df: Input DataFrame
         cut_value: Number of rows to remove (positive=from start, negative=from end)
+                   Cannot be 0 or equal to/exceed the dataframe size
 
     Returns:
-        DataFrame with rows removed
+        DataFrame with rows removed and index reset
 
     Raises:
-        ValueError: If cut_value is larger than the dataframe
+        ValueError: If cut_value is invalid
     """
+    if cut_value == 0:
+        raise ValueError("cut_value cannot be 0")
+
     if abs(cut_value) >= len(df):
         raise ValueError(
             f"Cannot cut {abs(cut_value)} rows from dataframe with {len(df)} rows"
@@ -193,10 +200,10 @@ def cut_rows(df: pd.DataFrame, cut_value: int) -> pd.DataFrame:
 
     if cut_value > 0:
         logger.info(f"Cutting first {cut_value} rows")
-        result_df = df.iloc[cut_value:]
+        result_df = df.iloc[cut_value:].reset_index(drop=True)
     else:
         logger.info(f"Cutting last {abs(cut_value)} rows")
-        result_df = df.iloc[:cut_value]
+        result_df = df.iloc[:cut_value].reset_index(drop=True)
 
     logger.debug(f"Result has {len(result_df)} rows")
     return result_df

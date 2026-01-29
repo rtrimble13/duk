@@ -384,3 +384,14 @@ class TestCutRows:
         )
         with pytest.raises(ValueError, match="Cannot cut"):
             cut_rows(df, 2)
+
+    def test_cut_zero_rows(self):
+        """Test that cutting zero rows raises an error."""
+        df = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2023-01-02", "2023-01-03"]),
+                "close": [100.0, 105.0],
+            }
+        )
+        with pytest.raises(ValueError, match="cannot be 0"):
+            cut_rows(df, 0)
