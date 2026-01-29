@@ -133,9 +133,15 @@ class TestProcessSectors:
         # sector_id should be integer
         assert pd.api.types.is_integer_dtype(result["sector_id"])
         # sector_hash should be string
-        assert pd.api.types.is_object_dtype(result["sector_hash"])
+        # (object dtype in pandas <3.0, str dtype in pandas >=3.0)
+        assert pd.api.types.is_string_dtype(
+            result["sector_hash"]
+        ) or pd.api.types.is_object_dtype(result["sector_hash"])
         # sector_name should be string
-        assert pd.api.types.is_object_dtype(result["sector_name"])
+        # (object dtype in pandas <3.0, str dtype in pandas >=3.0)
+        assert pd.api.types.is_string_dtype(
+            result["sector_name"]
+        ) or pd.api.types.is_object_dtype(result["sector_name"])
 
 
 class TestProcessIndustries:
@@ -273,9 +279,15 @@ class TestProcessIndustries:
         # industry_id should be integer
         assert pd.api.types.is_integer_dtype(result["industry_id"])
         # industry_hash should be string
-        assert pd.api.types.is_object_dtype(result["industry_hash"])
+        # (object dtype in pandas <3.0, str dtype in pandas >=3.0)
+        assert pd.api.types.is_string_dtype(
+            result["industry_hash"]
+        ) or pd.api.types.is_object_dtype(result["industry_hash"])
         # industry_name should be string
-        assert pd.api.types.is_object_dtype(result["industry_name"])
+        # (object dtype in pandas <3.0, str dtype in pandas >=3.0)
+        assert pd.api.types.is_string_dtype(
+            result["industry_name"]
+        ) or pd.api.types.is_object_dtype(result["industry_name"])
 
 
 class TestHashConsistency:
