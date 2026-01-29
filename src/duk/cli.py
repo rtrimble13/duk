@@ -23,6 +23,7 @@ from duk.fmp_api import (
 from duk.indicators import calculate_ema, calculate_macd, calculate_rsi, calculate_sma
 from duk.logging_config import setup_logging
 from duk.ls_utils import process_industries, process_sectors, screen_securities
+from duk.plier_utils import cut_rows, grab_columns, join_datasets, strip_columns
 from duk.return_utils import (
     annualized_return,
     cumulative_log_return,
@@ -1355,6 +1356,209 @@ def rc(
                 click.echo(output_df.to_json(orient="records", date_format="iso"))
             else:
                 click.echo(output_df.to_csv(index=False))
+
+
+@main.command()
+@click.option("-v", "--verbose", is_flag=True, help="Print all logging to stdout")
+@click.option(
+    "-q", "--quiet", is_flag=True, help="Suppress printing data to stdout"
+)
+@click.option(
+    "-i",
+    "--input",
+    "input_files",
+    type=click.Path(exists=True),
+    multiple=True,
+    required=True,
+    help="Input file(s) containing data (CSV or JSON)",
+)
+@click.option(
+    "--grab",
+    help="Retain specified columns (comma-separated names or indices)",
+)
+@click.option(
+    "--strip",
+    help="Remove specified columns (comma-separated names or indices)",
+)
+@click.option(
+    "--join",
+    "join_flag",
+    is_flag=True,
+    help="Merge datasets on date column (requires multiple input files)",
+)
+@click.option(
+    "--cut",
+    type=int,
+    help="Remove rows (positive=from start, negative=from end)",
+)
+@click.option("--csv", "output_csv", is_flag=True, help="Output data as CSV (default)")
+@click.option("--json", "output_json", is_flag=True, help="Output data as JSON")
+@click.option(
+    "-p",
+    "--precision",
+    type=int,
+    default=3,
+    help="Decimal precision for output values (default: 3)",
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(),
+    help="Write data to file",
+)
+@click.pass_context
+def plier(
+    ctx,
+    verbose,
+    quiet,
+    input_files,
+    grab,
+    strip,
+    join_flag,
+    cut,
+    output_csv,
+    output_json,
+    precision,
+    output,
+):
+    """
+    Perform data manipulation on input datasets.
+
+    Supports operations to grab/strip columns, join datasets, and cut rows.
+    """
+    # Get logger from context
+    logger = ctx.obj.get("logger", logging.getLogger("duk"))
+
+    # Adjust logging based on verbose flag
+    if verbose:
+        logger.setLevel(logging.INFO)
+        # Enable console output for all handlers
+        for handler in logger.handlers:
+            if isinstance(handler, logging.StreamHandler) and not isinstance(
+                handler, logging.FileHandler
+            ):
+                handler.setLevel(logging.DEBUG)
+
+    logger.info("Starting plier data manipulation")
+
+    # Validate mutual exclusivity
+    if grab and strip:
+        logger.error("Cannot use --grab and --strip together")
+        click.echo(
+            "Error: --grab and --strip cannot be used together",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Validate that at least one operation is specified
+    if not any([grab, strip, join_flag, cut]):
+        logger.error("At least one operation must be specified")
+        click.echo(
+            "Error: At least one operation (--grab, --strip, --join, --cut) must be specified",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Validate join operation requirements
+    if join_flag and len(input_files) < 2:
+        logger.error("Join operation requires at least 2 input files")
+        click.echo(
+            "Error: --join requires at least 2 input files (use -i multiple times)",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Determine output format
+    if output_csv and output_json:
+        logger.error("Only one output format can be specified")
+        click.echo(
+            "Error: Only one of --csv or --json can be specified",
+            err=True,
+        )
+        sys.exit(1)
+
+    # Default to CSV if neither is specified
+    output_format = "json" if output_json else "csv"
+
+    # Read input files
+    dataframes = []
+    for input_file in input_files:
+        try:
+            input_path = Path(input_file)
+            if input_path.suffix.lower() == ".json":
+                df = pd.read_json(input_file)
+            else:
+                # Default to CSV
+                df = pd.read_csv(input_file)
+
+            logger.info(f"Read {len(df)} records from {input_file}")
+            dataframes.append(df)
+        except Exception as e:
+            logger.error(f"Failed to read input file {input_file}: {e}")
+            click.echo(f"Error: Failed to read input file {input_file}: {e}", err=True)
+            sys.exit(1)
+
+    # Start with the first dataframe or join if requested
+    try:
+        if join_flag:
+            result_df = join_datasets(dataframes)
+        else:
+            result_df = dataframes[0]
+
+        # Apply grab operation
+        if grab:
+            result_df = grab_columns(result_df, grab)
+
+        # Apply strip operation
+        if strip:
+            result_df = strip_columns(result_df, strip)
+
+        # Apply cut operation
+        if cut:
+            result_df = cut_rows(result_df, cut)
+
+    except Exception as e:
+        logger.error(f"Failed to perform data manipulation: {e}")
+        click.echo(f"Error: Failed to perform data manipulation: {e}", err=True)
+        sys.exit(1)
+
+    logger.info(f"Data manipulation complete: {len(result_df)} rows, {len(result_df.columns)} columns")
+
+    # Prepare output
+    output_df = result_df.copy()
+
+    # Apply precision to numeric columns
+    output_df = apply_precision_to_dataframe(output_df, precision)
+
+    # Handle output to file
+    if output:
+        output_path = Path(output)
+
+        # Ensure parent directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write to file based on format
+        try:
+            if output_format == "json":
+                output_df.to_json(output_path, orient="records", date_format="iso")
+            else:
+                output_df.to_csv(output_path, index=False)
+
+            logger.info(f"Data written to {output_path}")
+
+            if not quiet:
+                click.echo(f"Data written to {output_path}")
+        except Exception as e:
+            logger.error(f"Failed to write output file: {e}")
+            click.echo(f"Error: Failed to write output file: {e}", err=True)
+            sys.exit(1)
+
+    # Print to stdout unless quiet flag is set
+    if not quiet:
+        if output_format == "json":
+            click.echo(output_df.to_json(orient="records", date_format="iso"))
+        else:
+            click.echo(output_df.to_csv(index=False))
 
 
 @main.group()
