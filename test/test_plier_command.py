@@ -90,7 +90,9 @@ class TestPlierCommand:
             )
             df.to_csv(input_file, index=False)
 
-            result = runner.invoke(main, ["plier", "-i", input_file, "--grab", "close,volume"])
+            result = runner.invoke(
+                main, ["plier", "-i", input_file, "--grab", "close,volume"]
+            )
 
             assert result.exit_code == 0
             assert "date" in result.output
@@ -158,12 +160,16 @@ class TestPlierCommand:
             )
             df.to_csv(input_file, index=False)
 
-            result = runner.invoke(main, ["plier", "-i", input_file, "--strip", "open,volume"])
+            result = runner.invoke(
+                main, ["plier", "-i", input_file, "--strip", "open,volume"]
+            )
 
             assert result.exit_code == 0
             assert "date,close" in result.output
             # Ensure open and volume are not in the data columns
-            lines = [line for line in result.output.split("\n") if not line.startswith("202")]  # Filter log lines
+            lines = [
+                line for line in result.output.split("\n") if not line.startswith("202")
+            ]  # Filter log lines
             csv_output = "\n".join(lines)
             assert ",open" not in csv_output and "open," not in csv_output
             assert ",volume" not in csv_output and "volume," not in csv_output
@@ -302,7 +308,11 @@ class TestPlierCommand:
             assert result.exit_code == 0
             # Should have 2 rows remaining (4 - 2)
             # Filter out log lines (they contain " - duk" pattern)
-            data_lines = [line for line in result.output.strip().split("\n") if " - duk" not in line]
+            data_lines = [
+                line
+                for line in result.output.strip().split("\n")
+                if " - duk" not in line
+            ]
             # Header + 2 data rows = 3 lines
             assert len(data_lines) == 3
 
@@ -327,7 +337,11 @@ class TestPlierCommand:
             assert result.exit_code == 0
             # Should have 2 rows remaining (4 - 2)
             # Filter out log lines (they contain " - duk" pattern)
-            data_lines = [line for line in result.output.strip().split("\n") if " - duk" not in line]
+            data_lines = [
+                line
+                for line in result.output.strip().split("\n")
+                if " - duk" not in line
+            ]
             # Header + 2 data rows = 3 lines
             assert len(data_lines) == 3
 
@@ -367,7 +381,11 @@ class TestPlierCommand:
             assert "volume" in result.output
             # Should have 2 rows remaining (4 - 2)
             # Filter out log lines (they contain " - duk" pattern)
-            data_lines = [line for line in result.output.strip().split("\n") if " - duk" not in line]
+            data_lines = [
+                line
+                for line in result.output.strip().split("\n")
+                if " - duk" not in line
+            ]
             assert len(data_lines) == 3  # Header + 2 data rows
 
     def test_plier_output_to_file(self):
@@ -434,7 +452,9 @@ class TestPlierCommand:
             )
             df.to_csv(input_file, index=False)
 
-            result = runner.invoke(main, ["plier", "-i", input_file, "--grab", "close", "--json"])
+            result = runner.invoke(
+                main, ["plier", "-i", input_file, "--grab", "close", "--json"]
+            )
 
             assert result.exit_code == 0
             assert "[{" in result.output  # JSON array format

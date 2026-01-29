@@ -6,7 +6,7 @@ grabbing/stripping columns, joining datasets, and cutting rows.
 """
 
 import logging
-from typing import List, Optional
+from typing import List
 
 import pandas as pd
 
@@ -41,7 +41,9 @@ def parse_column_spec(spec: str, df: pd.DataFrame) -> List[str]:
             if idx < 0:
                 idx = len(df.columns) + idx
             if idx < 0 or idx >= len(df.columns):
-                raise ValueError(f"Column index {part} out of range (0 to {len(df.columns) - 1})")
+                raise ValueError(
+                    f"Column index {part} out of range (0 to {len(df.columns) - 1})"
+                )
             columns.append(df.columns[idx])
         except ValueError as e:
             if "out of range" in str(e) or "invalid literal" not in str(e):
@@ -157,13 +159,15 @@ def join_datasets(dataframes: List[pd.DataFrame]) -> pd.DataFrame:
     result_df = normalized_dfs[0]
     for i, df in enumerate(normalized_dfs[1:], start=1):
         result_df = pd.merge(
-            result_df, df, on="date", how="outer", suffixes=(f"", f"_{i}")
+            result_df, df, on="date", how="outer", suffixes=("", f"_{i}")
         )
         logger.debug(f"Merged dataset {i + 1}")
 
     # Sort by date
     result_df = result_df.sort_values("date")
-    logger.info(f"Join complete: {len(result_df)} rows, {len(result_df.columns)} columns")
+    logger.info(
+        f"Join complete: {len(result_df)} rows, {len(result_df.columns)} columns"
+    )
 
     return result_df
 
