@@ -133,9 +133,9 @@ class TestProcessSectors:
         # sector_id should be integer
         assert pd.api.types.is_integer_dtype(result["sector_id"])
         # sector_hash should be string
-        assert pd.api.types.is_object_dtype(result["sector_hash"])
+        assert pd.api.types.is_string_dtype(result["sector_hash"])
         # sector_name should be string
-        assert pd.api.types.is_object_dtype(result["sector_name"])
+        assert pd.api.types.is_string_dtype(result["sector_name"])
 
 
 class TestProcessIndustries:
@@ -273,9 +273,9 @@ class TestProcessIndustries:
         # industry_id should be integer
         assert pd.api.types.is_integer_dtype(result["industry_id"])
         # industry_hash should be string
-        assert pd.api.types.is_object_dtype(result["industry_hash"])
+        assert pd.api.types.is_string_dtype(result["industry_hash"])
         # industry_name should be string
-        assert pd.api.types.is_object_dtype(result["industry_name"])
+        assert pd.api.types.is_string_dtype(result["industry_name"])
 
 
 class TestHashConsistency:

@@ -70,10 +70,10 @@ class TestSimpleReturn:
 
         assert pd.isna(result.iloc[0])
         assert np.isclose(result.iloc[1], 0.05)
-        # pct_change with NaN will forward fill by default (deprecated behavior)
-        # The behavior may vary, so we just check that we get a result
-        assert not pd.isna(result.iloc[2])  # Gets 0.0 from forward fill
-        assert not pd.isna(result.iloc[3])  # Forward fill propagates
+        # In pandas 3.0+, pct_change propagates NaN values
+        # When there's NaN in position i, both position i and i+1 will be NaN
+        assert pd.isna(result.iloc[2])  # NaN is propagated
+        assert pd.isna(result.iloc[3])  # Can't calculate % change from NaN to 108
 
     def test_simple_return_single_value(self):
         """Test simple return with single value."""
